@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from mcp_server.core.errors import TransientArtifactError
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 
@@ -2377,6 +2378,79 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[6]["stage_family"] == "final_closeout"
         assert snapshots[6]["semantic_stage"] == "blocked_summary_call_timeout"
         assert result["semantic_stage"] == "blocked_summary_call_timeout"
+
+    def test_index_directory_classifies_post_lexical_storage_closeout(self, tmp_path, monkeypatch):
+        store = MagicMock(db_path=str(tmp_path / "index.db"))
+        store.health_check.return_value = {
+            "status": "degraded",
+            "journal_mode": "WAL",
+            "busy_timeout_ms": 5000,
+            "readonly": True,
+        }
+        store.get_readonly_diagnostics.return_value = {
+            "storage_failure_family": "sqlite_operational",
+            "storage_failure_reason": "disk_io_error",
+            "storage_failure_message": "disk I/O error",
+            "readonly": True,
+        }
+        ctx = _make_repo_ctx(sqlite_store=store)
+        sample = tmp_path / "sample.py"
+        sample.write_text("x = 1\n", encoding="utf-8")
+        snapshots = []
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, *_args, **_kwargs):
+                raise TransientArtifactError("disk I/O error")
+
+        monkeypatch.setattr(
+            "mcp_server.dispatcher.dispatcher_enhanced.reload_settings",
+            lambda: SimpleNamespace(
+                semantic_default_profile="oss_high",
+                semantic_preflight_timeout_seconds=5,
+                get_profile_summarization_config=lambda _profile: {},
+            ),
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: FakeSemanticIndexer())
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: 0,
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            tmp_path,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["semantic_stage"] == "blocked_storage_error"
+        assert result["semantic_error"] == "disk I/O error"
+        assert result["semantic_blocker"] == {
+            "code": "storage_closeout",
+            "message": "disk I/O error",
+        }
+        assert result["storage_failure_family"] == "sqlite_operational"
+        assert result["storage_failure_reason"] == "disk_io_error"
+        assert result["storage_diagnostics"]["readonly"] is True
+        assert snapshots[-1]["stage"] == "blocked_storage_error"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["blocker_source"] == "storage_closeout"
 
     def test_index_directory_skips_fast_report_family_via_repo_ignore_boundary(
         self, tmp_path, monkeypatch

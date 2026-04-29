@@ -31,6 +31,11 @@ _LEXICAL_EXCLUDED_FILENAMES = {
     "test_queries.json",
 }
 
+_SQLITE_STORAGE_FAILURE_PATTERNS = (
+    ("disk I/O error", "disk_io_error"),
+    ("database or disk is full", "disk_full"),
+)
+
 
 def _normalized_query_terms(query: str) -> List[str]:
     expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", query)
@@ -69,6 +74,22 @@ def _fts_rank_adjustment(query: str, file_path: str) -> float:
     return adjustment
 
 
+def classify_sqlite_storage_failure(error: BaseException) -> Optional[Dict[str, Any]]:
+    """Normalize SQLite operational storage failures into a stable diagnostics shape."""
+    message = str(error)
+    lowered = message.lower()
+    for needle, reason in _SQLITE_STORAGE_FAILURE_PATTERNS:
+        if needle.lower() not in lowered:
+            continue
+        return {
+            "storage_failure_family": "sqlite_operational",
+            "storage_failure_reason": reason,
+            "storage_failure_message": message,
+            "readonly": True,
+        }
+    return None
+
+
 class SQLiteStore:
     """SQLite-based storage implementation with FTS5 support."""
 
@@ -91,6 +112,7 @@ class SQLiteStore:
         self.path_resolver = path_resolver or PathResolver()
         self._pool = pool
         self._readonly = False
+        self._readonly_diagnostics: Optional[Dict[str, Any]] = None
 
         self._init_database()
         self._run_migrations()
@@ -105,6 +127,25 @@ class SQLiteStore:
         """Close the store.  If a connection pool is attached, drain it."""
         if self._pool is not None:
             self._pool.close_all()
+
+    def get_readonly_diagnostics(self) -> Optional[Dict[str, Any]]:
+        """Return the most recent storage-failure provenance that forced read-only mode."""
+        if self._readonly_diagnostics is None:
+            return None
+        return dict(self._readonly_diagnostics)
+
+    def _mark_readonly_from_storage_failure(
+        self, error: sqlite3.OperationalError
+    ) -> Optional[Dict[str, Any]]:
+        diagnostics = classify_sqlite_storage_failure(error)
+        if diagnostics is None:
+            return None
+        self._readonly = True
+        self._readonly_diagnostics = diagnostics
+        from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
+
+        mcp_storage_readonly_total.inc()
+        return diagnostics
 
     def _ensure_semantic_points_table(self) -> None:
         """Ensure semantic point mapping table exists for stale vector cleanup."""
@@ -271,13 +312,7 @@ class SQLiteStore:
                     conn.commit()
                 except sqlite3.OperationalError as e:
                     conn.rollback()
-                    if "disk I/O error" in str(e) or "database or disk is full" in str(e):
-                        self._readonly = True
-                        from mcp_server.metrics.prometheus_exporter import (
-                            mcp_storage_readonly_total,
-                        )
-
-                        mcp_storage_readonly_total.inc()
+                    if self._mark_readonly_from_storage_failure(e) is not None:
                         raise TransientArtifactError(str(e)) from e
                     raise
                 except Exception:
@@ -292,11 +327,7 @@ class SQLiteStore:
                 conn.commit()
             except sqlite3.OperationalError as e:
                 conn.rollback()
-                if "disk I/O error" in str(e) or "database or disk is full" in str(e):
-                    self._readonly = True
-                    from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
-
-                    mcp_storage_readonly_total.inc()
+                if self._mark_readonly_from_storage_failure(e) is not None:
                     raise TransientArtifactError(str(e)) from e
                 raise
             except Exception:
@@ -1745,7 +1776,13 @@ class SQLiteStore:
             "wal_checkpoint": {"status": "not_run"},
             "database_files": {},
             "error": None,
+            "readonly": self._readonly,
+            "storage_failure_family": None,
+            "storage_failure_reason": None,
+            "storage_failure_message": None,
         }
+        if self._readonly_diagnostics is not None:
+            result.update(self._readonly_diagnostics)
 
         try:
             with self._get_connection() as conn:

@@ -740,6 +740,108 @@ def test_force_full_timeout_restores_active_runtime_and_preserves_exact_blocker(
     registry.update_indexed_commit.assert_not_called()
 
 
+def test_force_full_storage_closeout_restores_runtime_and_preserves_exact_blocker(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    index_base = Path(repo_info.index_location)
+    index_base.mkdir(parents=True, exist_ok=True)
+    semantic_qdrant = index_base / "semantic_qdrant"
+    semantic_qdrant.mkdir(parents=True)
+    (semantic_qdrant / "marker.txt").write_text("original", encoding="utf-8")
+
+    base_store = SQLiteStore(str(repo_info.index_path))
+    base_repo_row = base_store.ensure_repository_row(repo, name="test-repo")
+    base_store.store_file(
+        base_repo_row,
+        path=repo / "hello.py",
+        relative_path="hello.py",
+    )
+    base_store.close()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+
+    def _mutating_full_index(_repo_id, active_ctx):
+        mutated_store = active_ctx.sqlite_store
+        mutated_repo_row = mutated_store.ensure_repository_row(repo, name="test-repo")
+        mutated_store.store_file(
+            mutated_repo_row,
+            path=repo / "extra.py",
+            relative_path="extra.py",
+        )
+        (semantic_qdrant / "marker.txt").write_text("mutated", encoding="utf-8")
+        return UpdateResult(
+            indexed=2,
+            failed=1,
+            errors=["disk I/O error"],
+            semantic={
+                "summaries_written": 0,
+                "summary_chunks_attempted": 0,
+                "summary_missing_chunks": 0,
+                "summary_passes": 0,
+                "summary_remaining_chunks": 0,
+                "summary_scope_drained": True,
+                "summary_call_timed_out": False,
+                "semantic_indexed": 0,
+                "semantic_failed": 0,
+                "semantic_skipped": 0,
+                "semantic_blocked": 1,
+                "semantic_stage": "blocked_storage_error",
+                "semantic_error": "disk I/O error",
+                "semantic_blocker": {
+                    "code": "storage_closeout",
+                    "message": "disk I/O error",
+                },
+                "storage_failure_family": "sqlite_operational",
+                "storage_failure_reason": "disk_io_error",
+                "storage_failure_message": "disk I/O error",
+                "storage_diagnostics": {
+                    "status": "degraded",
+                    "journal_mode": "WAL",
+                    "readonly": True,
+                },
+            },
+        )
+
+    manager._full_index = MagicMock(side_effect=_mutating_full_index)
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert "disk I/O error" in result.error
+    assert "runtime restored via" in result.error
+    assert result.semantic is not None
+    assert result.semantic["runtime_restore_performed"] is True
+    assert result.semantic["runtime_restore_mode"].startswith("sqlite_restored")
+    assert trace["stage"] == "runtime_restore_completed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "storage_closeout"
+    assert trace["storage_failure_family"] == "sqlite_operational"
+    assert trace["storage_failure_reason"] == "disk_io_error"
+    assert trace["runtime_restore_performed"] is True
+    restored_store = SQLiteStore(str(repo_info.index_path))
+    with restored_store._get_connection() as conn:
+        files_count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+        file_paths = {
+            row[0] for row in conn.execute("SELECT relative_path FROM files").fetchall()
+        }
+        semantic_points = conn.execute("SELECT COUNT(*) FROM semantic_points").fetchone()[0]
+    restored_store.close()
+    assert files_count == 1
+    assert file_paths == {"hello.py"}
+    assert semantic_points == 0
+    assert (semantic_qdrant / "marker.txt").read_text(encoding="utf-8") == "original"
+    registry.update_indexed_commit.assert_not_called()
+
+
 def test_full_index_preserves_bounded_summary_continuation_details(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

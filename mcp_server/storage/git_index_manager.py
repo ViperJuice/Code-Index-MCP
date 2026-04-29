@@ -388,7 +388,20 @@ class GitAwareIndexManager:
                     "summary_call_timeout_seconds": (result.semantic or {}).get(
                         "summary_call_timeout_seconds"
                     ),
-                    "blocker_source": "runtime_restore",
+                    "blocker_source": self._trace_blocker_source(result),
+                    "storage_failure_family": (result.semantic or {}).get(
+                        "storage_failure_family"
+                    ),
+                    "storage_failure_reason": (result.semantic or {}).get(
+                        "storage_failure_reason"
+                    ),
+                    "storage_failure_message": (result.semantic or {}).get(
+                        "storage_failure_message"
+                    ),
+                    "storage_diagnostics": (result.semantic or {}).get("storage_diagnostics"),
+                    "runtime_restore_performed": True,
+                    "runtime_restore_mode": restore_result.mode,
+                    "runtime_restore_declined_reason": None,
                 },
             )
         if not result.clean:
@@ -422,6 +435,21 @@ class GitAwareIndexManager:
                             "summary_call_timeout_seconds"
                         ),
                         "blocker_source": self._trace_blocker_source(result),
+                        "storage_failure_family": (result.semantic or {}).get(
+                            "storage_failure_family"
+                        ),
+                        "storage_failure_reason": (result.semantic or {}).get(
+                            "storage_failure_reason"
+                        ),
+                        "storage_failure_message": (result.semantic or {}).get(
+                            "storage_failure_message"
+                        ),
+                        "storage_diagnostics": (result.semantic or {}).get("storage_diagnostics"),
+                        "runtime_restore_performed": False,
+                        "runtime_restore_mode": None,
+                        "runtime_restore_declined_reason": (result.semantic or {}).get(
+                            "runtime_restore_declined_reason"
+                        ),
                     },
                 )
             self.registry.update_last_sync_error(
@@ -804,6 +832,11 @@ class GitAwareIndexManager:
             "summary_call_file_path",
             "summary_call_chunk_ids",
             "summary_call_timeout_seconds",
+            "storage_failure_family",
+            "storage_failure_reason",
+            "storage_failure_message",
+            "storage_diagnostics",
+            "runtime_restore_declined_reason",
         ]:
             if key in semantic:
                 result.semantic[key] = semantic.get(key)
@@ -946,6 +979,13 @@ class GitAwareIndexManager:
                 "semantic_blocked": stats.get("semantic_blocked", 0),
                 "semantic_stage": stats.get("semantic_stage"),
                 "semantic_error": stats.get("semantic_error"),
+                "storage_failure_family": stats.get("storage_failure_family"),
+                "storage_failure_reason": stats.get("storage_failure_reason"),
+                "storage_failure_message": stats.get("storage_failure_message"),
+                "storage_diagnostics": stats.get("storage_diagnostics"),
+                "runtime_restore_declined_reason": stats.get(
+                    "runtime_restore_declined_reason"
+                ),
             }
             if (
                 stats.get("low_level_blocker") is not None
@@ -1070,9 +1110,15 @@ class GitAwareIndexManager:
     ) -> Optional[RuntimeRestoreResult]:
         semantic = result.semantic or {}
         timed_out = semantic.get("semantic_stage") == "blocked_summary_call_timeout"
+        storage_closeout = self._semantic_storage_closeout(semantic)
         zero_summary = int(semantic.get("summaries_written", 0) or 0) == 0
         zero_vectors = self._read_runtime_counts(snapshot.db_path).get("semantic_points", 0) == 0
-        if not timed_out or not zero_summary or not zero_vectors:
+        if (timed_out or storage_closeout) and (not zero_summary or not zero_vectors):
+            semantic["runtime_restore_declined_reason"] = (
+                "authoritative summaries or semantic vectors were already written"
+            )
+            result.semantic = semantic
+        if not (timed_out or storage_closeout) or not zero_summary or not zero_vectors:
             self._cleanup_runtime_snapshot(snapshot)
             return None
 
@@ -1226,6 +1272,15 @@ class GitAwareIndexManager:
                     "blocker_source": snapshot.get("blocker_source"),
                     "semantic_stage": snapshot.get("semantic_stage"),
                     "lexical_stage": snapshot.get("lexical_stage"),
+                    "storage_failure_family": snapshot.get("storage_failure_family"),
+                    "storage_failure_reason": snapshot.get("storage_failure_reason"),
+                    "storage_failure_message": snapshot.get("storage_failure_message"),
+                    "storage_diagnostics": snapshot.get("storage_diagnostics"),
+                    "runtime_restore_performed": snapshot.get("runtime_restore_performed"),
+                    "runtime_restore_mode": snapshot.get("runtime_restore_mode"),
+                    "runtime_restore_declined_reason": snapshot.get(
+                        "runtime_restore_declined_reason"
+                    ),
                 },
             )
 
@@ -1235,9 +1290,20 @@ class GitAwareIndexManager:
         if result.low_level is not None:
             return "lexical_mutation"
         semantic = result.semantic or {}
+        blocker = semantic.get("semantic_blocker")
+        if isinstance(blocker, dict) and blocker.get("code") == "storage_closeout":
+            return "storage_closeout"
+        if semantic.get("storage_failure_family"):
+            return "storage_closeout"
         if semantic.get("summary_call_timed_out"):
             return "summary_call_shutdown"
         return "final_closeout"
+
+    def _semantic_storage_closeout(self, semantic: Dict[str, Any]) -> bool:
+        blocker = semantic.get("semantic_blocker")
+        if isinstance(blocker, dict) and blocker.get("code") == "storage_closeout":
+            return True
+        return bool(semantic.get("storage_failure_family"))
 
     def sync_all_repositories(self) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates sequentially."""

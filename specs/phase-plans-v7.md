@@ -1956,6 +1956,59 @@ semantic closeout with `disk I/O error` on 2026-04-29.
 - IF-0-SEMDISKIO-1 — post-lexical semantic closeout disk-I/O blocker and
   evidence contract.
 
+### Phase 36 — Devcontainer Stale-Trace Rebound Recovery (SEMDEVSTALE)
+
+**Objective**
+
+Repair the renewed live lexical stall exposed during SEMDISKIO validation so a
+repo-local force-full rerun no longer leaves a stale-running trace on
+`.devcontainer/devcontainer.json` with `in_flight_path=null` before semantic
+closeout can be exercised on the current head.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMDISKIO head no
+      longer remains on `Trace stage: lexical_walking`,
+      `Trace freshness: stale-running snapshot`, and
+      `Last progress path: /home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`.
+- [ ] `force_full_exit_trace.json` and `uv run mcp-index repository status`
+      either advance durably beyond `.devcontainer/devcontainer.json` or fail
+      closed with a new exact lexical blocker that names the real renewed
+      stall source.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      SEMDISKIO code/test repair, the renewed stale-running evidence on commit
+      `c8b2d724`, and the final live verdict for the repaired rerun.
+
+**Scope notes**
+
+This phase exists only because the SEMDISKIO code-path repair landed, but the
+live rerun started during SEMDISKIO validation on observed commit `c8b2d724`
+never reached semantic closeout and instead left a stale-running lexical trace
+on `.devcontainer/devcontainer.json` at `2026-04-29T10:35:02Z`.
+
+**Non-goals**
+
+- No reopening of the SEMDISKIO storage-closeout classification or runtime
+  restore contract unless a refreshed rerun reaches final closeout again.
+- No unrelated semantic ranking, summary-timeout, or profile-default changes
+  unless the renewed lexical stall proves they are directly involved.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMDISKIO
+
+**Produces**
+- IF-0-SEMDEVSTALE-1 — renewed `.devcontainer/devcontainer.json`
+  stale-trace lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1994,6 +2047,7 @@ SEMCONTRACT
   -> SEMDEVREBOUND
   -> SEMSCRIPTREBOUND
   -> SEMDISKIO
+  -> SEMDEVSTALE
 ```
 
 ## Execution Notes
@@ -2027,6 +2081,10 @@ SEMCONTRACT
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during
   `force_full_failed`.
+- SEMDISKIO should amend the roadmap immediately if the refreshed live rerun
+  fails to reach semantic closeout on the current head and instead leaves a
+  renewed stale-running lexical trace, because the next repair is then no
+  longer a storage-closeout slice.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
@@ -2134,6 +2192,9 @@ SEMCONTRACT
 - SEMPUBLISHRACE should amend the roadmap immediately if the refreshed live
   rerun clears `tests/test_artifact_publish_race.py` but later re-anchors on a
   different exact lexical seam such as `.devcontainer/devcontainer.json`.
+- SEMDEVSTALE exists only if SEMDISKIO’s repaired live rerun never reaches the
+  intended disk-I/O closeout seam and instead re-anchors on a renewed stale
+  lexical trace at `.devcontainer/devcontainer.json`.
 
 ## Verification
 

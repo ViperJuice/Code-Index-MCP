@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..config.env_vars import get_max_file_size_bytes
 from ..config.settings import reload_settings
-from ..core.errors import IndexingError, record_handled_error
+from ..core.errors import IndexingError, TransientArtifactError, record_handled_error
 from ..core.ignore_patterns import EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS
 from ..core.ignore_patterns import (
     build_walker_filter,
@@ -37,7 +37,7 @@ from ..plugins.language_registry import get_all_extensions, get_language_by_exte
 from ..plugins.plugin_factory import PluginFactory, PluginUnavailableError
 from ..plugins.plugin_set_registry import PluginSetRegistry
 from ..storage.multi_repo_manager import MultiRepositoryManager
-from ..storage.sqlite_store import SQLiteStore
+from ..storage.sqlite_store import SQLiteStore, classify_sqlite_storage_failure
 from ..storage.two_phase import TwoPhaseCommitError, two_phase_commit
 from ..utils.semantic_indexer import SemanticIndexer
 from ..utils.semantic_indexer_registry import SemanticIndexerRegistry
@@ -3034,8 +3034,25 @@ class EnhancedDispatcher:
                 )
             except Exception as e:
                 logger.error(f"Batch semantic indexing failed: {e}", exc_info=True)
-                stats["semantic_stage"] = "failed"
-                stats["semantic_error"] = str(e)
+                storage_failure = self._classify_storage_closeout_failure(ctx, e)
+                if storage_failure is not None:
+                    stats["semantic_stage"] = "blocked_storage_error"
+                    stats["semantic_blocked"] = len(semantically_indexed_paths)
+                    stats["semantic_error"] = storage_failure["storage_failure_message"]
+                    stats["semantic_blocker"] = {
+                        "code": "storage_closeout",
+                        "message": storage_failure["storage_failure_message"],
+                    }
+                    stats.update(storage_failure)
+                    stats["storage_diagnostics"] = self._collect_storage_diagnostics(ctx)
+                    emit_progress(
+                        "blocked_storage_error",
+                        "final_closeout",
+                        "storage_closeout",
+                    )
+                else:
+                    stats["semantic_stage"] = "failed"
+                    stats["semantic_error"] = str(e)
 
         logger.info(
             f"Directory indexing complete: {stats['indexed_files']} indexed, "
@@ -3095,6 +3112,20 @@ class EnhancedDispatcher:
                 "status": "unhealthy",
                 "error": f"Storage diagnostics failed: {exc}",
             }
+
+    def _classify_storage_closeout_failure(
+        self, ctx: RepoContext, error: BaseException
+    ) -> Optional[Dict[str, Any]]:
+        sqlite_store = getattr(ctx, "sqlite_store", None)
+        if sqlite_store is not None and hasattr(sqlite_store, "get_readonly_diagnostics"):
+            diagnostics = sqlite_store.get_readonly_diagnostics()
+            if diagnostics is not None:
+                return diagnostics
+        if isinstance(error, TransientArtifactError):
+            return classify_sqlite_storage_failure(error)
+        if isinstance(error, sqlite3.OperationalError):
+            return classify_sqlite_storage_failure(error)
+        return None
 
     def _is_storage_lock_error(self, error: Optional[str]) -> bool:
         if not error:

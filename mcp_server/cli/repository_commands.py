@@ -107,6 +107,18 @@ def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -
         click.echo(f"{prefix}Trace freshness: stale-running snapshot")
     if trace.get("blocker_source"):
         click.echo(f"{prefix}Trace blocker source: {trace['blocker_source']}")
+    if trace.get("storage_failure_family"):
+        click.echo(
+            f"{prefix}Trace storage failure family: {trace['storage_failure_family']}"
+        )
+    if trace.get("storage_failure_reason"):
+        click.echo(
+            f"{prefix}Trace storage failure reason: {trace['storage_failure_reason']}"
+        )
+    if trace.get("storage_failure_message"):
+        click.echo(
+            f"{prefix}Trace storage failure message: {trace['storage_failure_message']}"
+        )
     if trace.get("current_commit"):
         click.echo(f"{prefix}Trace current commit: {trace['current_commit']}")
     if trace.get("indexed_commit_before") is not None:
@@ -121,6 +133,21 @@ def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -
         click.echo(f"{prefix}Timed-out summary chunks: {', '.join(trace['summary_call_chunk_ids'])}")
     if trace.get("summary_call_timeout_seconds") is not None:
         click.echo(f"{prefix}Timed-out summary timeout: {trace['summary_call_timeout_seconds']}")
+    if trace.get("runtime_restore_performed"):
+        mode = trace.get("runtime_restore_mode") or "unknown"
+        click.echo(f"{prefix}Trace runtime restore: performed via {mode}")
+    elif trace.get("runtime_restore_declined_reason"):
+        click.echo(
+            f"{prefix}Trace runtime restore: skipped - {trace['runtime_restore_declined_reason']}"
+        )
+    diagnostics = trace.get("storage_diagnostics")
+    if isinstance(diagnostics, dict) and diagnostics:
+        parts = []
+        for key in ("status", "journal_mode", "readonly"):
+            if key in diagnostics:
+                parts.append(f"{key}={diagnostics[key]}")
+        if parts:
+            click.echo(f"{prefix}Trace storage diagnostics: {' '.join(parts)}")
 
 
 def _force_full_trace_is_stale(trace: dict[str, Any]) -> bool:
