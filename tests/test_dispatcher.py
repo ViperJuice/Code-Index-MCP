@@ -4173,6 +4173,149 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "setup_style" in report_fts_rows[0][0]
         assert "create_comprehensive_report" in report_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_optimized_upload_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        analysis_script = scripts_dir / "execute_optimized_analysis.py"
+        upload_script = scripts_dir / "index-artifact-upload-v2.py"
+        helper_script = scripts_dir / "helper.py"
+        scripts_dir.mkdir(parents=True)
+        analysis_script.write_text(
+            "class OptimizedAnalysisMetrics:\n"
+            "    def as_dict(self):\n"
+            "        return {'ok': True}\n\n"
+            "class OptimizedAnalysisExecutor:\n"
+            "    async def execute_optimized_analysis(self):\n"
+            "        return {'status': 'ok'}\n\n"
+            "    def _generate_final_results(self):\n"
+            "        return {'final': True}\n\n"
+            "    def _generate_executive_summary_markdown(self):\n"
+            "        return '# Summary'\n\n"
+            "async def main():\n"
+            "    return await OptimizedAnalysisExecutor().execute_optimized_analysis()\n",
+            encoding="utf-8",
+        )
+        upload_script.write_text(
+            "class CompatibilityAwareUploader:\n"
+            "    def generate_compatibility_hash(self):\n"
+            "        return 'hash'\n\n"
+            "    def compress_indexes(self):\n"
+            "        return ('archive', 'checksum', 1)\n\n"
+            "    def create_metadata(self):\n"
+            "        return {'ok': True}\n\n"
+            "    def trigger_workflow_upload(self):\n"
+            "        return True\n\n"
+            "def main():\n"
+            "    return CompatibilityAwareUploader().create_metadata()\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(analysis_script.resolve()),
+            str(helper_script.resolve()),
+            str(upload_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            analysis_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py') ORDER BY id"
+                ).fetchall()
+            ]
+            upload_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            analysis_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py')"
+            ).fetchone()[0]
+            upload_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py')"
+            ).fetchone()[0]
+            analysis_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py'"
+            ).fetchone()[0]
+            upload_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            analysis_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py')"
+            ).fetchall()
+            upload_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py')"
+            ).fetchall()
+        store.close()
+        assert analysis_symbols == [
+            "OptimizedAnalysisMetrics",
+            "as_dict",
+            "OptimizedAnalysisExecutor",
+            "execute_optimized_analysis",
+            "_generate_final_results",
+            "_generate_executive_summary_markdown",
+            "main",
+        ]
+        assert upload_symbols == [
+            "CompatibilityAwareUploader",
+            "generate_compatibility_hash",
+            "compress_indexes",
+            "create_metadata",
+            "trigger_workflow_upload",
+            "main",
+        ]
+        assert helper_symbols == ["helper"]
+        assert analysis_chunk_count == 0
+        assert upload_chunk_count == 0
+        assert "exact_execute_optimized_analysis_rebound" in analysis_metadata
+        assert "exact_index_artifact_upload_v2_rebound" in upload_metadata
+        assert "exact_execute_optimized_analysis_rebound" not in helper_metadata
+        assert "exact_index_artifact_upload_v2_rebound" not in helper_metadata
+        assert len(analysis_fts_rows) == 1
+        assert "OptimizedAnalysisExecutor" in analysis_fts_rows[0][0]
+        assert "_generate_executive_summary_markdown" in analysis_fts_rows[0][0]
+        assert len(upload_fts_rows) == 1
+        assert "CompatibilityAwareUploader" in upload_fts_rows[0][0]
+        assert "trigger_workflow_upload" in upload_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -5914,6 +6057,158 @@ class TestEnhancedDispatcherProtocolConformance:
                 "scripts/utilities/verify_tool_usage.py",
                 "scripts/index_missing_repos_semantic.py",
                 "scripts/identify_working_indexes.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_optimized_upload_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        prior_file = scripts_dir / "execute_optimized_analysis.py"
+        prior_file.write_text(
+            "class OptimizedAnalysisMetrics:\n"
+            "    def as_dict(self):\n"
+            "        return {'ok': True}\n\n"
+            "class OptimizedAnalysisExecutor:\n"
+            "    async def execute_optimized_analysis(self):\n"
+            "        return {'status': 'ok'}\n\n"
+            "    def _generate_final_results(self):\n"
+            "        return {'final': True}\n\n"
+            "async def main():\n"
+            "    return await OptimizedAnalysisExecutor().execute_optimized_analysis()\n",
+            encoding="utf-8",
+        )
+        blocked_file = scripts_dir / "index-artifact-upload-v2.py"
+        blocked_file.write_text(
+            "class CompatibilityAwareUploader:\n"
+            "    def generate_compatibility_hash(self):\n"
+            "        return 'hash'\n\n"
+            "    def compress_indexes(self):\n"
+            "        return ('archive', 'checksum', 1)\n\n"
+            "    def create_metadata(self):\n"
+            "        return {'ok': True}\n\n"
+            "def main():\n"
+            "    return CompatibilityAwareUploader().create_metadata()\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(scripts_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["semantic_stage"] == "failed"
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            analysis_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py') ORDER BY id"
+                ).fetchall()
+            ]
+            upload_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py') ORDER BY id"
+                ).fetchall()
+            ]
+            analysis_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py')"
+            ).fetchone()[0]
+            upload_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py')"
+            ).fetchone()[0]
+            analysis_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/execute_optimized_analysis.py')"
+            ).fetchall()
+            upload_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index-artifact-upload-v2.py')"
+            ).fetchall()
+        store.close()
+        assert analysis_symbols == [
+            "OptimizedAnalysisMetrics",
+            "as_dict",
+            "OptimizedAnalysisExecutor",
+            "execute_optimized_analysis",
+            "_generate_final_results",
+            "main",
+        ]
+        assert upload_symbols == [
+            "CompatibilityAwareUploader",
+            "generate_compatibility_hash",
+            "compress_indexes",
+            "create_metadata",
+            "main",
+        ]
+        assert analysis_chunk_count == 0
+        assert upload_chunk_count == 0
+        assert len(analysis_fts) == 1
+        assert "OptimizedAnalysisExecutor" in analysis_fts[0][0]
+        assert "execute_optimized_analysis" in analysis_fts[0][0]
+        assert len(upload_fts) == 1
+        assert "CompatibilityAwareUploader" in upload_fts[0][0]
+        assert "create_metadata" in upload_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "scripts/utilities/prepare_index_for_upload.py",
+                "scripts/utilities/verify_tool_usage.py",
+                "scripts/map_repos_to_qdrant.py",
+                "scripts/create_claude_code_aware_report.py",
             )
             for snapshot in snapshots
         )

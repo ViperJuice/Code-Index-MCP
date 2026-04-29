@@ -4310,6 +4310,70 @@ scripts/index-artifact-upload-v2.py`.
 - IF-0-SEMOPTUPLOADTAIL-1 — exact later optimized-analysis/upload script
   recovery and evidence contract.
 
+### Phase 75 — Edit Analysis And Retrieval Tail Recovery (SEMEDITRETRIEVALTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later exact Python script seam
+exposed after SEMOPTUPLOADTAIL:
+`scripts/analyze_claude_code_edits.py ->
+scripts/verify_mcp_retrieval.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMOPTUPLOADTAIL
+      head either advances durably beyond the
+      `scripts/analyze_claude_code_edits.py ->
+      scripts/verify_mcp_retrieval.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later edit-analysis/retrieval script seam
+      stays narrow, tested, and does not reopen the already-cleared
+      `scripts/execute_optimized_analysis.py ->
+      scripts/index-artifact-upload-v2.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMOPTUPLOADTAIL rerun outcome and the final live verdict for the later
+      edit-analysis/retrieval script pair.
+
+**Scope notes**
+
+This phase exists only if SEMOPTUPLOADTAIL proves the later
+optimized-analysis/upload pair is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on
+`scripts/analyze_claude_code_edits.py ->
+scripts/verify_mcp_retrieval.py`.
+
+**Non-goals**
+
+- No reopening of the cleared optimized-analysis/upload recovery once the live
+  rerun has advanced beyond
+  `scripts/execute_optimized_analysis.py ->
+  scripts/index-artifact-upload-v2.py`.
+- No blanket reopening of unrelated script families unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower exact-path or
+  exact-pair contract.
+- No reopening of unrelated semantic-stage or release work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/analyze_claude_code_edits.py`
+- `scripts/verify_mcp_retrieval.py`
+
+**Depends on**
+- SEMOPTUPLOADTAIL
+
+**Produces**
+- IF-0-SEMEDITRETRIEVALTAIL-1 — exact later edit-analysis/retrieval script
+  recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4387,6 +4451,7 @@ SEMCONTRACT
   -> SEMUTILVERIFYTAIL
   -> SEMQDRANTREPORTTAIL
   -> SEMOPTUPLOADTAIL
+  -> SEMEDITRETRIEVALTAIL
 ```
 
 ## Execution Notes
@@ -4598,6 +4663,19 @@ SEMCONTRACT
   optimized-analysis/upload pair or preserve the next exact downstream blocker
   instead of reopening earlier Qdrant/report, utility, missing-repo, or
   test-repo index work.
+- SEMOPTUPLOADTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears the later optimized-analysis/upload pair but exposes a later
+  exact blocker such as
+  `scripts/analyze_claude_code_edits.py ->
+  scripts/verify_mcp_retrieval.py`.
+- SEMEDITRETRIEVALTAIL exists only if SEMOPTUPLOADTAIL proves the later
+  optimized-analysis/upload pair is cleared but the live rerun still remains
+  in lexical walking on
+  `scripts/analyze_claude_code_edits.py ->
+  scripts/verify_mcp_retrieval.py`; it should repair that exact later
+  edit-analysis/retrieval pair or preserve the next exact downstream blocker
+  instead of reopening earlier optimized-analysis/upload, Qdrant/report,
+  utility, missing-repo, or test-repo index work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.
