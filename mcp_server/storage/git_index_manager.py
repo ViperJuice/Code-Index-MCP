@@ -5,6 +5,7 @@ supporting incremental updates and artifact management.
 """
 
 import logging
+import json
 import shutil
 import sqlite3
 import subprocess
@@ -39,6 +40,7 @@ def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) ->
 
 
 logger = logging.getLogger(__name__)
+_FORCE_FULL_EXIT_TRACE = "force_full_exit_trace.json"
 
 # Callback type: (repo_id, current_branch, tracked_branch) -> None
 _DriftCallback = Optional[Any]
@@ -318,7 +320,43 @@ class GitAwareIndexManager:
 
         # Full index needed
         runtime_snapshot = self._snapshot_active_runtime(repo_info)
-        result = self._normalize_update_result(self._full_index(repo_id, ctx))
+        if force_full:
+            self._write_force_full_exit_trace(
+                repo_info,
+                {
+                    "status": "running",
+                    "stage": "force_full_started",
+                    "stage_family": "lexical",
+                    "current_commit": current_commit,
+                    "indexed_commit_before": last_indexed_commit,
+                    "last_progress_path": None,
+                    "in_flight_path": None,
+                    "summary_call_timed_out": False,
+                    "summary_call_file_path": None,
+                    "summary_call_chunk_ids": [],
+                    "summary_call_timeout_seconds": None,
+                    "blocker_source": "lexical_mutation",
+                },
+            )
+        progress_callback = None
+        if force_full:
+            progress_callback = self._make_force_full_progress_callback(
+                repo_info=repo_info,
+                current_commit=current_commit,
+                indexed_commit_before=last_indexed_commit,
+            )
+        try:
+            full_index_value = self._full_index(
+                repo_id,
+                ctx,
+                progress_callback=progress_callback,
+            )
+        except TypeError as exc:
+            if progress_callback is not None and "progress_callback" in str(exc):
+                full_index_value = self._full_index(repo_id, ctx)
+            else:
+                raise
+        result = self._normalize_update_result(full_index_value)
         restore_result = self._restore_zero_summary_runtime_if_needed(
             repo_id,
             repo_info,
@@ -326,12 +364,66 @@ class GitAwareIndexManager:
             result,
             runtime_snapshot,
         )
+        if restore_result is not None:
+            self._write_force_full_exit_trace(
+                repo_info,
+                {
+                    "status": "completed",
+                    "stage": "runtime_restore_completed",
+                    "stage_family": "final_closeout",
+                    "current_commit": current_commit,
+                    "indexed_commit_before": last_indexed_commit,
+                    "last_progress_path": (result.low_level or {}).get("last_progress_path")
+                    or (result.semantic or {}).get("summary_call_file_path"),
+                    "in_flight_path": (result.low_level or {}).get("in_flight_path"),
+                    "summary_call_timed_out": (result.semantic or {}).get(
+                        "summary_call_timed_out", False
+                    ),
+                    "summary_call_file_path": (result.semantic or {}).get(
+                        "summary_call_file_path"
+                    ),
+                    "summary_call_chunk_ids": (result.semantic or {}).get(
+                        "summary_call_chunk_ids", []
+                    ),
+                    "summary_call_timeout_seconds": (result.semantic or {}).get(
+                        "summary_call_timeout_seconds"
+                    ),
+                    "blocker_source": "runtime_restore",
+                },
+            )
         if not result.clean:
             self.registry.update_staleness_reason(repo_id, "partial_index_failure")
             error_detail = self._format_sync_error_with_restore_context(
                 "; ".join(result.errors) or "Full index failed",
                 restore_result,
             )
+            if force_full and restore_result is None:
+                self._write_force_full_exit_trace(
+                    repo_info,
+                    {
+                        "status": "completed",
+                        "stage": "force_full_failed",
+                        "stage_family": "final_closeout",
+                        "current_commit": current_commit,
+                        "indexed_commit_before": last_indexed_commit,
+                        "last_progress_path": (result.low_level or {}).get("last_progress_path")
+                        or (result.semantic or {}).get("summary_call_file_path"),
+                        "in_flight_path": (result.low_level or {}).get("in_flight_path"),
+                        "summary_call_timed_out": (result.semantic or {}).get(
+                            "summary_call_timed_out", False
+                        ),
+                        "summary_call_file_path": (result.semantic or {}).get(
+                            "summary_call_file_path"
+                        ),
+                        "summary_call_chunk_ids": (result.semantic or {}).get(
+                            "summary_call_chunk_ids", []
+                        ),
+                        "summary_call_timeout_seconds": (result.semantic or {}).get(
+                            "summary_call_timeout_seconds"
+                        ),
+                        "blocker_source": self._trace_blocker_source(result),
+                    },
+                )
             self.registry.update_last_sync_error(
                 repo_id,
                 error_detail,
@@ -363,6 +455,33 @@ class GitAwareIndexManager:
         ):
             repo_info.last_indexed_commit = current_commit
             self.registry.update_last_sync_error(repo_id, None)
+            if force_full:
+                self._write_force_full_exit_trace(
+                    repo_info,
+                    {
+                        "status": "completed",
+                        "stage": "force_full_completed",
+                        "stage_family": "final_closeout",
+                        "current_commit": current_commit,
+                        "indexed_commit_before": last_indexed_commit,
+                        "last_progress_path": (result.low_level or {}).get("last_progress_path")
+                        or (result.semantic or {}).get("summary_call_file_path"),
+                        "in_flight_path": None,
+                        "summary_call_timed_out": (result.semantic or {}).get(
+                            "summary_call_timed_out", False
+                        ),
+                        "summary_call_file_path": (result.semantic or {}).get(
+                            "summary_call_file_path"
+                        ),
+                        "summary_call_chunk_ids": (result.semantic or {}).get(
+                            "summary_call_chunk_ids", []
+                        ),
+                        "summary_call_timeout_seconds": (result.semantic or {}).get(
+                            "summary_call_timeout_seconds"
+                        ),
+                        "blocker_source": "final_closeout",
+                    },
+                )
         elif not self._index_exists(repo_info):
             self.registry.update_last_sync_error(
                 repo_id,
@@ -746,7 +865,12 @@ class GitAwareIndexManager:
             return None
         return f"Lexical stage ended with {stage}"
 
-    def _full_index(self, repo_id: str, ctx: RepoContext) -> UpdateResult:
+    def _full_index(
+        self,
+        repo_id: str,
+        ctx: RepoContext,
+        progress_callback: Optional[Any] = None,
+    ) -> UpdateResult:
         """Perform full repository indexing.
 
         Args:
@@ -778,7 +902,18 @@ class GitAwareIndexManager:
         # Index the directory
         logger.info(f"Starting full index of {repo_info.name}")
         try:
-            stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
+            try:
+                stats = self.dispatcher.index_directory(
+                    ctx,
+                    repo_path,
+                    recursive=True,
+                    progress_callback=progress_callback,
+                )
+            except TypeError as exc:
+                if progress_callback is not None and "progress_callback" in str(exc):
+                    stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
+                else:
+                    raise
         except Exception as exc:
             result.failed += 1
             result.errors.append(f"Full index failed: {exc}")
@@ -1036,6 +1171,71 @@ class GitAwareIndexManager:
             f"counts {restore_result.counts_before} -> {restore_result.counts_after}]"
         )
 
+    def _force_full_exit_trace_path(self, repo_info: Any) -> Path:
+        return Path(repo_info.index_location) / _FORCE_FULL_EXIT_TRACE
+
+    def _trace_timestamp(self) -> str:
+        return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+    def _read_force_full_exit_trace(self, repo_info: Any) -> Optional[Dict[str, Any]]:
+        path = self._force_full_exit_trace_path(repo_info)
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _write_force_full_exit_trace(self, repo_info: Any, update: Dict[str, Any]) -> None:
+        path = self._force_full_exit_trace_path(repo_info)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = self._read_force_full_exit_trace(repo_info) or {}
+        payload.update(update)
+        payload["trace_timestamp"] = self._trace_timestamp()
+        temp_path = path.with_suffix(".json.tmp")
+        temp_path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
+        temp_path.replace(path)
+
+    def _make_force_full_progress_callback(
+        self,
+        *,
+        repo_info: Any,
+        current_commit: Optional[str],
+        indexed_commit_before: Optional[str],
+    ) -> Any:
+        def callback(snapshot: Dict[str, Any]) -> None:
+            self._write_force_full_exit_trace(
+                repo_info,
+                {
+                    "status": "running",
+                    "stage": snapshot.get("stage"),
+                    "stage_family": snapshot.get("stage_family"),
+                    "current_commit": current_commit,
+                    "indexed_commit_before": indexed_commit_before,
+                    "last_progress_path": snapshot.get("last_progress_path"),
+                    "in_flight_path": snapshot.get("in_flight_path"),
+                    "summary_call_timed_out": snapshot.get("summary_call_timed_out", False),
+                    "summary_call_file_path": snapshot.get("summary_call_file_path"),
+                    "summary_call_chunk_ids": snapshot.get("summary_call_chunk_ids", []),
+                    "summary_call_timeout_seconds": snapshot.get(
+                        "summary_call_timeout_seconds"
+                    ),
+                    "blocker_source": snapshot.get("blocker_source"),
+                    "semantic_stage": snapshot.get("semantic_stage"),
+                    "lexical_stage": snapshot.get("lexical_stage"),
+                },
+            )
+
+        return callback
+
+    def _trace_blocker_source(self, result: UpdateResult) -> str:
+        if result.low_level is not None:
+            return "lexical_mutation"
+        semantic = result.semantic or {}
+        if semantic.get("summary_call_timed_out"):
+            return "summary_call_shutdown"
+        return "final_closeout"
+
     def sync_all_repositories(self) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates sequentially."""
         results = {}
@@ -1094,6 +1294,9 @@ class GitAwareIndexManager:
         else:
             status["index_exists"] = False
             status["index_size_mb"] = 0
+        trace = self._read_force_full_exit_trace(repo_info)
+        if trace is not None:
+            status["force_full_exit_trace"] = trace
 
         status.update(build_health_row(repo_info))
 

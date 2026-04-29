@@ -1,46 +1,50 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T06:47:14Z`.
-- Observed commit: `0032c46a`.
-- Phase plan: `plans/phase-plan-v7-SEMCANCEL.md`.
+- Evidence captured: `2026-04-29T07:06:18Z`.
+- Observed commit: `a6492a44`.
+- Phase plan: `plans/phase-plan-v7-SEMEXITTRACE.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMEXITTRACE` for the still-unbounded live force-full exit path after the
-  SEMCANCEL code-side repair landed.
+  `SEMFASTREPORT` for the newly narrowed lexical blocker after SEMEXITTRACE
+  landed its live trace persistence and operator-surface repair.
 
 ## Reset Boundary
 
-This SEMCANCEL rerun stayed inside the existing repo-local dogfood boundary:
+This SEMEXITTRACE rerun stayed inside the existing repo-local dogfood boundary:
 
-- `.mcp-index/current.db` and `.mcp-index/semantic_qdrant/` remained the only
-  active runtime locations touched by the live rerun.
+- `.mcp-index/current.db`, `.mcp-index/semantic_qdrant/`, and the new durable
+  trace file `.mcp-index/force_full_exit_trace.json` remained the only active
+  runtime locations touched by the live rerun.
 - The active semantic collection remained `code_index__oss_high__v1`.
 - No destructive reset of the SQLite runtime, WAL files, or Qdrant directory
   was used before the rerun.
 
-## SEMCANCEL Exit Recovery
+## SEMEXITTRACE Live Exit Recovery
 
-SEMCANCEL tightened the repo-scope timeout exit path in code and tests:
+SEMEXITTRACE tightened the repo-local observability contract in code and tests:
 
-- `mcp_server/indexing/summarization.py` now bounds repo-scope summary-call
-  waiting with explicit cancellation settlement instead of waiting
-  indefinitely for the first timed-out call to unwind.
-- `mcp_server/storage/git_index_manager.py` now snapshots the active
-  SQLite/Qdrant runtime, carries SQLite WAL/SHM sidecars, and restores the
-  pre-run runtime on zero-summary timed-out-call failures that return through
-  the repaired force-full closeout path.
-- `tests/test_summarization.py` and `tests/test_git_index_manager.py` now
-  freeze both the prompt timeout blocker and the zero-summary runtime restore
-  contract.
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now emits stable lexical,
+  summary-shutdown, semantic-closeout, and final-closeout progress snapshots
+  during `index_directory(...)` and `rebuild_semantic_for_paths(...)`.
+- `mcp_server/storage/git_index_manager.py` now persists repo-scoped force-full
+  trace updates to `.mcp-index/force_full_exit_trace.json` from force-full
+  start through closeout, and `get_repository_status(...)` now carries that
+  trace into operator-facing status output.
+- `mcp_server/cli/repository_commands.py`, `tests/test_dispatcher.py`,
+  `tests/test_git_index_manager.py`, `tests/test_repository_commands.py`, and
+  `tests/docs/test_semdogfood_evidence_contract.py` now freeze the durable
+  trace contract and its repository-status rendering.
 
-The live rerun still did not close the phase:
+The live rerun still did not close semantic dogfood readiness:
 
-- A fresh `repository sync --force-full` was started from a `missing_index`
-  baseline where no active `.mcp-index/current.db` existed yet.
-- The process stayed in flight for `1:43` before manual termination.
-- While in flight it recreated lexical rows in `.mcp-index/current.db` but
-  persisted no semantic progress.
-- Because the process never returned through the repaired closeout path, the
-  runtime-restore hook could not run before manual termination.
+- A fresh `repository sync --force-full` was started with
+  `MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5`.
+- The command stayed in flight for `2:10.04` before external termination by
+  `timeout`.
+- This time the command left a durable stage trace instead of forcing manual
+  SQLite-only interpretation.
+- The durable trace narrowed the blocker to lexical walking, with the most
+  recent durable progress path at
+  `/home/viperjuice/code/Code-Index-MCP/fast_test_results/fast_report_20250628_193425.md`.
 
 ## Rebuild Command
 
@@ -50,16 +54,7 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 
 ## Rebuild Evidence
 
-Pre-run runtime state for this SEMCANCEL rerun:
-
-- Active SQLite runtime: missing (`.mcp-index/current.db` did not exist).
-- Active Qdrant runtime: missing or empty for local semantic writes.
-- Files indexed in SQLite: `0`
-- Code chunks indexed in SQLite: `0`
-- Summary-backed chunks: `0`
-- Vector-linked chunks: `0`
-
-Observed in-flight runtime state before manual termination:
+Observed in-flight runtime state after external termination:
 
 - Files indexed in SQLite: `666`
 - Code chunks indexed in SQLite: `8934`
@@ -68,17 +63,31 @@ Observed in-flight runtime state before manual termination:
 - Vector-linked chunks: `0`
 - Chunks missing vectors: `8934`
 
+Durable stage trace from `.mcp-index/force_full_exit_trace.json`:
+
+- Trace status: `running`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Trace timestamp: `2026-04-29T07:06:18Z`
+- Trace current commit: `a6492a44fe4aa77bfa8ebb4e3fcb928da97995ab`
+- Trace indexed commit before:
+  `e2e9519858c3683c06b152c94a99e52098beaec6`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/fast_test_results/fast_report_20250628_193425.md`
+
 Runtime containment verdict for the live rerun:
 
 - Prompt exit: **not restored** in repo-local execution.
-- Zero-summary containment before process exit: **not restored** in repo-local
-  execution because the process never returned through force-full closeout.
-- Unit-level restore contract: **passed** in targeted coverage.
+- Zero-summary containment before process exit: **not restored**.
+- Runtime containment happened before process exit or only after external
+  termination: **neither**; external termination still left the partial
+  lexical runtime in place.
 
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
-after manual termination reported:
+after external termination reported:
 
 - Lexical readiness: `stale_commit`
 - Semantic readiness: `summaries_missing`
@@ -89,15 +98,14 @@ after manual termination reported:
 - Collection bootstrap state: `reused`
 - Query surface: `index_unavailable`
 - Rollout status: `stale_commit`
+- Force-full exit trace stage: `lexical_walking`
+- Force-full exit trace stage family: `lexical`
+- Force-full exit trace blocker source: `lexical_mutation`
 
 Repository/index freshness evidence:
 
-- Current commit: `0032c46a`
+- Current commit: `a6492a44`
 - Indexed commit: `e2e95198`
-
-The status surface still does not show the repaired exact timed-out-call
-blocker after the live rerun, because the command again had to be terminated
-before `sync_repository_index(...)` returned and persisted closeout state.
 
 ## Query Comparison
 
@@ -111,55 +119,59 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 - `symbol` and lexical probes still point operators at
   `mcp_server/setup/semantic_preflight.py` and
   `mcp_server/cli/repository_commands.py`.
-- The remaining downstream work is centered on
-  `mcp_server/indexing/summarization.py`,
-  `mcp_server/dispatcher/dispatcher_enhanced.py`,
-  `mcp_server/storage/git_index_manager.py`, and
-  `mcp_server/cli/repository_commands.py`.
-- No broader guide or support-matrix change is needed yet; the remaining issue
-  is still a repo-local dogfood runtime blocker.
+- The remaining downstream work is no longer centered on summary-call exit
+  uncertainty. It is now centered on the lexical handling of generated
+  `fast_test_results/fast_report_*.md` artifacts plus the durable trace/status
+  surfaces that proved that narrowing.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMCANCEL.
+Local multi-repo dogfooding is **still not ready** after SEMEXITTRACE.
 
 Why:
 
-- The unit-level timeout-settlement and zero-summary runtime-restore contracts
-  now pass in owned tests.
-- The live force-full rerun still does not exit promptly.
-- Manual termination still leaves a lexical-only partial runtime with
-  `chunk_summaries = 0` and `semantic_points = 0`.
-- Repository status still lands on semantic readiness `summaries_missing`.
+- The unit-level stage-trace, force-full trace persistence, and repository
+  status rendering contracts now pass in owned tests.
+- The live force-full rerun still does not finish inside the observed
+  `2:10.04` window.
+- The durable trace now proves the command was still in lexical walking rather
+  than summary shutdown or semantic closeout when it was terminated.
+- The partial runtime still ends with `chunk_summaries = 0` and
+  `semantic_points = 0`.
 
 Steering outcome:
 
-- SEMCANCEL implementation landed, but acceptance did not.
-- The roadmap now adds `SEMEXITTRACE` as the nearest downstream phase.
-- Older downstream assumptions that bounded timeout settlement plus restore
-  alone would finish the live dogfood rerun should be treated as stale.
+- SEMEXITTRACE implementation landed, and its acceptance goal was met: the
+  blocker is now durably visible without guesswork.
+- The roadmap now adds `SEMFASTREPORT` as the nearest downstream phase.
+- Older downstream assumptions should be treated as stale. The next repair is
+  not another generic exit-path rerun; it is a lexical file-family recovery or
+  explicit ignore-boundary decision for `fast_test_results/fast_report_*.md`.
 
 ## Verification
 
-Verification sequence for this SEMCANCEL slice:
+Verification sequence for this SEMEXITTRACE slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+python - <<'PY'
+from pathlib import Path
+print((Path(".mcp-index") / "force_full_exit_trace.json").read_text())
+PY
 sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
 ```
 
 Observed outcomes:
 
-- Targeted owned unit regression currently passes for the patched timeout and
-  restore contracts.
-- The live force-full rebuild stayed in flight for `1:43` and was terminated
-  manually.
-- Repository status still shows semantic readiness `summaries_missing` with
-  `Summary-backed chunks: 0` and `Vector-linked chunks: 0`.
-- Active-profile semantic preflight remains `ready`.
-- The next work item is roadmap phase `SEMEXITTRACE`, not another blind retry
-  of the older “timeout settlement plus restore is sufficient” assumption.
+- Targeted owned unit regression currently passes for the durable trace and
+  repository-status rendering contracts.
+- The live force-full rebuild stayed in flight for `2:10.04` and was
+  externally terminated.
+- Repository status now shows the durable trace directly instead of forcing
+  manual SQLite-only diagnosis.
+- The next work item is roadmap phase `SEMFASTREPORT`, not another blind retry
+  of the older generic “exit-path uncertainty” assumption.

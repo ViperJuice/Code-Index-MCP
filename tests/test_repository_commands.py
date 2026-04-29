@@ -311,3 +311,106 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
     assert "Active collection: code_index__oss_high__v1" in result.output
     assert "Collection-matched links: 9" in result.output
     assert "Collection mismatches: 1" in result.output
+
+
+def test_status_reports_durable_force_full_exit_trace(monkeypatch, tmp_path: Path):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required incremental mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "summaries_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                "force_full_exit_trace": {
+                    "status": "interrupted",
+                    "stage": "blocked_summary_call_timeout",
+                    "stage_family": "semantic_closeout",
+                    "trace_timestamp": "2026-04-29T09:00:00Z",
+                    "current_commit": "abcdef123456",
+                    "indexed_commit_before": "oldercommit",
+                    "last_progress_path": str(repo_info.path / "README.md"),
+                    "in_flight_path": str(repo_info.path / "README.md"),
+                    "summary_call_timed_out": True,
+                    "summary_call_file_path": str(repo_info.path / "README.md"),
+                    "summary_call_chunk_ids": ["chunk-1"],
+                    "summary_call_timeout_seconds": 30.0,
+                    "blocker_source": "summary_call_shutdown",
+                },
+                "features": {"semantic": {"readiness": {"evidence": {}}, "preflight": {}}},
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: SimpleNamespace(
+            to_dict=lambda: {
+                "overall_ready": True,
+                "can_write_semantic_vectors": True,
+                "effective_config": {
+                    "selected_profile": "oss_high",
+                    "collection_name": "code_index__oss_high__v1",
+                },
+            }
+        ),
+    )
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert "Force-full exit trace:" in result.output
+    assert "Trace status: interrupted" in result.output
+    assert "Trace stage: blocked_summary_call_timeout" in result.output
+    assert "Trace stage family: semantic_closeout" in result.output
+    assert "Trace timestamp: 2026-04-29T09:00:00Z" in result.output
+    assert "Trace blocker source: summary_call_shutdown" in result.output
+    assert "Timed-out summary file:" in result.output
+    assert "Timed-out summary timeout: 30.0" in result.output

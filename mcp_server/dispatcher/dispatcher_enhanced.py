@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..config.env_vars import get_max_file_size_bytes
@@ -2218,7 +2218,12 @@ class EnhancedDispatcher:
             "prompt_fingerprint": writer._prompt_fingerprint(),
         }
 
-    def rebuild_semantic_for_paths(self, ctx: RepoContext, paths: List[Path]) -> Dict[str, Any]:
+    def rebuild_semantic_for_paths(
+        self,
+        ctx: RepoContext,
+        paths: List[Path],
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
         """Run the summary-first strict semantic pipeline for selected files."""
         stats = {
             "summaries_written": 0,
@@ -2242,6 +2247,24 @@ class EnhancedDispatcher:
         if not normalized_paths:
             stats["semantic_stage"] = "skipped"
             return stats
+
+        def emit_progress(stage: str, stage_family: str, blocker_source: str) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "stage": stage,
+                    "stage_family": stage_family,
+                    "blocker_source": blocker_source,
+                    "semantic_stage": stats.get("semantic_stage"),
+                    "last_progress_path": None,
+                    "in_flight_path": None,
+                    "summary_call_timed_out": stats.get("summary_call_timed_out", False),
+                    "summary_call_file_path": stats.get("summary_call_file_path"),
+                    "summary_call_chunk_ids": list(stats.get("summary_call_chunk_ids", []) or []),
+                    "summary_call_timeout_seconds": stats.get("summary_call_timeout_seconds"),
+                }
+            )
 
         _sem = self._get_semantic_indexer(ctx)
         active_store = getattr(ctx, "sqlite_store", None)
@@ -2281,6 +2304,12 @@ class EnhancedDispatcher:
         summary_missing_ids: List[str] = []
         previous_missing = remaining_missing
         plateau_passes = 0
+        if remaining_missing > 0:
+            emit_progress(
+                "summary_shutdown_started",
+                "summary_shutdown",
+                "summary_call_shutdown",
+            )
 
         while remaining_missing > 0:
             missing_before_pass = remaining_missing
@@ -2312,6 +2341,11 @@ class EnhancedDispatcher:
                 )
                 if summary_missing_ids:
                     stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                emit_progress(
+                    "blocked_summary_timeout",
+                    "semantic_closeout",
+                    "summary_call_shutdown",
+                )
                 return stats
             if getattr(summary_result, "blocked_call_reason", None) == "timeout":
                 summary_missing_ids.extend(summary_result.missing_chunk_ids)
@@ -2352,6 +2386,11 @@ class EnhancedDispatcher:
                 )
                 if summary_missing_ids:
                     stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                emit_progress(
+                    "blocked_summary_call_timeout",
+                    "semantic_closeout",
+                    "summary_call_shutdown",
+                )
                 return stats
             stats["summary_passes"] += 1
             stats["summaries_written"] += summary_result.summaries_written
@@ -2378,6 +2417,11 @@ class EnhancedDispatcher:
                         )
                         if summary_missing_ids:
                             stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                        emit_progress(
+                            "blocked_summary_plateau",
+                            "semantic_closeout",
+                            "semantic_closeout",
+                        )
                         return stats
                 if max_summary_passes is not None and stats["summary_passes"] >= max_summary_passes:
                     stats["summary_missing_chunks"] = remaining_missing
@@ -2391,6 +2435,11 @@ class EnhancedDispatcher:
                     )
                     if summary_missing_ids:
                         stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                    emit_progress(
+                        "blocked_missing_summaries",
+                        "semantic_closeout",
+                        "semantic_closeout",
+                    )
                     return stats
             if summary_result.summaries_written == 0:
                 if remaining_missing >= missing_before_pass and summary_limit > min_summary_limit:
@@ -2410,6 +2459,11 @@ class EnhancedDispatcher:
             )
             if summary_missing_ids:
                 stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+            emit_progress(
+                "blocked_missing_summaries",
+                "semantic_closeout",
+                "semantic_closeout",
+            )
             return stats
 
         semantic_preflight = run_semantic_preflight(
@@ -2439,6 +2493,11 @@ class EnhancedDispatcher:
             stats["semantic_blocked"] = len(normalized_paths)
             stats["semantic_blocker"] = semantic_preflight.get("blocker")
             stats["semantic_error"] = (semantic_preflight.get("blocker") or {}).get("message")
+            emit_progress(
+                "blocked_preflight",
+                "semantic_closeout",
+                "semantic_closeout",
+            )
             return stats
 
         try:
@@ -2456,6 +2515,11 @@ class EnhancedDispatcher:
             stats["semantic_blocked"] = len(normalized_paths)
             stats["semantic_error"] = (
                 "Semantic batch writes timed out after summaries were generated"
+            )
+            emit_progress(
+                "blocked_semantic_batch_timeout",
+                "semantic_closeout",
+                "semantic_closeout",
             )
             return stats
         stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
@@ -2479,6 +2543,7 @@ class EnhancedDispatcher:
             stats["semantic_stage"] = "failed_semantic_batch"
         else:
             stats["semantic_stage"] = "skipped"
+        emit_progress(stats["semantic_stage"], "semantic_closeout", "semantic_closeout")
         return stats
 
     def _count_missing_summaries_for_paths(self, ctx: RepoContext, paths: List[Path]) -> int:
@@ -2690,7 +2755,11 @@ class EnhancedDispatcher:
             return {"total": 0, "by_language": {}}
 
     def index_directory(
-        self, ctx: RepoContext, directory: Path, recursive: bool = True
+        self,
+        ctx: RepoContext,
+        directory: Path,
+        recursive: bool = True,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Index all files in a directory, respecting ignore patterns."""
         logger.info(f"Indexing directory: {directory} (recursive={recursive})")
@@ -2724,6 +2793,25 @@ class EnhancedDispatcher:
             "low_level_blocker": None,
             "storage_diagnostics": None,
         }
+
+        def emit_progress(stage: str, stage_family: str, blocker_source: str) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "stage": stage,
+                    "stage_family": stage_family,
+                    "blocker_source": blocker_source,
+                    "lexical_stage": stats.get("lexical_stage"),
+                    "semantic_stage": stats.get("semantic_stage"),
+                    "last_progress_path": stats.get("last_progress_path"),
+                    "in_flight_path": stats.get("in_flight_path"),
+                    "summary_call_timed_out": stats.get("summary_call_timed_out", False),
+                    "summary_call_file_path": stats.get("summary_call_file_path"),
+                    "summary_call_chunk_ids": list(stats.get("summary_call_chunk_ids", []) or []),
+                    "summary_call_timeout_seconds": stats.get("summary_call_timeout_seconds"),
+                }
+            )
 
         is_excluded = build_walker_filter(directory)
 
@@ -2791,6 +2879,7 @@ class EnhancedDispatcher:
                     if mutation.status == IndexResultStatus.INDEXED:
                         stats["indexed_files"] += 1
                         semantically_indexed_paths.append(path.resolve())
+                        emit_progress("lexical_walking", "lexical", "lexical_mutation")
                     elif self._is_non_indexable_result(mutation):
                         stats["ignored_files"] += 1
                     else:
@@ -2817,6 +2906,7 @@ class EnhancedDispatcher:
                             if mutation.status == IndexResultStatus.INDEXED:
                                 stats["indexed_files"] += 1
                                 semantically_indexed_paths.append(path.resolve())
+                                emit_progress("lexical_walking", "lexical", "lexical_mutation")
                             elif self._is_non_indexable_result(mutation):
                                 stats["ignored_files"] += 1
                             else:
@@ -2860,6 +2950,7 @@ class EnhancedDispatcher:
                     path=path,
                     stage="blocked_file_timeout",
                 )
+                emit_progress("blocked_file_timeout", "lexical", "lexical_mutation")
                 break
             except sqlite3.OperationalError as exc:
                 logger.error("SQLite operational error while indexing %s: %s", path, exc)
@@ -2872,6 +2963,7 @@ class EnhancedDispatcher:
                     path=path,
                     stage="blocked_storage_error",
                 )
+                emit_progress("blocked_storage_error", "lexical", "lexical_mutation")
                 break
             except Exception as e:
                 logger.error(f"Failed to index {path}: {e}")
@@ -2890,7 +2982,18 @@ class EnhancedDispatcher:
         stats["semantic_indexer_present"] = _sem is not None
         if stats["low_level_blocker"] is None and _sem and semantically_indexed_paths:
             try:
-                stats.update(self.rebuild_semantic_for_paths(ctx, semantically_indexed_paths))
+                stats.update(
+                    self.rebuild_semantic_for_paths(
+                        ctx,
+                        semantically_indexed_paths,
+                        progress_callback=progress_callback,
+                    )
+                )
+                emit_progress(
+                    "force_full_closeout_handoff",
+                    "final_closeout",
+                    "final_closeout",
+                )
             except Exception as e:
                 logger.error(f"Batch semantic indexing failed: {e}", exc_info=True)
                 stats["semantic_stage"] = "failed"

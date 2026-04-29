@@ -89,6 +89,36 @@ def _print_sync_semantic_details(prefix: str, semantic: Optional[dict[str, Any]]
             )
 
 
+def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -> None:
+    if not trace:
+        return
+    click.echo("\nForce-full exit trace:")
+    if trace.get("status"):
+        click.echo(f"{prefix}Trace status: {trace['status']}")
+    if trace.get("stage"):
+        click.echo(f"{prefix}Trace stage: {trace['stage']}")
+    if trace.get("stage_family"):
+        click.echo(f"{prefix}Trace stage family: {trace['stage_family']}")
+    if trace.get("trace_timestamp"):
+        click.echo(f"{prefix}Trace timestamp: {trace['trace_timestamp']}")
+    if trace.get("blocker_source"):
+        click.echo(f"{prefix}Trace blocker source: {trace['blocker_source']}")
+    if trace.get("current_commit"):
+        click.echo(f"{prefix}Trace current commit: {trace['current_commit']}")
+    if trace.get("indexed_commit_before") is not None:
+        click.echo(f"{prefix}Trace indexed commit before: {trace['indexed_commit_before']}")
+    if trace.get("last_progress_path"):
+        click.echo(f"{prefix}Last progress path: {trace['last_progress_path']}")
+    if trace.get("in_flight_path"):
+        click.echo(f"{prefix}In-flight path: {trace['in_flight_path']}")
+    if trace.get("summary_call_file_path"):
+        click.echo(f"{prefix}Timed-out summary file: {trace['summary_call_file_path']}")
+    if trace.get("summary_call_chunk_ids"):
+        click.echo(f"{prefix}Timed-out summary chunks: {', '.join(trace['summary_call_chunk_ids'])}")
+    if trace.get("summary_call_timeout_seconds") is not None:
+        click.echo(f"{prefix}Timed-out summary timeout: {trace['summary_call_timeout_seconds']}")
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -477,6 +507,7 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Staleness reason: {status['staleness_reason']}")
         if status.get("last_sync_error"):
             click.echo(f"  Last sync error: {status['last_sync_error']}")
+        _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}
         blocker = semantic_preflight.get("blocker") or {}

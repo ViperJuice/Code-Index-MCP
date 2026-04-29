@@ -1,5 +1,6 @@
 """Tests for GitAwareIndexManager branch-change reindex guard (SL-3)."""
 
+import json
 import subprocess
 from datetime import datetime
 from inspect import signature
@@ -1180,6 +1181,143 @@ def test_force_full_sync_preserves_exact_summary_call_timeout_blocker(tmp_path):
     registry.update_staleness_reason.assert_called_once_with(
         repo_info.repository_id, "partial_index_failure"
     )
+
+
+def test_force_full_sync_preserves_durable_exit_trace_on_interrupt(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+    repo_info.index_path.touch()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+
+    def _interrupting_full_index(repo_id, _ctx):
+        manager._write_force_full_exit_trace(
+            repo_info,
+            {
+                "status": "interrupted",
+                "stage": "blocked_summary_call_timeout",
+                "stage_family": "semantic_closeout",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "README.md"),
+                "in_flight_path": str(repo / "README.md"),
+                "summary_call_timed_out": True,
+                "summary_call_file_path": str(repo / "README.md"),
+                "summary_call_chunk_ids": ["chunk-1"],
+                "summary_call_timeout_seconds": 30.0,
+                "blocker_source": "summary_call_shutdown",
+            },
+        )
+        raise KeyboardInterrupt("synthetic interrupt")
+
+    manager._full_index = MagicMock(side_effect=_interrupting_full_index)
+
+    try:
+        manager.sync_repository_index(repo_info.repository_id, force_full=True)
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("Expected synthetic KeyboardInterrupt")
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "interrupted"
+    assert trace["stage"] == "blocked_summary_call_timeout"
+    assert trace["stage_family"] == "semantic_closeout"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["summary_call_timed_out"] is True
+    assert trace["blocker_source"] == "summary_call_shutdown"
+    registry.update_indexed_commit.assert_not_called()
+
+
+def test_force_full_sync_marks_durable_exit_trace_completed_on_clean_closeout(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = None
+    repo_info.index_path.touch()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+    registry.update_indexed_commit.return_value = True
+
+    manager = _make_manager(registry)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=1,
+            semantic={
+                "semantic_stage": "indexed",
+            },
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "full_index"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_completed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] is None
+    registry.update_indexed_commit.assert_called_once_with(
+        repo_info.repository_id, commit, branch="main"
+    )
+
+
+def test_get_repository_status_includes_force_full_exit_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "blocked_summary_call_timeout",
+                "stage_family": "semantic_closeout",
+                "trace_timestamp": "2026-04-29T09:00:00Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "README.md"),
+                "in_flight_path": str(repo / "README.md"),
+                "summary_call_timed_out": True,
+                "summary_call_file_path": str(repo / "README.md"),
+                "summary_call_chunk_ids": ["chunk-1"],
+                "summary_call_timeout_seconds": 30.0,
+                "blocker_source": "summary_call_shutdown",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "blocked_summary_call_timeout"
+    assert status["force_full_exit_trace"]["stage_family"] == "semantic_closeout"
+    assert status["force_full_exit_trace"]["blocker_source"] == "summary_call_shutdown"
 
 
 def test_force_full_sync_does_not_advance_commit_when_low_level_blocker_fires(tmp_path):

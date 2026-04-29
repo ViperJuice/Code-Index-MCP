@@ -1399,6 +1399,60 @@ it before the repaired blocker can be persisted.
 - IF-0-SEMEXITTRACE-1 — Live force-full exit tracing and persisted blocker
   contract.
 
+### Phase 26 — Fast Test Report Lexical Recovery (SEMFASTREPORT)
+
+**Objective**
+
+Repair the next exact live blocker surfaced by SEMEXITTRACE so a repo-local
+`repository sync --force-full` rerun does not spend minutes in lexical walking
+on generated `fast_test_results/fast_report_*.md` artifacts before semantic
+closeout can begin.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer times out while the durable
+      trace is still in lexical walking on `fast_test_results/fast_report_*.md`.
+- [ ] If `fast_test_results/` remains indexable, its Markdown/report path uses
+      bounded lexical handling that returns promptly enough for the force-full
+      run to advance beyond lexical walking.
+- [ ] If `fast_test_results/` is judged generated noise, the chosen ignore or
+      filtering contract is explicit, tested, and reflected in
+      `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`.
+- [ ] The refreshed dogfood evidence records whether the next rerun advances
+      past lexical walking or preserves a narrower downstream blocker.
+
+**Scope notes**
+
+This phase exists only if SEMEXITTRACE proves the live force-full command is
+still blocked in lexical walking and identifies a specific generated
+`fast_test_results/fast_report_*.md` path as the most recent durable progress
+marker. Keep the repair narrowly on that file family and the lexical/index
+filter boundary it exposes.
+
+**Non-goals**
+
+- No semantic ranking or embedding-pipeline redesign.
+- No reopening of summary-timeout or runtime-restore work from SEMCALLTIME or
+  SEMCANCEL unless the new evidence proves direct contract drift there.
+- No artifact publishing or release-process changes.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/dispatcher/ignore_patterns.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMEXITTRACE
+
+**Produces**
+- IF-0-SEMFASTREPORT-1 — Generated fast-test report lexical recovery or
+  explicit ignore-boundary contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1427,6 +1481,7 @@ SEMCONTRACT
   -> SEMCALLTIME
   -> SEMCANCEL
   -> SEMEXITTRACE
+  -> SEMFASTREPORT
 ```
 
 ## Execution Notes
@@ -1516,6 +1571,11 @@ SEMCONTRACT
   blocker on the active commit; it should narrow the remaining hang to an
   exact live stage and persisted fail-closed status rather than repeating the
   same blind rerun.
+- SEMFASTREPORT exists only if SEMEXITTRACE proves the live force-full blocker
+  is still in lexical walking and the durable trace points at generated
+  `fast_test_results/fast_report_*.md` output; it should repair that exact
+  file family or make the ignore boundary explicit before reopening broader
+  lexical or semantic work.
 
 ## Verification
 
@@ -1592,5 +1652,25 @@ sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select coun
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+
+# SEMEXITTRACE
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+python - <<'PY'
+from pathlib import Path
+print((Path(".mcp-index") / "force_full_exit_trace.json").read_text())
+PY
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+
+# SEMFASTREPORT
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+python - <<'PY'
+from pathlib import Path
+print((Path(".mcp-index") / "force_full_exit_trace.json").read_text())
+PY
 sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
 ```
