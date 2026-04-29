@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T20:12:44Z`.
-- Observed commit: `e78c2861`.
+- Evidence captured: `2026-04-29T20:38:17Z`.
+- Observed commit: `dab8822a`.
 - Prior SEMSUPPORTTAIL live-rerun anchor: `2026-04-29T19:52:03Z` on observed
   commit `a7a71f24`.
 - Prior SEMCODEXLOOPTAIL live-rerun anchor: `2026-04-29T18:52:55Z` on observed
@@ -36,8 +36,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMV1PLANTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMJEDIP4TAIL` after SEMV1PLANTAIL proved the later historical v1
+  phase-plan seam is now cleared, but the refreshed live rerun on the new
+  head still terminalized later in lexical walking on
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md`. Older downstream assumptions should be treated
+  as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMV1PLANTAIL` after SEMSUPPORTTAIL proved the later support-docs Markdown
   seam is now cleared, but the refreshed live rerun on the new head still
@@ -2182,6 +2189,87 @@ Steering outcome:
   `docs/markdown-table-of-contents.md ->
   docs/SUPPORT_MATRIX.md`.
 
+## SEMV1PLANTAIL Live Rerun Check
+
+SEMV1PLANTAIL confirmed that the later historical v1 phase-plan pair is no
+longer the active lexical tail and that the live force-full rerun now exposes
+an even later mixed-generation phase-plan seam.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/markdown_plugin/plugin.py` now names
+  `plans/phase-plan-v1-p13.md` and `plans/phase-plan-v1-p3.md` as exact
+  bounded Markdown paths without widening into a blanket
+  `plans/phase-plan-v1-*.md` bypass.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md`:
+  `Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v1-p13.md -> plans/phase-plan-v1-p3.md`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the later historical v1
+  phase-plan pair without widening into a broader historical-plan shortcut.
+- `plans/phase-plan-v1-p13.md` and `plans/phase-plan-v1-p3.md` did not
+  require content simplification in this phase; the bounded Markdown path was
+  already sufficient and the live rerun proved the real blocker had moved
+  later.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMV1PLANTAIL live rerun started on observed commit
+  `dab8822a` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T20:36:26Z`, `.mcp-index/force_full_exit_trace.json` had
+  already advanced past the historical v1 pair to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/specs/active/architecture.md`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/specs/active/multi_profile_semantic_indexing_spec.md`.
+- At `2026-04-29T20:36:52Z`, the same rerun had already advanced again to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_persistence.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_dispatcher_document_routing.py`.
+- At `2026-04-29T20:37:15Z`, the live rerun had already advanced again to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260426T014018Z-01-gadisp-execute/launch.json`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260426T014018Z-01-gadisp-execute/heartbeat.json`.
+- At `2026-04-29T20:38:02Z`, the final running trace before timeout had
+  advanced to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMJEDI.md`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v1-p4.md`.
+- At `2026-04-29T20:38:17Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md` pair while continuing to advertise the repaired
+  exact bounded Markdown surface for the cleared
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md` seam.
+- The SEMV1PLANTAIL target pair is no longer the active blocker:
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md`.
+- SQLite runtime counts after the rerun were
+  `files = 1063`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMV1PLANTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  mixed-generation phase-plan pair
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md`.
+- The roadmap now adds downstream phase `SEMJEDIP4TAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMV1PLANTAIL-era historical v1 seam
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:
@@ -2202,6 +2290,18 @@ Verification sequence for this SEMSUPPORTTAIL slice:
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "support_matrix or markdown_table_of_contents or support_docs or markdown or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "support_matrix or markdown_table_of_contents or support_docs or lexical or interrupted or boundary"
 uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMV1PLANTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "p13 or p3 or historical_v1_phase_plan_pair"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "p13 or p3 or historical_v1_phase_plan_pair or historical_v1_phase_plan_markdown_boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sed -n '1,240p' .mcp-index/force_full_exit_trace.json

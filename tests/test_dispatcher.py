@@ -2102,6 +2102,161 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Watch truth" in watch_fts_rows[0][0]
         assert "Wave plan" in p19_fts_rows[0][0]
 
+    def test_index_directory_uses_bounded_markdown_path_for_historical_v1_phase_plan_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        plans_dir = repo / "plans"
+        plans_dir.mkdir(parents=True)
+        p13_doc = plans_dir / "phase-plan-v1-p13.md"
+        p3_doc = plans_dir / "phase-plan-v1-p3.md"
+        unrelated_doc = plans_dir / "phase-plan-v1-p17.md"
+        p13_doc.write_text(
+            "# P13: Reindex Durability + Artifact Automation\n\n"
+            "## Context\n\n"
+            "### What exists today\n"
+            "- Preserve bounded discoverability\n\n"
+            "## Interface Freeze Gates\n\n"
+            "### Gate contract\n"
+            "- Keep interface-freeze prose searchable\n",
+            encoding="utf-8",
+        )
+        p3_doc.write_text(
+            "> Plan doc produced by `/plan-phase P3 --consensus`\n\n"
+            "# PHASE-3-per-repo-plugins-stores-memory\n\n"
+            "## Context\n\n"
+            "### What exists\n"
+            "- Preserve quoted preamble discoverability\n\n"
+            "## Lane Index & Dependencies\n\n"
+            "### Wave plan\n"
+            "- Keep lane-table structure searchable\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# P17: Another Historical Plan\n\n"
+            "## Context\n\n"
+            "### Guardrail\n"
+            "- Keep generic phase-plan handling intact\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for bounded historical v1 phase-plan files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(p13_doc.resolve()),
+            str(p3_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            p13_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v1-p13.md') ORDER BY id"
+                ).fetchall()
+            ]
+            p3_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v1-p3.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v1-p17.md') ORDER BY id"
+                ).fetchall()
+            ]
+            p13_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p13.md')"
+            ).fetchone()[0]
+            p3_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p3.md')"
+            ).fetchone()[0]
+            unrelated_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p17.md')"
+            ).fetchone()[0]
+            p13_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p13.md')"
+            ).fetchall()
+            p3_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p3.md')"
+            ).fetchall()
+        store.close()
+
+        assert p13_symbols == [
+            "P13: Reindex Durability + Artifact Automation",
+            "P13: Reindex Durability + Artifact Automation",
+            "Context",
+            "What exists today",
+            "Interface Freeze Gates",
+            "Gate contract",
+        ]
+        assert p3_symbols == [
+            "PHASE-3-per-repo-plugins-stores-memory",
+            "PHASE-3-per-repo-plugins-stores-memory",
+            "Context",
+            "What exists",
+            "Lane Index & Dependencies",
+            "Wave plan",
+        ]
+        assert unrelated_symbols == [
+            "P17: Another Historical Plan",
+            "P17: Another Historical Plan",
+            "Context",
+            "Guardrail",
+        ]
+        assert p13_chunk_count == 0
+        assert p3_chunk_count == 0
+        assert unrelated_chunk_count == 0
+        assert len(p13_fts_rows) == 1
+        assert len(p3_fts_rows) == 1
+        assert "Gate contract" in p13_fts_rows[0][0]
+        assert "Wave plan" in p3_fts_rows[0][0]
+
     def test_index_directory_uses_bounded_markdown_path_for_mixed_version_phase_plan_pair(
         self, tmp_path, monkeypatch
     ):

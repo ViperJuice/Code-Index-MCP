@@ -3673,6 +3673,70 @@ plans/phase-plan-v1-p3.md`.
 - IF-0-SEMV1PLANTAIL-1 — later historical v1 phase-plan lexical recovery and
   evidence contract.
 
+### Phase 65 — SEMJEDI/P4 Tail Recovery (SEMJEDIP4TAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later mixed-generation phase-plan
+pair exposed after SEMV1PLANTAIL:
+`plans/phase-plan-v7-SEMJEDI.md ->
+plans/phase-plan-v1-p4.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMV1PLANTAIL head
+      either advances durably beyond the
+      `plans/phase-plan-v7-SEMJEDI.md ->
+      plans/phase-plan-v1-p4.md` pair or emits a truthful newer blocker before
+      the 120-second watchdog expires.
+- [ ] The chosen repair for the SEMJEDI/P4 tail stays narrow, tested, and
+      does not reopen the repaired
+      `plans/phase-plan-v1-p13.md ->
+      plans/phase-plan-v1-p3.md` boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMV1PLANTAIL
+      rerun outcome and the final live verdict for the later
+      `plans/phase-plan-v7-SEMJEDI.md ->
+      plans/phase-plan-v1-p4.md` phase-plan pair.
+
+**Scope notes**
+
+This phase exists only if SEMV1PLANTAIL proves the later historical v1
+phase-plan pair
+`plans/phase-plan-v1-p13.md ->
+plans/phase-plan-v1-p3.md` is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on a mixed-generation phase-plan pair
+such as `plans/phase-plan-v7-SEMJEDI.md ->
+plans/phase-plan-v1-p4.md`.
+
+**Non-goals**
+
+- No reopening of the repaired SEMV1PLANTAIL historical-v1 plan recovery once
+  the live rerun has advanced beyond that seam.
+- No broad reopening of unrelated plan artifacts, roadmap docs, or evidence
+  artifacts unless the refreshed rerun proves the active blocker requires
+  them.
+- No blanket `plans/phase-plan-*.md` bypass unless the refreshed rerun proves
+  the active blocker cannot be cleared with a narrower Markdown-path repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `plans/phase-plan-v7-SEMJEDI.md`
+- `plans/phase-plan-v1-p4.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMV1PLANTAIL
+
+**Produces**
+- IF-0-SEMJEDIP4TAIL-1 — later SEMJEDI/P4 lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3740,6 +3804,7 @@ SEMCONTRACT
   -> SEMDOCTRUTHTAIL
   -> SEMSUPPORTTAIL
   -> SEMV1PLANTAIL
+  -> SEMJEDIP4TAIL
 ```
 
 ## Execution Notes

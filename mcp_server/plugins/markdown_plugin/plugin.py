@@ -53,6 +53,8 @@ _EXACT_BOUNDED_MARKDOWN_PATHS = {
     "plans/phase-plan-v5-gagov.md": "mixed_gagov_phase_plan_path",
     "plans/phase-plan-v6-WATCH.md": "historical_watch_phase_plan_path",
     "plans/phase-plan-v1-p19.md": "historical_p19_phase_plan_path",
+    "plans/phase-plan-v1-p13.md": "historical_p13_phase_plan_path",
+    "plans/phase-plan-v1-p3.md": "historical_p3_phase_plan_path",
 }
 
 

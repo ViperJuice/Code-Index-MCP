@@ -320,6 +320,18 @@ def _print_historical_phase_plan_markdown_boundary(prefix: str, repo_path: Path)
         )
 
 
+def _print_historical_v1_phase_plan_markdown_boundary(prefix: str, repo_path: Path) -> None:
+    phase_plan_paths = (
+        repo_path / "plans" / "phase-plan-v1-p13.md",
+        repo_path / "plans" / "phase-plan-v1-p3.md",
+    )
+    if all(path.is_file() for path in phase_plan_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+            "plans/phase-plan-v1-p13.md -> plans/phase-plan-v1-p3.md"
+        )
+
+
 def _print_mixed_version_phase_plan_markdown_boundary(prefix: str, repo_path: Path) -> None:
     phase_plan_paths = (
         repo_path / "plans" / "phase-plan-v7-SEMPHASETAIL.md",
@@ -951,6 +963,7 @@ def status(repo_id: Optional[str]):
         _print_support_docs_markdown_boundary("  ", Path(status["path"]))
         _print_late_v7_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_historical_phase_plan_markdown_boundary("  ", Path(status["path"]))
+        _print_historical_v1_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_mixed_version_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_quick_validation_python_boundary("  ", Path(status["path"]))
