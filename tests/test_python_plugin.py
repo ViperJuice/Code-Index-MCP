@@ -16,7 +16,9 @@ from textwrap import dedent
 
 import pytest
 
+from mcp_server.core.path_resolver import PathResolver
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 class TestPluginInitialization:
@@ -40,6 +42,120 @@ class TestPluginInitialization:
         """Test the language property."""
         plugin = PythonPlugin()
         assert plugin.language == "python"
+
+    def test_visual_report_script_uses_exact_bounded_chunk_path(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        script = repo / "scripts" / "create_multi_repo_visual_report.py"
+        script.parent.mkdir(parents=True)
+        script.write_text(
+            dedent(
+                """
+                def setup_style():
+                    return "ok"
+
+                def create_html_report(data, output_dir):
+                    return output_dir
+
+                def main():
+                    return create_html_report({}, ".")
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        store.path_resolver = PathResolver(repo)
+        plugin = PythonPlugin(sqlite_store=store, preindex=False)
+        plugin._repository_id = store.create_repository(str(repo), repo.name, {"language": "python"})
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr("mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text)
+
+        result = plugin.indexFile(script, script.read_text(encoding="utf-8"))
+
+        assert result["file"] == str(script)
+        symbol_names = {symbol["symbol"] for symbol in result["symbols"]}
+        assert {"setup_style", "create_html_report", "main"} <= symbol_names
+
+        stored = store.get_file_by_path("scripts/create_multi_repo_visual_report.py", plugin._repository_id)
+        assert stored is not None
+        with store._get_connection() as conn:
+            symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id = ?",
+                (stored["id"],),
+            ).fetchone()[0]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id = ?",
+                (stored["id"],),
+            ).fetchone()[0]
+        store.close()
+
+        assert symbol_count >= 3
+        assert chunk_count == 0
+        assert calls == []
+
+    def test_visual_report_bounded_chunk_path_does_not_broaden_to_other_python_files(
+        self, tmp_path, monkeypatch
+    ):
+        repo = tmp_path / "repo"
+        other_script = repo / "scripts" / "other_report.py"
+        other_script.parent.mkdir(parents=True)
+        other_script.write_text(
+            dedent(
+                """
+                def build():
+                    return 1
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        store.path_resolver = PathResolver(repo)
+        plugin = PythonPlugin(sqlite_store=store, preindex=False)
+        plugin._repository_id = store.create_repository(str(repo), repo.name, {"language": "python"})
+
+        calls = []
+
+        class FakeChunk:
+            def __init__(self) -> None:
+                self.content = "def build():\n    return 1\n"
+                self.byte_start = 0
+                self.byte_end = len(self.content)
+                self.start_line = 1
+                self.end_line = 2
+                self.chunk_id = "chunk-1"
+                self.node_id = "node-1"
+                self.file_id = "file-1"
+                self.definition_id = "definition-1"
+                self.parent_chunk_id = None
+                self.node_type = "function_definition"
+                self.metadata = {}
+
+        def _fake_chunk_text(content, language):
+            calls.append((content, language))
+            return [FakeChunk()]
+
+        monkeypatch.setattr("mcp_server.plugins.python_plugin.plugin.chunk_text", _fake_chunk_text)
+
+        plugin.indexFile(other_script, other_script.read_text(encoding="utf-8"))
+
+        stored = store.get_file_by_path("scripts/other_report.py", plugin._repository_id)
+        assert stored is not None
+        with store._get_connection() as conn:
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id = ?",
+                (stored["id"],),
+            ).fetchone()[0]
+        store.close()
+
+        assert calls == [(other_script.read_text(encoding="utf-8"), "python")]
+        assert chunk_count == 1
 
 
 class TestFileSupport:

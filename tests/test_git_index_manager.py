@@ -1456,6 +1456,57 @@ def test_force_full_sync_trace_moves_past_pytest_overview_after_bounded_ai_docs_
     registry.update_indexed_commit.assert_not_called()
 
 
+def test_force_full_sync_trace_moves_past_visual_report_script_after_exact_python_repair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=2,
+            failed=1,
+            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 3,
+                "lexical_files_completed": 2,
+                "last_progress_path": str(repo / "src" / "semantic_preflight.py"),
+                "in_flight_path": str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": (
+                        "Lexical indexing timed out while processing "
+                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                    ),
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert "create_multi_repo_visual_report.py" not in (trace.get("last_progress_path") or "")
+    assert "create_multi_repo_visual_report.py" not in (trace.get("in_flight_path") or "")
+    assert trace["last_progress_path"] == str(repo / "src" / "semantic_preflight.py")
+    assert trace["in_flight_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    registry.update_indexed_commit.assert_not_called()
+
+
 def test_incremental_update_aggregates_semantic_mutation_stats(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

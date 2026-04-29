@@ -29,6 +29,7 @@ from ...utils.treesitter_wrapper import TreeSitterWrapper
 
 class Plugin(IPlugin):
     lang = "python"
+    _BOUNDED_CHUNK_PATHS = {"scripts/create_multi_repo_visual_report.py"}
 
     def __init__(self, sqlite_store: Optional[SQLiteStore] = None, preindex: bool = True) -> None:
         self._ts = TreeSitterWrapper()
@@ -72,6 +73,22 @@ class Plugin(IPlugin):
         """Return True if file extension matches plugin."""
         return Path(path).suffix == ".py"
 
+    def _normalized_relative_path(self, path: Path) -> str:
+        if self._sqlite_store is not None:
+            try:
+                return self._sqlite_store.path_resolver.normalize_path(path)
+            except Exception:
+                pass
+        if path.is_absolute():
+            try:
+                return path.relative_to(Path.cwd()).as_posix()
+            except ValueError:
+                return path.as_posix()
+        return path.as_posix()
+
+    def _uses_bounded_chunk_path(self, path: Path) -> bool:
+        return self._normalized_relative_path(path) in self._BOUNDED_CHUNK_PATHS
+
     # ------------------------------------------------------------------
     def indexFile(self, path: str | Path, content: str) -> IndexShard:
         if isinstance(path, str):
@@ -86,11 +103,7 @@ class Plugin(IPlugin):
             import hashlib
 
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            rel_path = str(
-                path.relative_to(Path.cwd())
-                if path.is_absolute() and path.is_relative_to(Path.cwd())
-                else path
-            )
+            rel_path = self._normalized_relative_path(path)
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
@@ -186,11 +199,12 @@ class Plugin(IPlugin):
         # Store chunks in SQLite (delete old ones first since chunk_id uses temp path)
         if self._sqlite_store and file_id:
             _chunks = []
-            try:
-                _chunks = chunk_text(content, "python")
-            except Exception:
-                pass
             self._sqlite_store.delete_chunks_for_file(file_id)
+            if not self._uses_bounded_chunk_path(path):
+                try:
+                    _chunks = chunk_text(content, "python")
+                except Exception:
+                    pass
             for i, chunk in enumerate(_chunks):
                 try:
                     self._sqlite_store.store_chunk(
