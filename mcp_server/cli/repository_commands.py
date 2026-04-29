@@ -147,6 +147,14 @@ def _print_ai_docs_overview_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_jedi_markdown_boundary(prefix: str, repo_path: Path) -> None:
+    jedi_doc = repo_path / "ai_docs" / "jedi.md"
+    if jedi_doc.is_file():
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for ai_docs/jedi.md"
+        )
+
+
 def _print_visual_report_python_boundary(prefix: str, repo_path: Path) -> None:
     script_path = repo_path / "scripts" / "create_multi_repo_visual_report.py"
     if script_path.is_file():
@@ -546,6 +554,7 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Last sync error: {status['last_sync_error']}")
         _print_fast_report_boundary("  ", Path(status["path"]))
         _print_ai_docs_overview_boundary("  ", Path(status["path"]))
+        _print_jedi_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
 

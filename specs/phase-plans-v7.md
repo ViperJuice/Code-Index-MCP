@@ -1606,6 +1606,63 @@ progress marker advances to `ai_docs/jedi.md`.
 **Produces**
 - IF-0-SEMJEDI-1 — Jedi AI doc lexical recovery and rerun evidence contract.
 
+### Phase 30 — Force-Full Trace Freshness Recovery (SEMTRACEFRESHNESS)
+
+**Objective**
+
+Repair the remaining live force-full handoff gap exposed by SEMJEDI so a
+repo-local rerun either refreshes `force_full_exit_trace.json` beyond the
+older `ai_docs/pytest_overview.md` marker or names the true current in-flight
+blocker instead of hanging with stale lexical progress.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer hangs with
+      `force_full_exit_trace.json` frozen at
+      `last_progress_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/pytest_overview.md`
+      and `in_flight_path=null`.
+- [ ] The durable trace refreshes to a later lexical or semantic stage with a
+      current in-flight path, or the command exits cleanly with a completed or
+      bounded blocked trace.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      trace-freshness evidence, the rerun outcome, and the next exact blocker
+      if semantic-stage work still does not begin.
+
+**Scope notes**
+
+This phase exists only because SEMJEDI proved the exact bounded Markdown path
+for `ai_docs/jedi.md`, but the live force-full rerun on 2026-04-29 still hung
+for more than two minutes while the durable trace remained stuck on the older
+`ai_docs/pytest_overview.md` progress marker and never populated a current
+`in_flight_path`.
+
+**Non-goals**
+
+- No reopening of the exact `ai_docs/jedi.md` bounded Markdown path unless new
+  evidence proves direct drift there.
+- No reopening of the fast-test report, `ai_docs/*_overview.md`, or
+  visual-report-script lexical repairs unless the refreshed trace directly
+  re-anchors on one of those seams.
+- No semantic summary timeout or vector-write work before the live trace is
+  trustworthy again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMJEDI
+
+**Produces**
+- IF-0-SEMTRACEFRESHNESS-1 — Force-full trace freshness and downstream blocker
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1638,6 +1695,7 @@ SEMCONTRACT
   -> SEMPYTESTOVERVIEW
   -> SEMVISUALREPORT
   -> SEMJEDI
+  -> SEMTRACEFRESHNESS
 ```
 
 ## Execution Notes
@@ -1661,6 +1719,9 @@ SEMCONTRACT
 - SEMVISUALREPORT should amend the roadmap immediately if the live rerun clears
   `scripts/create_multi_repo_visual_report.py` and exposes a later exact
   lexical seam such as `ai_docs/jedi.md`.
+- SEMJEDI should amend the roadmap immediately if the live rerun clears
+  `ai_docs/jedi.md` but exposes a later exact blocker or a trace-freshness
+  failure that changes the next downstream phase.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
@@ -1746,6 +1807,9 @@ SEMCONTRACT
   force-full rerun still remains in lexical walking on `ai_docs/jedi.md`; it
   should repair that exact file path or preserve a still narrower downstream
   blocker.
+- SEMTRACEFRESHNESS exists only if SEMJEDI clears `ai_docs/jedi.md` but the
+  live force-full rerun still hangs while the durable trace remains frozen on
+  an older progress marker without naming the current in-flight blocker.
 
 ## Verification
 

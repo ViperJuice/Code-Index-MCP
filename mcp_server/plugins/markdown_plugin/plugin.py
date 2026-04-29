@@ -92,6 +92,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
         if path.parent.name.lower() == "ai_docs" and path.stem.lower().endswith("_overview"):
             return "ai_docs_overview_path"
 
+        if path.parent.name.lower() == "ai_docs" and path.name.lower() == "jedi.md":
+            return "ai_docs_jedi_path"
+
         return None
 
     def _extract_lightweight_title(self, content: str, path: Path) -> str:

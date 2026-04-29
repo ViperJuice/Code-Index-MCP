@@ -1382,6 +1382,62 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Framework Overview" in symbol_names
         assert "Test Structure" in symbol_names
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_jedi_ai_doc(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        (repo / "ai_docs").mkdir(parents=True)
+        jedi_doc = repo / "ai_docs" / "jedi.md"
+        jedi_doc.write_text(
+            "# Jedi Documentation\n\n## Overview and Key Features\n\n### Code Completion\n- Preserve heading discoverability\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError("heavy Markdown path should not run for ai_docs/jedi.md")
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(jedi_doc.resolve())
+        with store._get_connection() as conn:
+            symbol_names = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'ai_docs/jedi.md') ORDER BY id"
+                ).fetchall()
+            ]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'ai_docs/jedi.md')"
+            ).fetchone()[0]
+        store.close()
+        assert "Jedi Documentation" in symbol_names
+        assert "Overview and Key Features" in symbol_names
+        assert "Code Completion" in symbol_names
+        assert chunk_count == 0
+
     def test_index_directory_uses_exact_bounded_python_path_for_visual_report_script(
         self, tmp_path, monkeypatch
     ):
