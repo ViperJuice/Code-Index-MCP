@@ -4182,6 +4182,70 @@ scripts/utilities/verify_tool_usage.py`.
 - IF-0-SEMUTILVERIFYTAIL-1 — exact later utility-script verification recovery
   and evidence contract.
 
+### Phase 73 — Qdrant Mapping And Claude Report Tail Recovery (SEMQDRANTREPORTTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later exact Python script seam
+exposed after SEMUTILVERIFYTAIL:
+`scripts/map_repos_to_qdrant.py ->
+scripts/create_claude_code_aware_report.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMUTILVERIFYTAIL
+      head either advances durably beyond the
+      `scripts/map_repos_to_qdrant.py ->
+      scripts/create_claude_code_aware_report.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later Qdrant/report script seam stays narrow,
+      tested, and does not reopen the already-cleared
+      `scripts/utilities/prepare_index_for_upload.py ->
+      scripts/utilities/verify_tool_usage.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMUTILVERIFYTAIL rerun outcome and the final live verdict for the later
+      Qdrant/report script pair.
+
+**Scope notes**
+
+This phase exists only if SEMUTILVERIFYTAIL proves the later utility-script
+verification pair is cleared, but the refreshed live rerun still terminalizes
+later in lexical walking on
+`scripts/map_repos_to_qdrant.py ->
+scripts/create_claude_code_aware_report.py`.
+
+**Non-goals**
+
+- No reopening of the cleared utility-script verification recovery once the
+  live rerun has advanced beyond
+  `scripts/utilities/prepare_index_for_upload.py ->
+  scripts/utilities/verify_tool_usage.py`.
+- No blanket reopening of unrelated script families unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower exact-path or
+  exact-pair contract.
+- No reopening of unrelated semantic-stage or release work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/map_repos_to_qdrant.py`
+- `scripts/create_claude_code_aware_report.py`
+
+**Depends on**
+- SEMUTILVERIFYTAIL
+
+**Produces**
+- IF-0-SEMQDRANTREPORTTAIL-1 — exact later Qdrant/report script recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4257,6 +4321,7 @@ SEMCONTRACT
   -> SEMTESTREPOINDEXTAIL
   -> SEMMISSINGREPOSEMTAIL
   -> SEMUTILVERIFYTAIL
+  -> SEMQDRANTREPORTTAIL
 ```
 
 ## Execution Notes
@@ -4442,6 +4507,19 @@ SEMCONTRACT
   scripts/utilities/verify_tool_usage.py`; it should repair that exact later
   utility-script pair or preserve the next exact downstream blocker instead of
   reopening earlier missing-repo or test-repo index work.
+- SEMUTILVERIFYTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears the later utility-script verification pair but exposes a later
+  exact blocker such as
+  `scripts/map_repos_to_qdrant.py ->
+  scripts/create_claude_code_aware_report.py`.
+- SEMQDRANTREPORTTAIL exists only if SEMUTILVERIFYTAIL proves the later
+  utility-script verification pair is cleared but the live rerun still remains
+  in lexical walking on
+  `scripts/map_repos_to_qdrant.py ->
+  scripts/create_claude_code_aware_report.py`; it should repair that exact
+  later Qdrant/report pair or preserve the next exact downstream blocker
+  instead of reopening earlier utility, missing-repo, or test-repo index
+  work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

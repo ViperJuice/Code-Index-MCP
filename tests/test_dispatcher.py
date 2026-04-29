@@ -3909,6 +3909,133 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "check_index_health" in working_indexes_fts_rows[0][0]
         assert "find_test_repos" in working_indexes_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_utility_verification_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        utility_dir = repo / "scripts" / "utilities"
+        prepare_script = utility_dir / "prepare_index_for_upload.py"
+        verify_script = utility_dir / "verify_tool_usage.py"
+        helper_script = utility_dir / "helper.py"
+        utility_dir.mkdir(parents=True)
+        prepare_script.write_text(
+            "def get_repo_hash():\n"
+            "    return 'hash'\n\n"
+            "def find_current_index(indexes_dir, repo_hash):\n"
+            "    return indexes_dir / repo_hash\n\n"
+            "def prepare_for_upload(index_dir, staging_dir):\n"
+            "    return True, f'{index_dir}:{staging_dir}'\n\n"
+            "def main():\n"
+            "    return prepare_for_upload('index', 'staging')\n",
+            encoding="utf-8",
+        )
+        verify_script.write_text(
+            "class ToolUsageAnalyzer:\n"
+            "    def parse_tool_sequence(self, session_log):\n"
+            "        return [session_log]\n\n"
+            "def create_mock_session_log():\n"
+            "    return 'mock-session-log'\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(prepare_script.resolve()),
+            str(helper_script.resolve()),
+            str(verify_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            prepare_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py') ORDER BY id"
+                ).fetchall()
+            ]
+            verify_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            prepare_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py')"
+            ).fetchone()[0]
+            verify_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py')"
+            ).fetchone()[0]
+            prepare_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py'"
+            ).fetchone()[0]
+            verify_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/utilities/helper.py'"
+            ).fetchone()[0]
+            prepare_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py')"
+            ).fetchall()
+            verify_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py')"
+            ).fetchall()
+        store.close()
+        assert prepare_symbols == [
+            "get_repo_hash",
+            "find_current_index",
+            "prepare_for_upload",
+            "main",
+        ]
+        assert verify_symbols == [
+            "ToolUsageAnalyzer",
+            "parse_tool_sequence",
+            "create_mock_session_log",
+        ]
+        assert helper_symbols == ["helper"]
+        assert prepare_chunk_count == 0
+        assert verify_chunk_count == 0
+        assert "exact_prepare_index_for_upload_rebound" in prepare_metadata
+        assert "exact_verify_tool_usage_rebound" in verify_metadata
+        assert "exact_prepare_index_for_upload_rebound" not in helper_metadata
+        assert "exact_verify_tool_usage_rebound" not in helper_metadata
+        assert len(prepare_fts_rows) == 1
+        assert "get_repo_hash" in prepare_fts_rows[0][0]
+        assert "prepare_for_upload" in prepare_fts_rows[0][0]
+        assert len(verify_fts_rows) == 1
+        assert "ToolUsageAnalyzer" in verify_fts_rows[0][0]
+        assert "create_mock_session_log" in verify_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -5374,6 +5501,148 @@ class TestEnhancedDispatcherProtocolConformance:
                 "scripts/ensure_test_repos_indexed.py",
                 "scripts/consolidate_real_performance_data.py",
                 "tests/docs/test_p8_deployment_security.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_utility_verification_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        utility_dir = repo / "scripts" / "utilities"
+        utility_dir.mkdir(parents=True)
+        prior_file = utility_dir / "prepare_index_for_upload.py"
+        prior_file.write_text(
+            "def get_repo_hash():\n"
+            "    return 'hash'\n\n"
+            "def find_current_index(indexes_dir, repo_hash):\n"
+            "    return indexes_dir / repo_hash\n\n"
+            "def prepare_for_upload(index_dir, staging_dir):\n"
+            "    return True, f'{index_dir}:{staging_dir}'\n\n"
+            "def main():\n"
+            "    return prepare_for_upload('index', 'staging')\n",
+            encoding="utf-8",
+        )
+        blocked_file = utility_dir / "verify_tool_usage.py"
+        blocked_file.write_text(
+            "class ToolUsageAnalyzer:\n"
+            "    def parse_tool_sequence(self, session_log):\n"
+            "        return [session_log]\n\n"
+            "def create_mock_session_log():\n"
+            "    return 'mock-session-log'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(utility_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["semantic_stage"] == "failed"
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            prepare_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py') ORDER BY id"
+                ).fetchall()
+            ]
+            verify_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py') ORDER BY id"
+                ).fetchall()
+            ]
+            prepare_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py')"
+            ).fetchone()[0]
+            verify_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py')"
+            ).fetchone()[0]
+            prepare_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/prepare_index_for_upload.py')"
+            ).fetchall()
+            verify_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/utilities/verify_tool_usage.py')"
+            ).fetchall()
+        store.close()
+        assert prepare_symbols == [
+            "get_repo_hash",
+            "find_current_index",
+            "prepare_for_upload",
+            "main",
+        ]
+        assert verify_symbols == [
+            "ToolUsageAnalyzer",
+            "parse_tool_sequence",
+            "create_mock_session_log",
+        ]
+        assert prepare_chunk_count == 0
+        assert verify_chunk_count == 0
+        assert len(prepare_fts) == 1
+        assert "get_repo_hash" in prepare_fts[0][0]
+        assert "prepare_for_upload" in prepare_fts[0][0]
+        assert len(verify_fts) == 1
+        assert "ToolUsageAnalyzer" in verify_fts[0][0]
+        assert "create_mock_session_log" in verify_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "scripts/check_test_index_schema.py",
+                "scripts/ensure_test_repos_indexed.py",
+                "scripts/index_missing_repos_semantic.py",
+                "scripts/identify_working_indexes.py",
             )
             for snapshot in snapshots
         )
