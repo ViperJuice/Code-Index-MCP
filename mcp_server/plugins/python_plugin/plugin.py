@@ -29,7 +29,10 @@ from ...utils.treesitter_wrapper import TreeSitterWrapper
 
 class Plugin(IPlugin):
     lang = "python"
-    _BOUNDED_CHUNK_PATHS = {"scripts/create_multi_repo_visual_report.py"}
+    _BOUNDED_CHUNK_PATHS = {
+        "scripts/create_multi_repo_visual_report.py",
+        "tests/test_artifact_publish_race.py",
+    }
 
     def __init__(self, sqlite_store: Optional[SQLiteStore] = None, preindex: bool = True) -> None:
         self._ts = TreeSitterWrapper()

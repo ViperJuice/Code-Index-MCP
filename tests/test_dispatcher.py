@@ -1545,6 +1545,116 @@ class TestEnhancedDispatcherProtocolConformance:
         assert chunk_count == 0
         assert calls == []
 
+    def test_index_directory_uses_exact_bounded_python_path_for_artifact_publish_race(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        test_file = repo / "tests" / "test_artifact_publish_race.py"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text(
+            "class TestArtifactPublishRace:\n"
+            "    def test_publish_race_boundary(self):\n"
+            "        return 'ok'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(test_file.resolve())
+        with store._get_connection() as conn:
+            symbol_names = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_artifact_publish_race.py') ORDER BY id"
+                ).fetchall()
+            ]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_artifact_publish_race.py')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_artifact_publish_race.py')"
+            ).fetchall()
+        store.close()
+        assert "TestArtifactPublishRace" in symbol_names
+        assert "test_publish_race_boundary" in symbol_names
+        assert chunk_count == 0
+        assert calls == []
+        assert len(fts_rows) == 1
+        assert "test_publish_race_boundary" in fts_rows[0][0]
+
+    def test_index_directory_keeps_other_bounded_python_tests_on_chunked_path(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.python_plugin.plugin import Plugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        test_file = repo / "tests" / "test_benchmarks.py"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text(
+            "def test_benchmark_listing():\n"
+            "    return 'ok'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["last_progress_path"] == str(test_file.resolve())
+        with store._get_connection() as conn:
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_benchmarks.py')"
+            ).fetchone()[0]
+        store.close()
+        assert chunk_count == 0
+        assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/test_benchmarks.py" not in Plugin._BOUNDED_CHUNK_PATHS
+
     def test_index_directory_keeps_unrelated_status_markdown_on_heavy_path(
         self, tmp_path, monkeypatch
     ):

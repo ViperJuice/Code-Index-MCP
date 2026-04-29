@@ -1775,6 +1775,66 @@ rerun on 2026-04-29 still stopped refreshing at the later
 - IF-0-SEMPUBLISHRACE-1 — `tests/test_artifact_publish_race.py` lexical exit
   and blocker evidence contract.
 
+### Phase 33 — Devcontainer Rebound Lexical Re-Anchor Recovery (SEMDEVREBOUND)
+
+**Objective**
+
+Repair the renewed exact lexical blocker exposed after SEMPUBLISHRACE so a
+repo-local force-full rerun no longer advances beyond
+`tests/test_artifact_publish_race.py` only to re-anchor on
+`.devcontainer/devcontainer.json` with a stale durable trace.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer remains on
+      `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/post_create.sh`
+      and
+      `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+      with an unchanged `trace_timestamp` after the configured lexical-timeout
+      window once the rerun has already advanced beyond
+      `tests/test_artifact_publish_race.py`.
+- [ ] The rerun either completes the renewed `.devcontainer/devcontainer.json`
+      lexical seam and advances into later lexical or semantic work, or exits
+      with a bounded lexical blocker that still names that exact file family
+      truthfully.
+- [ ] Operator status, tests, and dogfood evidence stay aligned with the
+      configured timeout window and the renewed
+      `.devcontainer/devcontainer.json` blocker shape after the
+      `tests/test_artifact_publish_race.py` seam is cleared.
+
+**Scope notes**
+
+This phase exists only because SEMPUBLISHRACE proved the live force-full rerun
+no longer remains on `tests/test_artifact_publish_race.py`, but the same live
+rerun later re-anchored on `.devcontainer/devcontainer.json` with a stale
+running snapshot on 2026-04-29.
+
+**Non-goals**
+
+- No reopening of `tests/test_artifact_publish_race.py`, `ai_docs/jedi.md`,
+  `ai_docs/*_overview.md`, fast-test report, or visual-report-script lexical
+  repairs unless fresh evidence re-anchors there again.
+- No semantic summary or vector-write work before the renewed
+  `.devcontainer/devcontainer.json` lexical blocker exits cleanly or advances
+  past that seam.
+- No broad repo-wide timeout retuning beyond what is needed to make this exact
+  blocker surface truthfully and fail closed.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMPUBLISHRACE
+
+**Produces**
+- IF-0-SEMDEVREBOUND-1 — renewed `.devcontainer/devcontainer.json` lexical
+  re-anchor and blocker evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1810,6 +1870,7 @@ SEMCONTRACT
   -> SEMTRACEFRESHNESS
   -> SEMDEVCONTAINER
   -> SEMPUBLISHRACE
+  -> SEMDEVREBOUND
 ```
 
 ## Execution Notes
@@ -1940,6 +2001,9 @@ SEMCONTRACT
   rerun still remains in lexical walking on
   `tests/test_artifact_publish_race.py`; it should repair that exact file path
   or preserve a still narrower downstream blocker.
+- SEMPUBLISHRACE should amend the roadmap immediately if the refreshed live
+  rerun clears `tests/test_artifact_publish_race.py` but later re-anchors on a
+  different exact lexical seam such as `.devcontainer/devcontainer.json`.
 
 ## Verification
 
