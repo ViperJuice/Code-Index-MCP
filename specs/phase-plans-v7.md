@@ -2177,6 +2177,64 @@ root-test pair.
 - IF-0-SEMROOTTESTABORT-1 — later root-test abort trace recovery and evidence
   contract.
 
+### Phase 40 — Renewed Devcontainer Lexical Relapse Recovery (SEMDEVRELAPSE)
+
+**Objective**
+
+Repair the renewed repo-local force-full lexical relapse exposed after
+SEMROOTTESTABORT hardens the later root-test seam, so a refreshed rerun on the
+new head no longer re-anchors early on `.devcontainer/devcontainer.json`
+before it can reach the later script/root-test families.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMROOTTESTABORT
+      head no longer stalls or terminates with the durable trace re-anchored
+      on `Last progress path:
+      /home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+      while still in `Trace stage: lexical_walking`.
+- [ ] `force_full_exit_trace.json` and `uv run mcp-index repository status`
+      either advance durably beyond `.devcontainer/devcontainer.json` on the
+      new head or fail closed with a newer exact blocker that is truthful for
+      the refreshed rerun.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      SEMROOTTESTABORT coverage landing, the renewed `.devcontainer`
+      relapse evidence on commit `a4120401`, and the final live verdict for
+      the repaired rerun.
+
+**Scope notes**
+
+This phase exists only because SEMROOTTESTABORT proved the later
+`tests/root_tests/test_voyage_api.py ->
+tests/root_tests/run_reranking_tests.py` seam is now frozen correctly, but
+the refreshed live rerun on observed commit `a4120401` never reached that pair
+and instead re-anchored earlier on `.devcontainer/devcontainer.json`.
+
+**Non-goals**
+
+- No reopening of the later root-test seam unless a refreshed rerun reaches it
+  again and exposes a newer blocker.
+- No reopening of the cleared later script-pair seam unless the live rerun
+  re-anchors there again.
+- No widening into semantic-closeout or summary/vector work unless the
+  refreshed rerun clears the renewed `.devcontainer` relapse first.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMROOTTESTABORT
+
+**Produces**
+- IF-0-SEMDEVRELAPSE-1 — renewed `.devcontainer/devcontainer.json` lexical
+  relapse recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2219,6 +2277,7 @@ SEMCONTRACT
   -> SEMTESTSTALE
   -> SEMSCRIPTABORT
   -> SEMROOTTESTABORT
+  -> SEMDEVRELAPSE
 ```
 
 ## Execution Notes
@@ -2261,6 +2320,11 @@ SEMCONTRACT
   scripts/validate_mcp_comprehensive.py` but exposes a later exact blocker
   such as `tests/root_tests/test_voyage_api.py ->
   tests/root_tests/run_reranking_tests.py`.
+- SEMROOTTESTABORT should amend the roadmap immediately if the refreshed live
+  rerun on the new head fails to reach the later root-test pair and instead
+  re-anchors earlier on `.devcontainer/devcontainer.json`, because the next
+  repair is then no longer root-test-local and any older downstream plan is
+  stale.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

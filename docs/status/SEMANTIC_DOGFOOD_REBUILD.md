@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T11:43:19Z`.
-- Observed commit: `098c1ad1`.
+- Evidence captured: `2026-04-29T12:04:52Z`.
+- Observed commit: `a4120401`.
 - Prior SEMDISKIO live-rerun anchor: `2026-04-29T10:35:02Z` on observed
   commit `c8b2d724`.
 - Prior SEMSCRIPTREBOUND evidence anchor: `2026-04-29T10:13:12Z` on observed
@@ -12,16 +12,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMSCRIPTABORT.md`.
+- Phase plan: `plans/phase-plan-v7-SEMROOTTESTABORT.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMSCRIPTABORT` after SEMTESTSTALE proved the later
-  `tests/test_deployment_runbook_shape.py ->
-  tests/test_reindex_resume.py` stale-running seam is cleared, but the
-  refreshed live rerun on the new head exited with code `135` and later
-  re-anchored on
-  `scripts/validate_mcp_comprehensive.py` after
-  `scripts/run_test_batch.py`. Older downstream assumptions should be treated
-  as stale after this roadmap amendment.
+  `SEMDEVRELAPSE` after SEMROOTTESTABORT proved the later
+  `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py` seam is now frozen in dispatcher,
+  durable-trace, and operator-status coverage, but the refreshed live rerun on
+  the new head never reached that pair and instead re-anchored earlier on
+  `.devcontainer/devcontainer.json`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
 
 ## Reset Boundary
 
@@ -238,6 +237,54 @@ Steering outcome from that live rerun:
 - Older downstream assumptions should be treated as stale, including any plan
   or handoff that still treats the active blocker as the semantic-closeout
   `disk I/O error` seam on the current head.
+
+## SEMROOTTESTABORT Code And Live Rerun Check
+
+SEMROOTTESTABORT tightened the later root-test contract at the exact bounded
+path, durable trace, and operator-status surfaces, but the refreshed live
+rerun on the new head re-anchored earlier and changed the next downstream
+work again.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `tests/root_tests/run_reranking_tests.py` as an exact bounded Python path.
+- `mcp_server/cli/repository_commands.py` now prints the matching exact
+  bounded lexical boundary line for
+  `tests/root_tests/run_reranking_tests.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze the later
+  `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py` trace and status contract without
+  reopening earlier script, publish-race, or `.devcontainer` seams.
+
+Observed progression on the refreshed live repo-local force-full command:
+
+- The SEMROOTTESTABORT live rerun started on observed commit
+  `a4120401381a0e179d0ee0e9355742817e8285d1` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`.
+- By `2026-04-29T12:04:35Z`, the durable trace was still in
+  `Trace stage: lexical_walking` with
+  `Trace blocker source: lexical_mutation` and
+  `Last progress path: /home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`.
+- The bounded command timed out locally after 120 seconds, and
+  `uv run mcp-index repository status` then terminalized the stale running
+  snapshot to
+  `Trace status: interrupted` at `2026-04-29T12:04:52Z` on the same
+  `.devcontainer/devcontainer.json` marker.
+- The rerun did not advance to
+  `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py` on the new head.
+
+Steering outcome from that refreshed rerun:
+
+- The root-test seam is now covered and operator-visible when reached, but the
+  active live blocker on observed commit `a4120401` is no longer the later
+  root-test pair.
+- The roadmap now adds `SEMDEVRELAPSE` as the nearest downstream phase.
+- Older downstream assumptions should be treated as stale, including any plan
+  or handoff that still treats the active blocker as the later root-test pair
+  on the current head.
 
 ## SEMDEVSTALE Live Rerun Check
 
