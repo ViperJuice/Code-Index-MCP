@@ -507,6 +507,19 @@ def _print_utility_verification_script_boundary(prefix: str, repo_path: Path) ->
         )
 
 
+def _print_qdrant_report_script_boundary(prefix: str, repo_path: Path) -> None:
+    script_paths = (
+        repo_path / "scripts" / "map_repos_to_qdrant.py",
+        repo_path / "scripts" / "create_claude_code_aware_report.py",
+    )
+    if all(path.is_file() for path in script_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "scripts/map_repos_to_qdrant.py -> "
+            "scripts/create_claude_code_aware_report.py"
+        )
+
+
 def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -> None:
     test_path = repo_path / "tests" / "test_artifact_publish_race.py"
     if test_path.is_file():
@@ -1064,6 +1077,7 @@ def status(repo_id: Optional[str]):
         _print_test_repo_index_script_boundary("  ", Path(status["path"]))
         _print_missing_repo_semantic_script_boundary("  ", Path(status["path"]))
         _print_utility_verification_script_boundary("  ", Path(status["path"]))
+        _print_qdrant_report_script_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_docs_governance_contract_python_boundary("  ", Path(status["path"]))

@@ -4246,6 +4246,70 @@ scripts/create_claude_code_aware_report.py`.
 - IF-0-SEMQDRANTREPORTTAIL-1 — exact later Qdrant/report script recovery and
   evidence contract.
 
+### Phase 74 — Optimized Analysis Upload Tail Recovery (SEMOPTUPLOADTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later exact Python script seam
+exposed after SEMQDRANTREPORTTAIL:
+`scripts/execute_optimized_analysis.py ->
+scripts/index-artifact-upload-v2.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMQDRANTREPORTTAIL
+      head either advances durably beyond the
+      `scripts/execute_optimized_analysis.py ->
+      scripts/index-artifact-upload-v2.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later optimized-analysis/upload script seam
+      stays narrow, tested, and does not reopen the already-cleared
+      `scripts/map_repos_to_qdrant.py ->
+      scripts/create_claude_code_aware_report.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMQDRANTREPORTTAIL rerun outcome and the final live verdict for the
+      later optimized-analysis/upload script pair.
+
+**Scope notes**
+
+This phase exists only if SEMQDRANTREPORTTAIL proves the later Qdrant/report
+pair is cleared, but the refreshed live rerun still terminalizes later in
+lexical walking on
+`scripts/execute_optimized_analysis.py ->
+scripts/index-artifact-upload-v2.py`.
+
+**Non-goals**
+
+- No reopening of the cleared Qdrant/report recovery once the live rerun has
+  advanced beyond
+  `scripts/map_repos_to_qdrant.py ->
+  scripts/create_claude_code_aware_report.py`.
+- No blanket reopening of unrelated script families unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower exact-path or
+  exact-pair contract.
+- No reopening of unrelated semantic-stage or release work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/execute_optimized_analysis.py`
+- `scripts/index-artifact-upload-v2.py`
+
+**Depends on**
+- SEMQDRANTREPORTTAIL
+
+**Produces**
+- IF-0-SEMOPTUPLOADTAIL-1 — exact later optimized-analysis/upload script
+  recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4322,6 +4386,7 @@ SEMCONTRACT
   -> SEMMISSINGREPOSEMTAIL
   -> SEMUTILVERIFYTAIL
   -> SEMQDRANTREPORTTAIL
+  -> SEMOPTUPLOADTAIL
 ```
 
 ## Execution Notes
@@ -4520,6 +4585,19 @@ SEMCONTRACT
   later Qdrant/report pair or preserve the next exact downstream blocker
   instead of reopening earlier utility, missing-repo, or test-repo index
   work.
+- SEMQDRANTREPORTTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears the later Qdrant/report pair but exposes a later exact
+  blocker such as
+  `scripts/execute_optimized_analysis.py ->
+  scripts/index-artifact-upload-v2.py`.
+- SEMOPTUPLOADTAIL exists only if SEMQDRANTREPORTTAIL proves the later
+  Qdrant/report pair is cleared but the live rerun still remains in lexical
+  walking on
+  `scripts/execute_optimized_analysis.py ->
+  scripts/index-artifact-upload-v2.py`; it should repair that exact later
+  optimized-analysis/upload pair or preserve the next exact downstream blocker
+  instead of reopening earlier Qdrant/report, utility, missing-repo, or
+  test-repo index work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

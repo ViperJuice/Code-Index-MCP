@@ -132,6 +132,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
         "exact_prepare_index_for_upload_rebound"
     ),
     "scripts/utilities/verify_tool_usage.py": "exact_verify_tool_usage_rebound",
+    "scripts/map_repos_to_qdrant.py": "exact_map_repos_to_qdrant_rebound",
+    "scripts/create_claude_code_aware_report.py": (
+        "exact_create_claude_code_aware_report_rebound"
+    ),
     "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "scripts/verify_embeddings.py": "exact_verify_embeddings_rebound",
     "scripts/claude_code_behavior_simulator.py": "exact_claude_code_behavior_simulator_rebound",

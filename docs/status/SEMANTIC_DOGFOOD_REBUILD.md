@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T23:02:25Z`.
-- Observed commit: `490ad260833a7a12c10e8be9a1c656f789247f9c`.
+- Evidence captured: `2026-04-29T23:19:22Z`.
+- Observed commit: `2a439a39b168cb01571e0b0872016875d198b6e2`.
+- Prior SEMQDRANTREPORTTAIL live-rerun anchor: `2026-04-29T23:02:25Z` on
+  observed commit `490ad260833a7a12c10e8be9a1c656f789247f9c`.
 - Prior SEMUTILVERIFYTAIL live-rerun anchor: `2026-04-29T22:44:15Z` on
   observed commit `d0732db6`.
 - Prior SEMMISSINGREPOSEMTAIL live-rerun anchor: `2026-04-29T22:27:04Z` on
@@ -44,8 +46,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMUTILVERIFYTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMMISSINGREPOSEMTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMQDRANTREPORTTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMUTILVERIFYTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMOPTUPLOADTAIL` after SEMQDRANTREPORTTAIL proved the later Qdrant/report
+  seam is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `scripts/execute_optimized_analysis.py ->
+  scripts/index-artifact-upload-v2.py`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMQDRANTREPORTTAIL` after SEMUTILVERIFYTAIL proved the later utility-script
   verification seam is now cleared, but the refreshed live rerun on the new
@@ -2771,14 +2780,66 @@ Steering outcome:
   `scripts/utilities/prepare_index_for_upload.py ->
   scripts/utilities/verify_tool_usage.py`.
 
+## SEMQDRANTREPORTTAIL Live Rerun Check
+
+SEMQDRANTREPORTTAIL repaired the later Qdrant/report seam on the current
+head. The refreshed repo-local force-full rerun advanced durably beyond that
+pair and re-anchored later in lexical walking on a newer exact Python script
+seam.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMQDRANTREPORTTAIL live rerun started on observed commit
+  `2a439a39b168cb01571e0b0872016875d198b6e2` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T23:19:13Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/execute_optimized_analysis.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/index-artifact-upload-v2.py`.
+- At `2026-04-29T23:19:22Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving the same later script
+  pair and keeping the repo semantically fail-closed.
+- The SEMQDRANTREPORTTAIL target pair is no longer the active blocker:
+  `scripts/map_repos_to_qdrant.py ->
+  scripts/create_claude_code_aware_report.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+- `repository status` now advertises the repaired exact bounded lexical
+  surface
+  `Lexical boundary: using exact bounded Python indexing for scripts/map_repos_to_qdrant.py -> scripts/create_claude_code_aware_report.py`.
+
+Steering outcome:
+
+- SEMQDRANTREPORTTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `scripts/map_repos_to_qdrant.py ->
+  scripts/create_claude_code_aware_report.py`.
+- The final authoritative rerun for this phase moved later and now reaches
+  the exact script pair
+  `scripts/execute_optimized_analysis.py ->
+  scripts/index-artifact-upload-v2.py`.
+- The roadmap now adds downstream phase `SEMOPTUPLOADTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMQDRANTREPORTTAIL-era script seam
+  `scripts/map_repos_to_qdrant.py ->
+  scripts/create_claude_code_aware_report.py`.
+
 ## Verification
 
-Verification sequence for this SEMUTILVERIFYTAIL slice:
+Verification sequence for this SEMQDRANTREPORTTAIL slice:
 
 ```bash
-uv run pytest tests/test_dispatcher.py -q --no-cov -k "prepare_index_for_upload or verify_tool_usage or lexical or bounded or utility"
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "prepare_index_for_upload or verify_tool_usage or lexical or interrupted or boundary or utility"
-uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMUTILVERIFYTAIL or prepare_index_for_upload or verify_tool_usage or utility"
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "map_repos_to_qdrant or claude_code_aware_report or qdrant or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "map_repos_to_qdrant or claude_code_aware_report or qdrant or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMQDRANTREPORTTAIL or map_repos_to_qdrant or create_claude_code_aware_report or qdrant"
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sed -n '1,240p' .mcp-index/force_full_exit_trace.json
