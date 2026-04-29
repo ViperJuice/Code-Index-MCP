@@ -2294,6 +2294,101 @@ def test_force_full_sync_durable_trace_moves_past_jedi_ai_doc(tmp_path):
     registry.update_indexed_commit.assert_not_called()
 
 
+def test_get_repository_status_preserves_later_ai_docs_overview_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    black_doc = repo / "ai_docs" / "black_isort_overview.md"
+    sqlite_doc = repo / "ai_docs" / "sqlite_fts5_overview.md"
+    black_doc.parent.mkdir(parents=True, exist_ok=True)
+    black_doc.write_text("# Black & isort AI Context\n", encoding="utf-8")
+    sqlite_doc.write_text("# SQLite FTS5 Comprehensive Guide for Code Indexing\n", encoding="utf-8")
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-29T21:50:51Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(black_doc),
+                "in_flight_path": str(sqlite_doc),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(black_doc)
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(sqlite_doc)
+    assert "tests/fixtures/multi_repo.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+
+
+def test_force_full_sync_durable_trace_moves_past_later_ai_docs_overview_pair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.index_path.touch()
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    later_file = repo / "mcp_search_code_test_results.json"
+    in_flight_file = repo / "MIGRATION_LOG.md"
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=5,
+            failed=1,
+            errors=["Lexical indexing timed out while processing MIGRATION_LOG.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 6,
+                "lexical_files_completed": 5,
+                "last_progress_path": str(later_file),
+                "in_flight_path": str(in_flight_file),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing MIGRATION_LOG.md",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert "black_isort_overview.md" not in (trace.get("last_progress_path") or "")
+    assert "sqlite_fts5_overview.md" not in (trace.get("in_flight_path") or "")
+    assert trace["last_progress_path"] == str(later_file)
+    assert trace["in_flight_path"] == str(in_flight_file)
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    registry.update_indexed_commit.assert_not_called()
+
+
 def test_force_full_sync_durable_trace_moves_past_validation_doc_pair(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

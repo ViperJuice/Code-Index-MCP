@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T20:38:17Z`.
-- Observed commit: `dab8822a`.
+- Evidence captured: `2026-04-29T22:08:25Z`.
+- Observed commit: `a0811d8a`.
+- Prior SEMFIXTURETAIL live-rerun anchor: `2026-04-29T21:51:02Z` on observed
+  commit `3b92a81`.
 - Prior SEMSUPPORTTAIL live-rerun anchor: `2026-04-29T19:52:03Z` on observed
   commit `a7a71f24`.
 - Prior SEMCODEXLOOPTAIL live-rerun anchor: `2026-04-29T18:52:55Z` on observed
@@ -36,8 +38,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMV1PLANTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMFIXTURETAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMTESTREPOINDEXTAIL` after SEMAIOVERVIEWTAIL proved the later `ai_docs`
+  overview seam is now cleared, but the refreshed live rerun on the new head
+  still terminalized later in lexical walking on
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`. Older downstream assumptions should
+  be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMJEDIP4TAIL` after SEMV1PLANTAIL proved the later historical v1
   phase-plan seam is now cleared, but the refreshed live rerun on the new
@@ -823,40 +832,32 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
 Local multi-repo dogfooding is **still not ready** after
-SEMARCHIVEWALKGAP.
+SEMAIOVERVIEWTAIL.
 
 Why:
 
-- The SEMWALKGAP evidence refresh is real: the post-devcontainer ignore tail
-  is now frozen in phase-local tests and the live status artifact.
-- The stale trace bug from SEMJEDI remains closed as a unit/status contract:
-  the operator surface now distinguishes missing traces, stale-running traces,
-  and storage-closeout traces.
-- The refreshed live rerun on commit `26a163da` still times out, but the
-  durable trace now advances to
-  `mcp_server/visualization/__init__.py ->
-  mcp_server/visualization/quick_charts.py` while `repository status`
-  truthfully terminalizes that later running trace to `interrupted`.
-- The post-devcontainer ignored tail is no longer the active blocker on the
-  current head.
+- The bounded `ai_docs/*_overview.md` contract is now frozen in phase-local
+  tests for the exact later pair
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+- The refreshed live rerun on commit `a0811d8a` still times out, but the
+  durable trace now advances beyond the later `ai_docs` overview seam and
+  `repository status` truthfully terminalizes that rerun to `interrupted` on
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
+- The SEMFIXTURETAIL and SEMAIOVERVIEWTAIL blockers are no longer the active
+  blockers on the current head.
 - The partial runtime still ends with `chunk_summaries = 0` and
   `semantic_points = 0`.
 
 Steering outcome:
 
-- SEMTRACEFRESHNESS acceptance remains satisfied for the operator surface: the
-  stale-running condition is now reported truthfully instead of silently
-  disappearing behind a missing trace.
-- SEMDEVRELAPSE remains historically valid on the prior head: it captured the
-  walk-order evidence showing the post-devcontainer tail was the next
-  unexplained gap.
-- SEMDEVSTALE and SEMTESTSTALE remain historically valid on earlier heads, and
-  SEMWALKGAP now proves the refreshed current-head rerun has moved beyond the
-  same-file `.devcontainer/devcontainer.json` marker again.
-- SEMSCRIPTABORT and SEMROOTTESTABORT remain historically valid repairs for
-  later seams that were not reached by the refreshed current-head rerun.
-- The roadmap now adds downstream phase `SEMQUICKCHARTS`.
-- The roadmap now adds downstream phase `SEMVALIDEVIDENCE`.
+- SEMAIOVERVIEWTAIL acceptance remains satisfied for the operator surface and
+  the exact later overview pair.
+- SEMFIXTURETAIL remains historically valid on the prior head: it captured
+  the last fixture-local blocker before the current rerun advanced into the
+  later overview seam.
+- The roadmap now adds downstream phase `SEMTESTREPOINDEXTAIL`.
 - Older downstream assumptions should be treated as stale, including any
   downstream phase plan or handoff that still treats the active current-head
   blocker as the post-devcontainer ignore tail or the older
@@ -2525,6 +2526,64 @@ Steering outcome:
   `tests/fixtures/multi_repo.py ->
   tests/fixtures/files/test_files/example.c`.
 
+## SEMAIOVERVIEWTAIL Live Rerun Check
+
+SEMAIOVERVIEWTAIL did not require a new overview-local repair on the current
+head. The refreshed repo-local force-full rerun already advanced beyond the
+later `ai_docs` overview pair and terminalized later in lexical walking on a
+narrower exact Python script seam.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMAIOVERVIEWTAIL live rerun started on observed commit
+  `a0811d8a` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T22:03:19Z`, `repository status` still reflected the stale
+  pre-rerun partial-index surface and reported `Force-full exit trace:
+  missing`.
+- By `2026-04-29T22:04:27Z`, `.mcp-index/force_full_exit_trace.json` had
+  already advanced later than the overview seam to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/mcp_search_code_test_results.json`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/MIGRATION_LOG.md`.
+- By `2026-04-29T22:05:44Z`, the same rerun had advanced again to the legacy
+  compatibility runtime path
+  `.codex/phase-loop/runs/20260427T075538Z-06-watch-plan/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T075538Z-06-watch-plan/launch.json`.
+- At `2026-04-29T22:08:25Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` with the later exact script pair
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py` while keeping the repo semantically
+  fail-closed.
+- The SEMAIOVERVIEWTAIL target pair is no longer the active blocker:
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMAIOVERVIEWTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+- The final authoritative rerun for this phase moved later and now reaches
+  the exact script pair
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
+- The roadmap now adds downstream phase `SEMTESTREPOINDEXTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMAIOVERVIEWTAIL-era overview seam
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:
@@ -2557,6 +2616,18 @@ Verification sequence for this SEMOPTREPORTTAIL slice:
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "optimized_final_report or final_report_data or analysis_report"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "optimized_final_report or final_report_data or analysis_report or interrupted or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMAIOVERVIEWTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k "black_isort or sqlite_fts5 or overview or ai_docs or markdown"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "black_isort or sqlite_fts5 or overview or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMAIOVERVIEWTAIL or black_isort or sqlite_fts5 or overview"
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sed -n '1,240p' .mcp-index/force_full_exit_trace.json

@@ -721,6 +721,58 @@ All notable changes to this project will be documented in this file.
         assert "MCP Server Use Cases" in symbol_names
         assert "Code Intelligence Service" in symbol_names
 
+    def test_later_ai_docs_overview_pair_uses_generic_bounded_markdown_path(
+        self, markdown_plugin
+    ):
+        """The later ai_docs overview pair should stay on the generic overview path."""
+        black_content = """
+# Black & isort AI Context
+
+## Framework Overview
+
+### Tooling Contract
+- Preserve lexical file and heading discoverability
+"""
+        sqlite_content = """
+# SQLite FTS5 Comprehensive Guide for Code Indexing
+
+## Table of Contents
+
+### Introduction to FTS5
+- Keep the later overview seam on the bounded path
+"""
+        unrelated_content = """
+# Qdrant Notes
+
+## Heavy Path
+
+### Guardrail
+- Do not broaden ai_docs overview handling
+"""
+
+        black_result = markdown_plugin.indexFile("ai_docs/black_isort_overview.md", black_content)
+        sqlite_result = markdown_plugin.indexFile("ai_docs/sqlite_fts5_overview.md", sqlite_content)
+        unrelated_result = markdown_plugin.indexFile("ai_docs/qdrant.md", unrelated_content)
+
+        assert black_result["metadata"]["lightweight_index"] is True
+        assert black_result["metadata"]["lightweight_reason"] == "ai_docs_overview_path"
+        assert black_result["chunks"] == []
+        black_symbols = [symbol["symbol"] for symbol in black_result["symbols"]]
+        assert "Black & isort AI Context" in black_symbols
+        assert "Framework Overview" in black_symbols
+        assert "Tooling Contract" in black_symbols
+
+        assert sqlite_result["metadata"]["lightweight_index"] is True
+        assert sqlite_result["metadata"]["lightweight_reason"] == "ai_docs_overview_path"
+        assert sqlite_result["chunks"] == []
+        sqlite_symbols = [symbol["symbol"] for symbol in sqlite_result["symbols"]]
+        assert "SQLite FTS5 Comprehensive Guide for Code Indexing" in sqlite_symbols
+        assert "Table of Contents" in sqlite_symbols
+        assert "Introduction to FTS5" in sqlite_symbols
+
+        assert unrelated_result["metadata"].get("lightweight_index") is not True
+        assert unrelated_result["chunks"] != []
+
     def test_other_ai_docs_markdown_stays_on_heavy_path(self, markdown_plugin):
         """The Jedi recovery must not broaden to unrelated ai_docs Markdown files."""
         content = """

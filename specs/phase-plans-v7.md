@@ -3990,6 +3990,70 @@ ai_docs/sqlite_fts5_overview.md`.
 - IF-0-SEMAIOVERVIEWTAIL-1 — exact later `ai_docs` overview recovery and
   evidence contract.
 
+### Phase 70 — Test-Repo Index Script Tail Recovery (SEMTESTREPOINDEXTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later Python script seam exposed
+after SEMAIOVERVIEWTAIL:
+`scripts/check_test_index_schema.py ->
+scripts/ensure_test_repos_indexed.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMAIOVERVIEWTAIL
+      head either advances durably beyond the
+      `scripts/check_test_index_schema.py ->
+      scripts/ensure_test_repos_indexed.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later test-repo index script seam stays
+      narrow, tested, and does not reopen the already-cleared
+      `ai_docs/black_isort_overview.md ->
+      ai_docs/sqlite_fts5_overview.md`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMAIOVERVIEWTAIL rerun outcome and the final live verdict for the later
+      test-repo index script pair.
+
+**Scope notes**
+
+This phase exists only if SEMAIOVERVIEWTAIL proves the later `ai_docs`
+overview pair is cleared, but the refreshed live rerun still terminalizes
+later in lexical walking on
+`scripts/check_test_index_schema.py ->
+scripts/ensure_test_repos_indexed.py`.
+
+**Non-goals**
+
+- No reopening of the cleared `ai_docs` overview recovery once the live rerun
+  has advanced beyond
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+- No blanket reopening of unrelated script families unless the refreshed
+  rerun proves the active blocker cannot be cleared with a narrower exact-path
+  or exact-pair contract.
+- No reopening of unrelated semantic-stage or roadmap work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/check_test_index_schema.py`
+- `scripts/ensure_test_repos_indexed.py`
+
+**Depends on**
+- SEMAIOVERVIEWTAIL
+
+**Produces**
+- IF-0-SEMTESTREPOINDEXTAIL-1 — exact later test-repo index script recovery
+  and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4062,6 +4126,7 @@ SEMCONTRACT
   -> SEMOPTREPORTTAIL
   -> SEMFIXTURETAIL
   -> SEMAIOVERVIEWTAIL
+  -> SEMTESTREPOINDEXTAIL
 ```
 
 ## Execution Notes
@@ -4211,6 +4276,18 @@ SEMCONTRACT
   ai_docs/sqlite_fts5_overview.md`; it should repair that exact later
   `ai_docs` pair or preserve the next exact downstream blocker instead of
   reopening earlier fixture or optimized-report work.
+- SEMAIOVERVIEWTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears the later `ai_docs` overview pair but exposes a later exact
+  blocker such as
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
+- SEMTESTREPOINDEXTAIL exists only if SEMAIOVERVIEWTAIL proves the later
+  `ai_docs` overview pair is cleared but the live rerun still remains in
+  lexical walking on
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`; it should repair that exact later
+  script pair or preserve the next exact downstream blocker instead of
+  reopening earlier overview, fixture, or optimized-report work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

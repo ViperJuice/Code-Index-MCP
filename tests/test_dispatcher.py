@@ -1431,6 +1431,128 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Framework Overview" in symbol_names
         assert "Test Structure" in symbol_names
 
+    def test_index_directory_uses_bounded_markdown_path_for_later_ai_docs_overview_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        (repo / "ai_docs").mkdir(parents=True)
+        black_doc = repo / "ai_docs" / "black_isort_overview.md"
+        sqlite_doc = repo / "ai_docs" / "sqlite_fts5_overview.md"
+        unrelated_doc = repo / "ai_docs" / "qdrant.md"
+        jedi_doc = repo / "ai_docs" / "jedi.md"
+        black_doc.write_text(
+            "# Black & isort AI Context\n\n## Framework Overview\n\n### Tooling Contract\n"
+            "- Preserve lexical discoverability\n",
+            encoding="utf-8",
+        )
+        sqlite_doc.write_text(
+            "# SQLite FTS5 Comprehensive Guide for Code Indexing\n\n## Table of Contents\n\n"
+            "### Introduction to FTS5\n- Keep the later overview seam on the bounded path\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# Qdrant Notes\n\n## Heavy Path\n\n### Guardrail\n- Do not broaden ai_docs bounds\n",
+            encoding="utf-8",
+        )
+        jedi_doc.write_text(
+            "# Jedi Documentation\n\n## Overview and Key Features\n\n### Code Completion\n"
+            "- Preserve the exact bounded path\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for the later ai_docs overview pair"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        plugin = MarkdownPlugin()
+        assert (
+            plugin._resolve_lightweight_reason(black_doc, black_doc.read_text(encoding="utf-8"))
+            == "ai_docs_overview_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                sqlite_doc, sqlite_doc.read_text(encoding="utf-8")
+            )
+            == "ai_docs_overview_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                unrelated_doc, unrelated_doc.read_text(encoding="utf-8")
+            )
+            is None
+        )
+        assert (
+            plugin._resolve_lightweight_reason(jedi_doc, jedi_doc.read_text(encoding="utf-8"))
+            == "ai_docs_jedi_path"
+        )
+
+        result = Dispatcher([]).index_directory(ctx, repo / "ai_docs")
+
+        assert result["indexed_files"] == 4
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(black_doc.resolve()),
+            str(sqlite_doc.resolve()),
+            str(unrelated_doc.resolve()),
+            str(jedi_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            black_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = 'ai_docs/black_isort_overview.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            sqlite_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = 'ai_docs/sqlite_fts5_overview.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            black_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'ai_docs/black_isort_overview.md')"
+            ).fetchone()[0]
+            sqlite_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'ai_docs/sqlite_fts5_overview.md')"
+            ).fetchone()[0]
+        store.close()
+        assert "Black & isort AI Context" in black_symbols
+        assert "Framework Overview" in black_symbols
+        assert "Tooling Contract" in black_symbols
+        assert "SQLite FTS5 Comprehensive Guide for Code Indexing" in sqlite_symbols
+        assert "Table of Contents" in sqlite_symbols
+        assert "Introduction to FTS5" in sqlite_symbols
+        assert black_chunk_count == 0
+        assert sqlite_chunk_count == 0
+
     def test_index_directory_uses_exact_bounded_markdown_path_for_jedi_ai_doc(
         self, tmp_path, monkeypatch
     ):
