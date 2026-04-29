@@ -1330,6 +1330,97 @@ class TestEnhancedDispatcherProtocolConformance:
         store.close()
         assert symbol_count >= 3
 
+    def test_index_directory_uses_bounded_markdown_path_for_ai_docs_overview(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        (repo / "ai_docs").mkdir(parents=True)
+        overview = repo / "ai_docs" / "pytest_overview.md"
+        overview.write_text(
+            "# pytest AI Context\n\n## Framework Overview\n\n### Test Structure\n- Preserve overview heading discoverability\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError("heavy Markdown path should not run for ai_docs/*_overview.md")
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(overview.resolve())
+        with store._get_connection() as conn:
+            symbol_names = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'ai_docs/pytest_overview.md') ORDER BY id"
+                ).fetchall()
+            ]
+        store.close()
+        assert "pytest AI Context" in symbol_names
+        assert "Framework Overview" in symbol_names
+        assert "Test Structure" in symbol_names
+
+    def test_index_directory_keeps_unrelated_status_markdown_on_heavy_path(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        status_doc = repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
+        status_doc.parent.mkdir(parents=True)
+        status_doc.write_text(
+            "# Semantic Dogfood Rebuild\n\n## Dogfood Verdict\n\n- Preserve the existing heavy Markdown path here.\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["last_progress_path"] == str(status_doc.resolve())
+        with store._get_connection() as conn:
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'docs/status/SEMANTIC_DOGFOOD_REBUILD.md')"
+            ).fetchone()[0]
+        store.close()
+        assert chunk_count > 0
+
     def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
         events = []
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))

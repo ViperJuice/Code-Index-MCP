@@ -1505,6 +1505,55 @@ it exercises.
 - IF-0-SEMPYTESTOVERVIEW-1 — Pytest overview lexical recovery and rerun
   evidence contract.
 
+### Phase 28 — Visual Report Script Lexical Recovery (SEMVISUALREPORT)
+
+**Objective**
+
+Carry the live force-full rerun beyond `scripts/create_multi_repo_visual_report.py`
+after SEMPYTESTOVERVIEW proves the `ai_docs/pytest_overview.md` seam is no
+longer the active lexical blocker.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer leaves the durable trace on
+      `scripts/create_multi_repo_visual_report.py`.
+- [ ] The chosen repair for `scripts/create_multi_repo_visual_report.py` stays
+      narrow, tested, and does not reopen the `ai_docs/*_overview.md` or
+      fast-test report lexical boundaries without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the rerun
+      outcome and either semantic-stage advancement or the next exact
+      downstream blocker after the visual-report script seam.
+
+**Scope notes**
+
+This phase exists only if SEMPYTESTOVERVIEW proves the bounded
+`ai_docs/*_overview.md` repair works but the live force-full rerun still does
+not complete and the latest durable lexical progress marker advances to
+`scripts/create_multi_repo_visual_report.py`.
+
+**Non-goals**
+
+- No reopening of the `ai_docs/*_overview.md` bounded Markdown path unless new
+  evidence proves direct drift there.
+- No semantic timeout, release, or rollout-policy work.
+
+**Key files**
+
+- `scripts/create_multi_repo_visual_report.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMPYTESTOVERVIEW
+
+**Produces**
+- IF-0-SEMVISUALREPORT-1 — Visual report script lexical recovery and rerun
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1535,6 +1584,7 @@ SEMCONTRACT
   -> SEMEXITTRACE
   -> SEMFASTREPORT
   -> SEMPYTESTOVERVIEW
+  -> SEMVISUALREPORT
 ```
 
 ## Execution Notes
@@ -1553,6 +1603,8 @@ SEMCONTRACT
   semantic artifacts.
 - SEMDOGFOOD should be the only phase that performs the full clean rebuild and
   broad natural-language result-quality check.
+- SEMPYTESTOVERVIEW should amend the roadmap immediately if the live rerun
+  clears `ai_docs/pytest_overview.md` and exposes a later exact lexical seam.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

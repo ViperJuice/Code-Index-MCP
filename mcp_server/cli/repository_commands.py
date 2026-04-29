@@ -137,6 +137,16 @@ def _print_fast_report_boundary(prefix: str, repo_path: Path) -> None:
             return
 
 
+def _print_ai_docs_overview_boundary(prefix: str, repo_path: Path) -> None:
+    ai_docs_dir = repo_path / "ai_docs"
+    if not ai_docs_dir.is_dir():
+        return
+    if any(path.is_file() for path in ai_docs_dir.glob("*_overview.md")):
+        click.echo(
+            f"{prefix}Lexical boundary: using bounded Markdown indexing for ai_docs/*_overview.md"
+        )
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -526,6 +536,7 @@ def status(repo_id: Optional[str]):
         if status.get("last_sync_error"):
             click.echo(f"  Last sync error: {status['last_sync_error']}")
         _print_fast_report_boundary("  ", Path(status["path"]))
+        _print_ai_docs_overview_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}

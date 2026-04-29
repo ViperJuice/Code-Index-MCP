@@ -317,6 +317,8 @@ def test_status_reports_durable_force_full_exit_trace(monkeypatch, tmp_path: Pat
     runner = CliRunner()
     repo_info = _repo_info(tmp_path)
     (repo_info.path / ".mcp-index-ignore").write_text("fast_test_results/fast_report_*.md\n")
+    (repo_info.path / "ai_docs").mkdir()
+    (repo_info.path / "ai_docs" / "pytest_overview.md").write_text("# pytest\n", encoding="utf-8")
 
     class FakeRegistry:
         def get_repository_by_path(self, path):
@@ -410,6 +412,10 @@ def test_status_reports_durable_force_full_exit_trace(monkeypatch, tmp_path: Pat
     assert (
         "Lexical boundary: ignoring generated fast-test reports matching "
         "fast_test_results/fast_report_*.md" in result.output
+    )
+    assert (
+        "Lexical boundary: using bounded Markdown indexing for ai_docs/*_overview.md"
+        in result.output
     )
     assert "Force-full exit trace:" in result.output
     assert "Trace status: interrupted" in result.output

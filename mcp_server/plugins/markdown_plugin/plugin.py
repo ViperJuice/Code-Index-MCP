@@ -89,6 +89,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
         if _README_MARKDOWN_NAME_RE.match(path.stem):
             return "readme_path"
 
+        if path.parent.name.lower() == "ai_docs" and path.stem.lower().endswith("_overview"):
+            return "ai_docs_overview_path"
+
         return None
 
     def _extract_lightweight_title(self, content: str, path: Path) -> str:
