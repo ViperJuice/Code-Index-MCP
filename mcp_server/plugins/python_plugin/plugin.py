@@ -32,6 +32,8 @@ class Plugin(IPlugin):
     _BOUNDED_CHUNK_PATHS = {
         "scripts/create_multi_repo_visual_report.py",
         "scripts/quick_mcp_vs_native_validation.py",
+        "scripts/verify_embeddings.py",
+        "scripts/claude_code_behavior_simulator.py",
         "tests/test_artifact_publish_race.py",
         "mcp_server/visualization/quick_charts.py",
     }

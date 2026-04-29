@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T17:07:52Z`.
-- Observed commit: `c240c23e`.
+- Evidence captured: `2026-04-29T17:28:49Z`.
+- Observed commit: `504e419a`.
 - Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:49:50Z` on
   observed commit `468dee18`.
 - Prior SEMLEGACYPLANS live-rerun anchor: `2026-04-29T16:07:22Z` on observed
@@ -28,9 +28,16 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMPREUPGRADETAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMPREUPGRADETAIL.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMEMBEDCONSOL` after SEMVERIFYSIMTAIL proved the later Python-script
+  seam is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMVERIFYSIMTAIL` after SEMPREUPGRADETAIL proved the mixed shell/Python
   script seam is now cleared, but the refreshed live rerun on the new head
   still terminalized later in lexical walking on
@@ -1496,6 +1503,76 @@ Steering outcome:
   `scripts/preflight_upgrade.sh ->
   scripts/test_mcp_protocol_direct.py` script seam.
 
+## SEMVERIFYSIMTAIL Live Rerun Check
+
+SEMVERIFYSIMTAIL tightened the exact later Python-script seam in the
+dispatcher, Python plugin, and operator-status surfaces, and the refreshed live
+rerun advanced durably beyond `scripts/verify_embeddings.py` and
+`scripts/claude_code_behavior_simulator.py` before the 120-second watchdog
+expired.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `scripts/verify_embeddings.py` and
+  `scripts/claude_code_behavior_simulator.py` as exact bounded Python paths,
+  preserving full-text discoverability plus the `verify_embeddings()` and
+  `ClaudeCodeSimulator` entry surfaces without widening into a blanket
+  `scripts/*.py` bypass.
+- `mcp_server/plugins/python_plugin/plugin.py` now keeps the same exact pair
+  on the bounded chunk path list so direct Python-plugin indexing stays aligned
+  with dispatcher exact-bounded behavior.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the exact verify/simulator
+  pair without widening into a broader script-family shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The SEMVERIFYSIMTAIL live rerun started on observed commit `504e419a` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Immediately after the timeout, a direct `repository status` probe still
+  showed `Force-full exit trace: missing`, but the durable trace file had
+  already been rewritten in `.mcp-index/force_full_exit_trace.json`.
+- At `2026-04-29T17:28:28Z`, `force_full_exit_trace.json` showed a running
+  lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/create_semantic_embeddings.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/consolidate_real_performance_data.py`.
+- At `2026-04-29T17:28:49Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py` pair while advertising both
+  repaired exact bounded lexical surfaces:
+  `Lexical boundary: using exact bounded shell/Python indexing for scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`
+  and
+  `Lexical boundary: using exact bounded Python indexing for scripts/verify_embeddings.py -> scripts/claude_code_behavior_simulator.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMVERIFYSIMTAIL acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  Python-script lexical pair
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py`.
+- The roadmap now adds downstream phase `SEMEMBEDCONSOL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the verify/simulator
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py` script seam.
+
 ## Verification
 
 Verification sequence for this SEMCROSSPLANS slice:
@@ -1551,6 +1628,18 @@ Verification sequence for this SEMPREUPGRADETAIL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "preflight_upgrade or test_mcp_protocol_direct or lexical or bounded or shell or script"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "preflight_upgrade or test_mcp_protocol_direct or lexical or interrupted or boundary or script"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMVERIFYSIMTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "verify_embeddings or claude_code_behavior_simulator or lexical or bounded or simulator or script"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "verify_embeddings or claude_code_behavior_simulator or lexical or interrupted or boundary or simulator or script"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

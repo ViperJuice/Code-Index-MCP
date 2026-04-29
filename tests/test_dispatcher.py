@@ -2862,6 +2862,112 @@ class TestEnhancedDispatcherProtocolConformance:
         assert unrelated_shell_row is None
         assert unrelated_python_chunk_count == 0
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_verify_simulator_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        verify_script = repo / "scripts" / "verify_embeddings.py"
+        simulator_script = repo / "scripts" / "claude_code_behavior_simulator.py"
+        helper_script = repo / "scripts" / "helper.py"
+        verify_script.parent.mkdir(parents=True)
+        verify_script.write_text(
+            "def verify_embeddings():\n"
+            "    return 'verified'\n",
+            encoding="utf-8",
+        )
+        simulator_script.write_text(
+            "class ClaudeCodeSimulator:\n"
+            "    def run_scenario(self):\n"
+            "        return 'simulated'\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(helper_script.resolve()),
+            str(simulator_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            verify_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_embeddings.py') ORDER BY id"
+                ).fetchall()
+            ]
+            simulator_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/claude_code_behavior_simulator.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            verify_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_embeddings.py')"
+            ).fetchone()[0]
+            simulator_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/claude_code_behavior_simulator.py')"
+            ).fetchone()[0]
+            verify_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/verify_embeddings.py'"
+            ).fetchone()[0]
+            simulator_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/claude_code_behavior_simulator.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            verify_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_embeddings.py')"
+            ).fetchall()
+            simulator_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/claude_code_behavior_simulator.py')"
+            ).fetchall()
+        store.close()
+        assert verify_symbols == ["verify_embeddings"]
+        assert simulator_symbols == ["ClaudeCodeSimulator", "run_scenario"]
+        assert helper_symbols == ["helper"]
+        assert verify_chunk_count == 0
+        assert simulator_chunk_count == 0
+        assert "exact_verify_embeddings_rebound" in verify_metadata
+        assert "exact_claude_code_behavior_simulator_rebound" in simulator_metadata
+        assert "exact_verify_embeddings_rebound" not in helper_metadata
+        assert "exact_claude_code_behavior_simulator_rebound" not in helper_metadata
+        assert len(verify_fts_rows) == 1
+        assert "verify_embeddings" in verify_fts_rows[0][0]
+        assert len(simulator_fts_rows) == 1
+        assert "ClaudeCodeSimulator" in simulator_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -3870,6 +3976,8 @@ class TestEnhancedDispatcherProtocolConformance:
         store.close()
         assert chunk_count == 0
         assert "scripts/quick_mcp_vs_native_validation.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "scripts/verify_embeddings.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "scripts/claude_code_behavior_simulator.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/rerun_failed_native_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/run_reranking_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
