@@ -1,22 +1,24 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T09:52:03Z`.
-- Observed commit: `4c28493a`.
+- Evidence captured: `2026-04-29T10:13:12Z`.
+- Observed commit: `1e7a2a10`.
+- Prior SEMSCRIPTREBOUND evidence anchor: `2026-04-29T09:52:03Z` on observed
+  commit `4c28493a`.
 - Prior phase evidence anchor: `SEMPUBLISHRACE` at `2026-04-29T09:31:19Z`
   on observed commit `aec99482`.
 - Prior trace-freshness anchor: `SEMTRACEFRESHNESS` at `2026-04-29T08:53:23Z`
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMDEVREBOUND.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSCRIPTREBOUND.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMSCRIPTREBOUND` after SEMDEVREBOUND proved the live rerun clears
-  `.devcontainer/devcontainer.json`, but the durable trace later stops
-  refreshing again at `scripts/quick_mcp_vs_native_validation.py`.
+  `SEMDISKIO` after SEMSCRIPTREBOUND proved the live rerun clears
+  `scripts/quick_mcp_vs_native_validation.py`, but the same rerun later fails
+  in semantic closeout with `disk I/O error`.
 
 ## Reset Boundary
 
-This SEMDEVREBOUND rerun stayed inside the existing repo-local dogfood
+This SEMSCRIPTREBOUND rerun stayed inside the existing repo-local dogfood
 boundary:
 
 - `.mcp-index/current.db`, `.mcp-index/semantic_qdrant/`, and
@@ -116,10 +118,10 @@ was cleared before the rerun re-anchored on the older `.devcontainer` family:
 ## SEMDEVREBOUND Live Rerun Check
 
 SEMDEVREBOUND repaired the exact `.devcontainer/devcontainer.json` lexical seam
-on the current `HEAD`, but the same live rerun later re-anchored on a later
-exact Python-script pair and changed the next downstream work again.
+on the prior evidence commit, but the same live rerun later re-anchored on a
+later exact Python-script pair and changed the next downstream work again.
 
-Observed progression on the current repo-local force-full command:
+Observed progression on the earlier current repo-local force-full command:
 
 - At `2026-04-29T09:50:53Z`, the durable trace had already advanced to
   `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/check_index_schema.py`
@@ -133,14 +135,51 @@ Observed progression on the current repo-local force-full command:
   non-zero status, and `repository status` later reported `Trace freshness:
   stale-running snapshot`.
 
-Current rebound sizing confirms the `.devcontainer` seam was cleared before the
-rerun re-anchored on the new script family:
+Current rebound sizing confirmed the `.devcontainer` seam was cleared before
+the rerun re-anchored on the new script family:
 
 - `scripts/check_index_schema.py`: later lexical progress observed after the
   `.devcontainer/devcontainer.json` boundary was added.
 - `scripts/rerun_failed_native_tests.py`: latest durable `last_progress_path`.
 - `scripts/quick_mcp_vs_native_validation.py`: current exact `in_flight_path`.
 - `.devcontainer/devcontainer.json`: no longer the active blocker.
+
+## SEMSCRIPTREBOUND Live Rerun Check
+
+SEMSCRIPTREBOUND repaired the renewed exact
+`scripts/quick_mcp_vs_native_validation.py` lexical seam on the current
+`HEAD`, and the same live rerun advanced well past that script family before
+failing later in semantic closeout.
+
+Observed progression on the current repo-local force-full command:
+
+- At `2026-04-29T10:09:17Z`, the durable trace still showed an early lexical
+  snapshot on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+  with `in_flight_path=null` while the force-full command was still running.
+- At `2026-04-29T10:12:58Z`, the same rerun had already advanced to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/mcp_server/plugin_system/loader.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/mcp_server/plugin_system/interfaces.py`.
+- At `2026-04-29T10:13:00Z`, `repository status` reported the live rerun at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/mcp_server/document_processing/__init__.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/mcp_server/document_processing/chunk_optimizer.py`.
+- At `2026-04-29T10:13:12Z`, the force-full command exited with
+  `disk I/O error`, and the durable trace recorded
+  `Trace status: completed`, `Trace stage: force_full_failed`,
+  `Trace stage family: final_closeout`, and
+  `Trace blocker source: final_closeout`.
+
+Current downstream verdict confirms the renewed script rebound seam is cleared:
+
+- `scripts/rerun_failed_native_tests.py`: no longer the latest durable
+  `last_progress_path`.
+- `scripts/quick_mcp_vs_native_validation.py`: no longer the active
+  `in_flight_path`.
+- `.devcontainer/devcontainer.json`: no longer the active blocker.
+- The next blocker is no longer lexical. It is the post-lexical semantic
+  closeout failure `disk I/O error`.
 
 ## Rebuild Command
 
@@ -150,30 +189,26 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 
 ## Rebuild Evidence
 
-Observed runtime state during the current SEMDEVREBOUND rerun check:
+Observed runtime state during the current SEMSCRIPTREBOUND rerun check:
 
-- Files indexed in SQLite: `666`
-- Code chunks indexed in SQLite: `5418`
+- Files indexed in SQLite: `1393`
+- Code chunks indexed in SQLite: `28013`
 - Summary-backed chunks: `0`
-- Chunks missing summaries: `5418`
+- Chunks missing summaries: `28013`
 - Vector-linked chunks: `0`
-- Chunks missing vectors: `5418`
+- Chunks missing vectors: `28013`
 
 Durable stage trace from `.mcp-index/force_full_exit_trace.json` after the
-current rerun stopped refreshing:
+current rerun exited:
 
-- Trace status: `running`
-- Trace stage: `lexical_walking`
-- Trace stage family: `lexical`
-- Trace timestamp: `2026-04-29T09:50:55Z`
-- Trace blocker source: `lexical_mutation`
-- Trace current commit: `4c28493a60ee25090c66af6679371cd0306601c6`
+- Trace status: `completed`
+- Trace stage: `force_full_failed`
+- Trace stage family: `final_closeout`
+- Trace timestamp: `2026-04-29T10:13:12Z`
+- Trace blocker source: `final_closeout`
+- Trace current commit: `1e7a2a1011541d41255eab575a91d636171e1a22`
 - Trace indexed commit before:
   `e2e9519858c3683c06b152c94a99e52098beaec6`
-- Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/rerun_failed_native_tests.py`
-- In-flight path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/quick_mcp_vs_native_validation.py`
 
 Runtime containment verdict for the live rerun:
 
@@ -182,22 +217,26 @@ Runtime containment verdict for the live rerun:
 - The exact bounded Python seam for
   `tests/test_artifact_publish_race.py` remains preserved and is no longer the
   active blocker.
+- The exact bounded Python seam for
+  `scripts/quick_mcp_vs_native_validation.py` is now preserved and no longer
+  the active blocker.
 - The fast-test report boundary, the bounded `ai_docs/*_overview.md` seam, the
   exact `ai_docs/jedi.md` boundary, and the exact visual-report Python
   boundary all remained preserved.
-- Prompt terminal closeout is still not restored for the renewed exact
-  `scripts/quick_mcp_vs_native_validation.py` lexical seam.
+- Prompt terminal closeout is still not restored for the semantic-stage
+  rebuild because the rerun exits with `disk I/O error`.
 - The next exact blocker is no longer `ai_docs/jedi.md`,
-  `ai_docs/pytest_overview.md`, `tests/test_artifact_publish_race.py`, or
-  `.devcontainer/devcontainer.json`; it has re-anchored on
-  `scripts/quick_mcp_vs_native_validation.py`.
+  `ai_docs/pytest_overview.md`, `tests/test_artifact_publish_race.py`,
+  `.devcontainer/devcontainer.json`, or
+  `scripts/quick_mcp_vs_native_validation.py`; it has advanced into later
+  lexical work and now fails in post-lexical semantic closeout.
 - The partial runtime still ends with no `chunk_summaries` and no
   `semantic_points`.
 
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
-after the SEMDEVREBOUND rerun check reported:
+after the SEMSCRIPTREBOUND rerun check reported:
 
 - Lexical readiness: `stale_commit`
 - Semantic readiness: `summaries_missing`
@@ -207,7 +246,9 @@ after the SEMDEVREBOUND rerun check reported:
 - Active collection: `code_index__oss_high__v1`
 - Collection bootstrap state: `reused`
 - Query surface: `index_unavailable`
-- Rollout status: `stale_commit`
+- Rollout status: `partial_index_failure`
+- Last sync error: `disk I/O error`
+- Last sync error: disk I/O error
 - Lexical boundary:
   `ignoring generated fast-test reports matching fast_test_results/fast_report_*.md`
 - Lexical boundary:
@@ -217,21 +258,18 @@ after the SEMDEVREBOUND rerun check reported:
 - Lexical boundary:
   `using exact bounded Python indexing for scripts/create_multi_repo_visual_report.py`
 - Lexical boundary:
+  `using exact bounded Python indexing for scripts/quick_mcp_vs_native_validation.py`
+- Lexical boundary:
   `using exact bounded Python indexing for tests/test_artifact_publish_race.py`
 - Lexical boundary:
   `using exact bounded JSON indexing for .devcontainer/devcontainer.json`
-- Force-full exit trace stage: `lexical_walking`
-- Force-full exit trace stage family: `lexical`
-- Force-full exit trace freshness: `stale-running snapshot`
-- Force-full exit trace blocker source: `lexical_mutation`
-- Force-full exit trace last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/rerun_failed_native_tests.py`
-- Force-full exit trace in-flight path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/quick_mcp_vs_native_validation.py`
+- Force-full exit trace stage: `force_full_failed`
+- Force-full exit trace stage family: `final_closeout`
+- Force-full exit trace blocker source: `final_closeout`
 
 Repository/index freshness evidence:
 
-- Current commit: `4c28493a`
+- Current commit: `1e7a2a10`
 - Indexed commit: `e2e95198`
 
 ## Query Comparison
@@ -245,19 +283,20 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
   `semantic_collection_name: "code_index__oss_high__v1"`.
 - `symbol` and lexical probes still point operators at
   `mcp_server/dispatcher/dispatcher_enhanced.py`,
-  `mcp_server/cli/repository_commands.py`, and the renewed exact lexical
-  blocker seam.
+  `mcp_server/cli/repository_commands.py`, and the post-lexical closeout
+  blocker lineage.
 - The remaining downstream work is no longer centered on `ai_docs/jedi.md`,
   the stale `ai_docs/pytest_overview.md` marker,
-  `tests/test_artifact_publish_race.py`, or
-  `.devcontainer/devcontainer.json`. It is now centered on the renewed
-  `scripts/quick_mcp_vs_native_validation.py` lexical re-anchor.
+  `tests/test_artifact_publish_race.py`,
+  `.devcontainer/devcontainer.json`, or
+  `scripts/quick_mcp_vs_native_validation.py`. It is now centered on the
+  semantic closeout `disk I/O error` blocker.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMDEVREBOUND.
+Local multi-repo dogfooding is **still not ready** after SEMSCRIPTREBOUND.
 
 Why:
 
@@ -267,13 +306,14 @@ Why:
 - SEMPUBLISHRACE acceptance remains satisfied on the current worktree because
   the live rerun no longer remained on `tests/test_artifact_publish_race.py`;
   it advanced into later lexical work.
-- SEMDEVREBOUND acceptance is now also satisfied on the current worktree
+- SEMDEVREBOUND acceptance remains satisfied on the current worktree because
+  the live rerun no longer remained on `.devcontainer/devcontainer.json`.
+- SEMSCRIPTREBOUND acceptance is now also satisfied on the current worktree
   because the live rerun no longer remained on
-  `.devcontainer/devcontainer.json`; it advanced into later lexical script
-  work.
-- The live force-full rerun still did not complete cleanly and later
-  re-anchored in lexical walking on
-  `scripts/quick_mcp_vs_native_validation.py`.
+  `scripts/quick_mcp_vs_native_validation.py`; it advanced into later lexical
+  and semantic-closeout work.
+- The live force-full rerun still did not complete cleanly and later failed
+  in semantic closeout with `disk I/O error`.
 - The partial runtime still ends with `chunk_summaries = 0` and
   `semantic_points = 0`.
 
@@ -284,18 +324,21 @@ Steering outcome:
   `ai_docs/pytest_overview.md` marker and `in_flight_path=null`.
 - SEMPUBLISHRACE acceptance remains satisfied: the refreshed live rerun
   remains beyond `tests/test_artifact_publish_race.py`.
-- SEMDEVREBOUND acceptance is now also satisfied: the refreshed live rerun
-  clears `.devcontainer/devcontainer.json`.
-- The roadmap now adds `SEMSCRIPTREBOUND` as the nearest downstream phase.
+- SEMDEVREBOUND acceptance remains satisfied: the refreshed live rerun clears
+  `.devcontainer/devcontainer.json`.
+- SEMSCRIPTREBOUND acceptance remains satisfied: the refreshed live rerun
+  clears `scripts/quick_mcp_vs_native_validation.py`.
+- The roadmap now adds `SEMDISKIO` as the nearest downstream phase.
 - Older downstream assumptions should be treated as stale, including any
   downstream phase plan or handoff that still treats
+  `scripts/quick_mcp_vs_native_validation.py` or
   `.devcontainer/devcontainer.json` as the active blocker. The next repair is
-  not another retry of the devcontainer seam; it is a bounded recovery for the
-  renewed `scripts/quick_mcp_vs_native_validation.py` lexical re-anchor.
+  not another lexical seam retry; it is a bounded recovery for the semantic
+  closeout `disk I/O error` blocker.
 
 ## Verification
 
-Verification sequence for this SEMDEVREBOUND slice:
+Verification sequence for this SEMSCRIPTREBOUND slice:
 
 ```bash
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov

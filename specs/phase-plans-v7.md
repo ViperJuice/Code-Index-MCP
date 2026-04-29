@@ -1897,6 +1897,65 @@ stale running snapshot on 2026-04-29.
   `scripts/quick_mcp_vs_native_validation.py` lexical re-anchor and blocker
   evidence contract.
 
+### Phase 35 — Force-Full Semantic Closeout Disk I/O Recovery (SEMDISKIO)
+
+**Objective**
+
+Repair the next downstream blocker exposed after SEMSCRIPTREBOUND so a
+repo-local force-full rerun no longer clears the renewed
+`scripts/quick_mcp_vs_native_validation.py` lexical seam only to fail in
+final semantic closeout with `disk I/O error` before any summaries or vectors
+are written.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer ends with
+      `Trace stage: force_full_failed`,
+      `Trace stage family: final_closeout`,
+      `Trace blocker source: final_closeout`, and `Last sync error: disk I/O error`
+      on the active commit after lexical walking has already advanced beyond
+      `scripts/quick_mcp_vs_native_validation.py`.
+- [ ] The rerun either completes semantic closeout far enough to write
+      non-zero `chunk_summaries` or exits with a narrower semantic-stage
+      blocker that names the real storage or closeout failure truthfully.
+- [ ] Operator status, tests, and dogfood evidence stay aligned with the
+      final-closeout failure mode and no longer claim that the active blocker
+      is lexical once the script rebound seam has been cleared.
+
+**Scope notes**
+
+This phase exists only because SEMSCRIPTREBOUND proved the live force-full
+rerun now advances far beyond the renewed script seam and later exits from
+semantic closeout with `disk I/O error` on 2026-04-29.
+
+**Non-goals**
+
+- No reopening of `scripts/quick_mcp_vs_native_validation.py`,
+  `.devcontainer/devcontainer.json`, `tests/test_artifact_publish_race.py`,
+  `ai_docs/jedi.md`, `ai_docs/*_overview.md`, fast-test report, or
+  visual-report-script lexical repairs unless fresh evidence re-anchors there
+  again.
+- No silent downgrade back to lexical success when semantic closeout fails.
+- No unrelated semantic ranking or profile-default redesign unless the
+  closeout failure proves those surfaces are the direct cause.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/sqlite_store.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMSCRIPTREBOUND
+
+**Produces**
+- IF-0-SEMDISKIO-1 — post-lexical semantic closeout disk-I/O blocker and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1934,6 +1993,7 @@ SEMCONTRACT
   -> SEMPUBLISHRACE
   -> SEMDEVREBOUND
   -> SEMSCRIPTREBOUND
+  -> SEMDISKIO
 ```
 
 ## Execution Notes
@@ -1963,6 +2023,10 @@ SEMCONTRACT
 - SEMDEVREBOUND should amend the roadmap immediately if the live rerun clears
   `.devcontainer/devcontainer.json` but exposes a later exact blocker such as
   `scripts/quick_mcp_vs_native_validation.py`.
+- SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
+  clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
+  semantic closeout blocker such as `disk I/O error` during
+  `force_full_failed`.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

@@ -1545,6 +1545,70 @@ class TestEnhancedDispatcherProtocolConformance:
         assert chunk_count == 0
         assert calls == []
 
+    def test_index_directory_uses_exact_bounded_python_path_for_quick_validation_script(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        script = repo / "scripts" / "quick_mcp_vs_native_validation.py"
+        script.parent.mkdir(parents=True)
+        script.write_text(
+            "def compare_results():\n    return 'ok'\n\n\ndef main():\n    return compare_results()\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(script.resolve())
+        with store._get_connection() as conn:
+            symbol_names = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/quick_mcp_vs_native_validation.py') ORDER BY id"
+                ).fetchall()
+            ]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/quick_mcp_vs_native_validation.py')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/quick_mcp_vs_native_validation.py')"
+            ).fetchall()
+        store.close()
+        assert "compare_results" in symbol_names
+        assert "main" in symbol_names
+        assert chunk_count == 0
+        assert calls == []
+        assert len(fts_rows) == 1
+        assert "compare_results" in fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_artifact_publish_race(
         self, tmp_path, monkeypatch
     ):
@@ -1744,6 +1808,8 @@ class TestEnhancedDispatcherProtocolConformance:
             ).fetchone()[0]
         store.close()
         assert chunk_count == 0
+        assert "scripts/quick_mcp_vs_native_validation.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "scripts/rerun_failed_native_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_benchmarks.py" not in Plugin._BOUNDED_CHUNK_PATHS
 
