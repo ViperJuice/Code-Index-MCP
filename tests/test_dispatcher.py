@@ -3778,6 +3778,137 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "check_index_exists" in ensure_fts_rows[0][0]
         assert "index_repository" in ensure_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_missing_repo_semantic_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        missing_repo_script = repo / "scripts" / "index_missing_repos_semantic.py"
+        working_indexes_script = repo / "scripts" / "identify_working_indexes.py"
+        helper_script = repo / "scripts" / "helper.py"
+        missing_repo_script.parent.mkdir(parents=True)
+        missing_repo_script.write_text(
+            "def get_existing_collections():\n"
+            "    return {}\n\n"
+            "def find_missing_repositories():\n"
+            "    return []\n\n"
+            "def estimate_repo_size(repo_name):\n"
+            "    return len(repo_name)\n\n"
+            "def main():\n"
+            "    return find_missing_repositories()\n",
+            encoding="utf-8",
+        )
+        working_indexes_script.write_text(
+            "def get_repo_hash(repo_path):\n"
+            "    return str(repo_path)\n\n"
+            "def check_index_health(db_path):\n"
+            "    return True, {'path': str(db_path)}\n\n"
+            "def find_test_repos():\n"
+            "    return []\n\n"
+            "def main():\n"
+            "    return find_test_repos()\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(missing_repo_script.resolve()),
+            str(helper_script.resolve()),
+            str(working_indexes_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            missing_repo_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py') ORDER BY id"
+                ).fetchall()
+            ]
+            working_indexes_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/identify_working_indexes.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            missing_repo_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py')"
+            ).fetchone()[0]
+            working_indexes_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/identify_working_indexes.py')"
+            ).fetchone()[0]
+            missing_repo_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py'"
+            ).fetchone()[0]
+            working_indexes_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/identify_working_indexes.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            missing_repo_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py')"
+            ).fetchall()
+            working_indexes_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/identify_working_indexes.py')"
+            ).fetchall()
+        store.close()
+        assert missing_repo_symbols == [
+            "get_existing_collections",
+            "find_missing_repositories",
+            "estimate_repo_size",
+            "main",
+        ]
+        assert working_indexes_symbols == [
+            "get_repo_hash",
+            "check_index_health",
+            "find_test_repos",
+            "main",
+        ]
+        assert helper_symbols == ["helper"]
+        assert missing_repo_chunk_count == 0
+        assert working_indexes_chunk_count == 0
+        assert "exact_index_missing_repos_semantic_rebound" in missing_repo_metadata
+        assert "exact_identify_working_indexes_rebound" in working_indexes_metadata
+        assert "exact_index_missing_repos_semantic_rebound" not in helper_metadata
+        assert "exact_identify_working_indexes_rebound" not in helper_metadata
+        assert len(missing_repo_fts_rows) == 1
+        assert "get_existing_collections" in missing_repo_fts_rows[0][0]
+        assert "find_missing_repositories" in missing_repo_fts_rows[0][0]
+        assert len(working_indexes_fts_rows) == 1
+        assert "get_repo_hash" in working_indexes_fts_rows[0][0]
+        assert "check_index_health" in working_indexes_fts_rows[0][0]
+        assert "find_test_repos" in working_indexes_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -5094,6 +5225,153 @@ class TestEnhancedDispatcherProtocolConformance:
             for needle in (
                 "scripts/check_index_languages.py",
                 "scripts/test_mcp_protocol_direct.py",
+                "scripts/consolidate_real_performance_data.py",
+                "tests/docs/test_p8_deployment_security.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_missing_repo_semantic_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        prior_file = scripts_dir / "index_missing_repos_semantic.py"
+        prior_file.write_text(
+            "def get_existing_collections():\n"
+            "    return {}\n\n"
+            "def find_missing_repositories():\n"
+            "    return []\n\n"
+            "def estimate_repo_size(repo_name):\n"
+            "    return len(repo_name)\n\n"
+            "def main():\n"
+            "    return find_missing_repositories()\n",
+            encoding="utf-8",
+        )
+        blocked_file = scripts_dir / "identify_working_indexes.py"
+        blocked_file.write_text(
+            "def get_repo_hash(repo_path):\n"
+            "    return str(repo_path)\n\n"
+            "def check_index_health(db_path):\n"
+            "    return True, {'path': str(db_path)}\n\n"
+            "def find_test_repos():\n"
+            "    return []\n\n"
+            "def main():\n"
+            "    return find_test_repos()\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(scripts_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["semantic_stage"] == "failed"
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            missing_repo_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py') ORDER BY id"
+                ).fetchall()
+            ]
+            working_indexes_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/identify_working_indexes.py') ORDER BY id"
+                ).fetchall()
+            ]
+            missing_repo_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py')"
+            ).fetchone()[0]
+            working_indexes_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/identify_working_indexes.py')"
+            ).fetchone()[0]
+            missing_repo_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_missing_repos_semantic.py')"
+            ).fetchall()
+            working_indexes_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/identify_working_indexes.py')"
+            ).fetchall()
+        store.close()
+        assert missing_repo_symbols == [
+            "get_existing_collections",
+            "find_missing_repositories",
+            "estimate_repo_size",
+            "main",
+        ]
+        assert working_indexes_symbols == [
+            "get_repo_hash",
+            "check_index_health",
+            "find_test_repos",
+            "main",
+        ]
+        assert missing_repo_chunk_count == 0
+        assert working_indexes_chunk_count == 0
+        assert len(missing_repo_fts) == 1
+        assert "get_existing_collections" in missing_repo_fts[0][0]
+        assert "find_missing_repositories" in missing_repo_fts[0][0]
+        assert len(working_indexes_fts) == 1
+        assert "get_repo_hash" in working_indexes_fts[0][0]
+        assert "check_index_health" in working_indexes_fts[0][0]
+        assert "find_test_repos" in working_indexes_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "scripts/check_test_index_schema.py",
+                "scripts/ensure_test_repos_indexed.py",
                 "scripts/consolidate_real_performance_data.py",
                 "tests/docs/test_p8_deployment_security.py",
             )

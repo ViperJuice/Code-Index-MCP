@@ -4118,6 +4118,70 @@ scripts/identify_working_indexes.py`.
 - IF-0-SEMMISSINGREPOSEMTAIL-1 — exact later missing-repo semantic index
   script recovery and evidence contract.
 
+### Phase 72 — Utility Script Verification Tail Recovery (SEMUTILVERIFYTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later Python utility-script seam
+exposed after SEMMISSINGREPOSEMTAIL:
+`scripts/utilities/prepare_index_for_upload.py ->
+scripts/utilities/verify_tool_usage.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMMISSINGREPOSEMTAIL
+      head either advances durably beyond the
+      `scripts/utilities/prepare_index_for_upload.py ->
+      scripts/utilities/verify_tool_usage.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later utility-script verification seam stays
+      narrow, tested, and does not reopen the already-cleared
+      `scripts/index_missing_repos_semantic.py ->
+      scripts/identify_working_indexes.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMMISSINGREPOSEMTAIL rerun outcome and the final live verdict for the
+      later utility-script verification pair.
+
+**Scope notes**
+
+This phase exists only if SEMMISSINGREPOSEMTAIL proves the later missing-repo
+semantic index script pair is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on
+`scripts/utilities/prepare_index_for_upload.py ->
+scripts/utilities/verify_tool_usage.py`.
+
+**Non-goals**
+
+- No reopening of the cleared missing-repo semantic index script recovery once
+  the live rerun has advanced beyond
+  `scripts/index_missing_repos_semantic.py ->
+  scripts/identify_working_indexes.py`.
+- No blanket reopening of unrelated utility or script families unless the
+  refreshed rerun proves the active blocker cannot be cleared with a narrower
+  exact-path or exact-pair contract.
+- No reopening of unrelated semantic-stage or roadmap work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/utilities/prepare_index_for_upload.py`
+- `scripts/utilities/verify_tool_usage.py`
+
+**Depends on**
+- SEMMISSINGREPOSEMTAIL
+
+**Produces**
+- IF-0-SEMUTILVERIFYTAIL-1 — exact later utility-script verification recovery
+  and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4192,6 +4256,7 @@ SEMCONTRACT
   -> SEMAIOVERVIEWTAIL
   -> SEMTESTREPOINDEXTAIL
   -> SEMMISSINGREPOSEMTAIL
+  -> SEMUTILVERIFYTAIL
 ```
 
 ## Execution Notes
@@ -4365,6 +4430,18 @@ SEMCONTRACT
   scripts/identify_working_indexes.py`; it should repair that exact later
   script pair or preserve the next exact downstream blocker instead of
   reopening earlier overview or test-repo index work.
+- SEMMISSINGREPOSEMTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears the later missing-repo semantic index script pair but
+  exposes a later exact blocker such as
+  `scripts/utilities/prepare_index_for_upload.py ->
+  scripts/utilities/verify_tool_usage.py`.
+- SEMUTILVERIFYTAIL exists only if SEMMISSINGREPOSEMTAIL proves the later
+  missing-repo semantic index script pair is cleared but the live rerun still
+  remains in lexical walking on
+  `scripts/utilities/prepare_index_for_upload.py ->
+  scripts/utilities/verify_tool_usage.py`; it should repair that exact later
+  utility-script pair or preserve the next exact downstream blocker instead of
+  reopening earlier missing-repo or test-repo index work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

@@ -126,6 +126,8 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "scripts/check_index_languages.py": "exact_check_index_languages_rebound",
     "scripts/check_test_index_schema.py": "exact_check_test_index_schema_rebound",
     "scripts/ensure_test_repos_indexed.py": "exact_ensure_test_repos_indexed_rebound",
+    "scripts/index_missing_repos_semantic.py": "exact_index_missing_repos_semantic_rebound",
+    "scripts/identify_working_indexes.py": "exact_identify_working_indexes_rebound",
     "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "scripts/verify_embeddings.py": "exact_verify_embeddings_rebound",
     "scripts/claude_code_behavior_simulator.py": "exact_claude_code_behavior_simulator_rebound",
