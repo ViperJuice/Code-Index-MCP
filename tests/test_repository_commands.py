@@ -41,6 +41,19 @@ def _repo_info(tmp_path: Path) -> RepositoryInfo:
     )
 
 
+def _semantic_preflight_ready() -> SimpleNamespace:
+    return SimpleNamespace(
+        to_dict=lambda: {
+            "overall_ready": True,
+            "can_write_semantic_vectors": True,
+            "effective_config": {
+                "selected_profile": "oss_high",
+                "collection_name": "code_index__oss_high__v1",
+            },
+        }
+    )
+
+
 def test_register_sets_local_first_defaults(monkeypatch, tmp_path: Path):
     runner = CliRunner()
     repo_path = tmp_path / "repo"
@@ -1546,6 +1559,110 @@ def test_status_reports_same_devcontainer_relapse_without_older_or_later_boundar
     assert "tests/test_reindex_resume.py" not in result.output
     assert "scripts/validate_mcp_comprehensive.py" not in result.output
     assert "tests/root_tests/run_reranking_tests.py" not in result.output
+
+
+def test_status_reports_test_workspace_boundary_with_post_devcontainer_later_path(
+    monkeypatch, tmp_path: Path
+):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+    (repo_info.path / ".mcp-index-ignore").write_text(
+        "fast_test_results/fast_report_*.md\ntest_workspace/\n",
+        encoding="utf-8",
+    )
+    config_file = repo_info.path / ".devcontainer" / "devcontainer.json"
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text('{"name": "devcontainer"}\n', encoding="utf-8")
+    later_file = repo_info.path / "mcp_server" / "cli" / "repository_commands.py"
+    later_file.parent.mkdir(parents=True)
+    later_file.write_text("# later included file\n", encoding="utf-8")
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required lexical mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "summaries_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                "force_full_exit_trace": {
+                    "status": "interrupted",
+                    "stage": "lexical_walking",
+                    "stage_family": "lexical",
+                    "trace_timestamp": "2026-04-29T12:47:18Z",
+                    "current_commit": "26a163da52865a85c4f0c91e657c3f959e26b00e",
+                    "indexed_commit_before": "869eea9302c687b7b4b496735de74e85a72e95f0",
+                    "last_progress_path": str(later_file),
+                    "in_flight_path": None,
+                    "blocker_source": "lexical_mutation",
+                },
+                "features": {"semantic": {"readiness": {"evidence": {}}, "preflight": {}}},
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: _semantic_preflight_ready(),
+    )
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert (
+        "Lexical boundary: fixture repositories under test_workspace/ are ignored during "
+        "lexical walking" in result.output
+    )
+    assert (
+        "Lexical boundary: using exact bounded JSON indexing for "
+        ".devcontainer/devcontainer.json" in result.output
+    )
+    assert f"Last progress path: {later_file}" in result.output
+    assert f"Last progress path: {config_file}" not in result.output
 
 
 def test_status_reports_exact_jedi_markdown_boundary(monkeypatch, tmp_path: Path):

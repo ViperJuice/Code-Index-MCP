@@ -12,7 +12,7 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMDEVRELAPSE.md`.
+- Phase plan: `plans/phase-plan-v7-SEMWALKGAP.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMDEVRELAPSE` after SEMROOTTESTABORT proved the later
   `tests/root_tests/test_voyage_api.py ->
@@ -329,6 +329,73 @@ Steering outcome from that refreshed rerun:
   or handoff that assumes the next work still belongs to the later root-test
   seam or to the older `.devcontainer/post_create.sh` rebound.
 
+## SEMWALKGAP Live Rerun Check
+
+SEMWALKGAP repaired the post-devcontainer walk-gap contract on the current
+head, and the refreshed live rerun advanced durably beyond the ignored
+fast-report and `test_workspace/` tail before the 120-second watchdog
+expired.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now prunes recursive walk
+  subtrees through `build_walker_filter(...)`, so repo-local ignored fixture
+  directories such as `test_workspace/` are skipped before lexical walking
+  enters them.
+- `mcp_server/cli/repository_commands.py` now reports the explicit
+  `test_workspace/` lexical boundary alongside the existing fast-report and
+  exact-path boundary lines.
+- `tests/test_dispatcher.py` freezes the combined post-devcontainer tail by
+  requiring the ignored `test_workspace/` subtree to be pruned before the
+  walker can reach the next later included file.
+- `tests/test_git_index_manager.py` freezes durable trace preservation of the
+  later included path after ignored tail handling.
+- `tests/test_ignore_patterns.py` freezes both the explicit repo-local
+  `test_workspace/` boundary and absolute-path walker filtering for
+  `fast_test_results/fast_report_*.md` plus
+  `test_workspace/real_repos/search_scaling/package.json`.
+- `tests/test_repository_commands.py` freezes the operator surface so the
+  `test_workspace/` lexical boundary is visible while the later included path,
+  not `.devcontainer/devcontainer.json`, remains authoritative.
+
+Observed progression on the refreshed live repo-local force-full command:
+
+- The SEMWALKGAP live rerun started on observed commit
+  `26a163da52865a85c4f0c91e657c3f959e26b00e` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`.
+- By `2026-04-29T12:51:58Z`, the durable trace had already advanced far past
+  `.devcontainer/devcontainer.json` to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/post_migration/test_mcp_functionality.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_semcontract_contract.py`.
+- By `2026-04-29T12:52:00Z`, `repository status` reported the same live rerun
+  at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_p7_schema_alignment.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_sempipe_contract.py`.
+- By `2026-04-29T12:53:14Z`, the durable trace had advanced again to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/__init__.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/quick_charts.py`.
+- The bounded command then timed out locally after 120 seconds, and
+  `repository status` terminalized the dead-process snapshot to
+  `Trace status: interrupted` at `2026-04-29T12:53:24Z` while preserving the
+  same later visualization pair.
+
+Current downstream verdict confirms the post-devcontainer walk gap is cleared:
+
+- `.devcontainer/devcontainer.json`: no longer the latest durable
+  `last_progress_path`.
+- `.devcontainer/devcontainer.json`: no longer the active `in_flight_path`.
+- `fast_test_results/fast_report_*.md`: still a bounded ignored lexical
+  family, not the authoritative blocker.
+- `test_workspace/real_repos/search_scaling/package.json`: still a bounded
+  ignored fixture path, not the authoritative blocker.
+- `mcp_server/visualization/__init__.py`: latest durable `last_progress_path`.
+- `mcp_server/visualization/quick_charts.py`: current exact `in_flight_path`.
+- The next blocker is no longer the post-devcontainer ignore tail. It is the
+  later visualization lexical seam.
+
 ## SEMDEVSTALE Live Rerun Check
 
 SEMDEVSTALE repaired the post-lexical handoff contract around the renewed
@@ -494,49 +561,51 @@ timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync
 
 ## Rebuild Evidence
 
-Observed runtime state during the current SEMDEVRELAPSE rerun check:
+Observed runtime state during the current SEMWALKGAP rerun check:
 
-- Files indexed in SQLite: `665`
-- Code chunks indexed in SQLite: `5418`
+- Files indexed in SQLite: `1113`
+- Code chunks indexed in SQLite: `28098`
 - Summary-backed chunks: `0`
-- Chunks missing summaries: `5418`
+- Chunks missing summaries: `28098`
 - Vector-linked chunks: `0`
-- Chunks missing vectors: `5418`
+- Chunks missing vectors: `28098`
 
 Durable stage trace from `.mcp-index/force_full_exit_trace.json` after the
-post-timeout SEMDEVRELAPSE rerun evidence capture:
+post-timeout SEMWALKGAP rerun evidence capture:
 
 - Trace status: `interrupted`
 - Trace stage: `lexical_walking`
 - Trace stage family: `lexical`
-- Trace timestamp: `2026-04-29T12:21:08Z`
+- Trace timestamp: `2026-04-29T12:53:24Z`
 - Trace blocker source: `lexical_mutation`
-- Trace current commit: `ec443d85edd902cdcc018d2103a334abe5235124`
+- Trace current commit: `26a163da52865a85c4f0c91e657c3f959e26b00e`
 - Trace indexed commit before:
   `e2e9519858c3683c06b152c94a99e52098beaec6`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/__init__.py`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/quick_charts.py`
 
 Runtime containment verdict for the refreshed live rerun:
 
-- The repaired later script and root-test contracts remain frozen in unit
-  coverage, but this refreshed live rerun never reached them again.
-- The current exact blocker is still the renewed same-file marker
-  `.devcontainer/devcontainer.json` under `Trace stage: lexical_walking`.
-- The live rerun timed out under the 120-second watchdog, and
+- The repaired post-devcontainer walk-gap contract is now validated live: the
+  durable trace advanced well beyond `.devcontainer/devcontainer.json`.
+- The ignored tail remains bounded and truthful: generated fast reports and
+  `test_workspace/` fixture repos are no longer treated as authoritative
+  progress markers.
+- The live rerun still timed out under the 120-second watchdog, and
   `repository status` rewrote the dead-process durable trace from
-  `status=running` to `status=interrupted` on the same same-file marker.
-- Walk-order evidence shows the next unexplained tail after that marker now
-  includes `fast_test_results/fast_report_20250628_193425.md` and
-  `test_workspace/real_repos/search_scaling/package.json`, so the next repair
-  is no longer obviously the older `.devcontainer` predecessor/handoff pair.
+  `status=running` to `status=interrupted` on the later visualization pair.
+- The next exact blocker is now
+  `mcp_server/visualization/__init__.py ->
+  mcp_server/visualization/quick_charts.py`.
 - The partial runtime still ends with no `chunk_summaries` and no
   `semantic_points`.
 
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
-after the SEMDEVRELAPSE live rerun had already timed out
+after the SEMWALKGAP live rerun had already timed out
 reported:
 
 - Lexical readiness: `stale_commit`
@@ -551,6 +620,8 @@ reported:
 - Last sync error: `disk I/O error`
 - Lexical boundary:
   `ignoring generated fast-test reports matching fast_test_results/fast_report_*.md`
+- Lexical boundary:
+  `fixture repositories under test_workspace/ are ignored during lexical walking`
 - Lexical boundary:
   `using bounded Markdown indexing for ai_docs/*_overview.md`
 - Lexical boundary:
@@ -570,7 +641,9 @@ reported:
 - Trace stage family: `lexical`
 - Trace blocker source: `lexical_mutation`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/__init__.py`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/quick_charts.py`
 
 Repository/index freshness evidence:
 
@@ -589,33 +662,32 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 - `symbol` and lexical probes still point operators at
   `mcp_server/dispatcher/dispatcher_enhanced.py`,
   `mcp_server/cli/repository_commands.py`, and the renewed
-  `.devcontainer/devcontainer.json` lexical blocker.
-- The remaining downstream work is no longer centered on the later root-test
-  abort captured by `SEMROOTTESTABORT`. It is now centered on the renewed
-  same-file devcontainer relapse plus the newly observed post-devcontainer
-  walk gap captured by `SEMWALKGAP`.
+  `mcp_server/visualization/quick_charts.py` lexical blocker.
+- The remaining downstream work is no longer centered on the renewed
+  `.devcontainer/devcontainer.json` relapse captured by `SEMDEVRELAPSE`.
+  It is now centered on the later visualization lexical seam uncovered by
+  `SEMWALKGAP`.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMDEVRELAPSE.
+Local multi-repo dogfooding is **still not ready** after SEMWALKGAP.
 
 Why:
 
-- The SEMDEVRELAPSE evidence refresh is real: the renewed same-file
-  `.devcontainer/devcontainer.json` relapse is now frozen in the phase-local
-  tests and live status artifact.
+- The SEMWALKGAP evidence refresh is real: the post-devcontainer ignore tail
+  is now frozen in phase-local tests and the live status artifact.
 - The stale trace bug from SEMJEDI remains closed as a unit/status contract:
   the operator surface now distinguishes missing traces, stale-running traces,
   and storage-closeout traces.
-- The refreshed live rerun on commit `ec443d85` still times out with the
-  durable trace re-anchored on `.devcontainer/devcontainer.json` while
-  `repository status` truthfully terminalizes that stale running trace to
-  `interrupted`.
-- The live rerun still does not reach the later
-  `tests/root_tests/test_voyage_api.py ->
-  tests/root_tests/run_reranking_tests.py` pair on the current head.
+- The refreshed live rerun on commit `26a163da` still times out, but the
+  durable trace now advances to
+  `mcp_server/visualization/__init__.py ->
+  mcp_server/visualization/quick_charts.py` while `repository status`
+  truthfully terminalizes that later running trace to `interrupted`.
+- The post-devcontainer ignored tail is no longer the active blocker on the
+  current head.
 - The partial runtime still ends with `chunk_summaries = 0` and
   `semantic_points = 0`.
 
@@ -624,27 +696,26 @@ Steering outcome:
 - SEMTRACEFRESHNESS acceptance remains satisfied for the operator surface: the
   stale-running condition is now reported truthfully instead of silently
   disappearing behind a missing trace.
-- SEMSCRIPTREBOUND remains historically valid on the prior head: the earlier
-  rerun did clear `scripts/quick_mcp_vs_native_validation.py` and expose the
-  later disk-I/O closeout seam.
-- SEMDEVSTALE and SEMTESTSTALE remain historically valid on earlier heads, but
-  the refreshed current-head rerun in SEMDEVRELAPSE reintroduced the same-file
-  `.devcontainer/devcontainer.json` marker before those later seams were
-  reached again.
+- SEMDEVRELAPSE remains historically valid on the prior head: it captured the
+  walk-order evidence showing the post-devcontainer tail was the next
+  unexplained gap.
+- SEMDEVSTALE and SEMTESTSTALE remain historically valid on earlier heads, and
+  SEMWALKGAP now proves the refreshed current-head rerun has moved beyond the
+  same-file `.devcontainer/devcontainer.json` marker again.
 - SEMSCRIPTABORT and SEMROOTTESTABORT remain historically valid repairs for
   later seams that were not reached by the refreshed current-head rerun.
-- The roadmap now adds downstream phase `SEMWALKGAP`.
+- The roadmap now adds downstream phase `SEMQUICKCHARTS`.
 - Older downstream assumptions should be treated as stale, including any
   downstream phase plan or handoff that still treats the active current-head
-  blocker as either the later root-test seam or the older
+  blocker as the post-devcontainer ignore tail or the older
   `.devcontainer/post_create.sh -> .devcontainer/devcontainer.json` rebound.
 
 ## Verification
 
-Verification sequence for this SEMDEVRELAPSE slice:
+Verification sequence for this SEMWALKGAP slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "devcontainer or lexical or force_full or interrupted or stale or trace or boundary"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_ignore_patterns.py tests/test_repository_commands.py -q --no-cov -k "devcontainer or fast_report or test_workspace or lexical or force_full or trace or ignore or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

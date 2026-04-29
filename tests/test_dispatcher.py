@@ -2305,7 +2305,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "scripts/quick_mcp_vs_native_validation.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/rerun_failed_native_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
-        assert "tests/root_tests/run_reranking_tests.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/root_tests/run_reranking_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/validate_mcp_comprehensive.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/test_voyage_api.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_benchmarks.py" not in Plugin._BOUNDED_CHUNK_PATHS
@@ -2990,6 +2990,65 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_files_attempted"] == 1
         assert result["last_progress_path"] == str(sample.resolve())
         assert result["last_progress_path"] != str(fast_report.resolve())
+
+    def test_index_directory_prunes_test_workspace_after_devcontainer_tail(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        (tmp_path / ".mcp-index-ignore").write_text(
+            "fast_test_results/fast_report_*.md\ntest_workspace/\n"
+        )
+        devcontainer = tmp_path / ".devcontainer" / "devcontainer.json"
+        devcontainer.parent.mkdir()
+        devcontainer.write_text('{"name": "devcontainer"}\n', encoding="utf-8")
+        fast_report = tmp_path / "fast_test_results" / "fast_report_20250628_193425.md"
+        fast_report.parent.mkdir()
+        fast_report.write_text("# generated\n", encoding="utf-8")
+        ignored_workspace_file = (
+            tmp_path / "test_workspace" / "real_repos" / "search_scaling" / "package.json"
+        )
+        ignored_workspace_file.parent.mkdir(parents=True)
+        ignored_workspace_file.write_text('{"name": "ignored-fixture"}\n', encoding="utf-8")
+        later_file = tmp_path / "src" / "later.py"
+        later_file.parent.mkdir()
+        later_file.write_text("value = 1\n", encoding="utf-8")
+
+        def _fake_walk(_root, followlinks=False):
+            root_dirnames = [".devcontainer", "fast_test_results", "test_workspace", "src"]
+            yield str(tmp_path), root_dirnames, []
+            if ".devcontainer" in root_dirnames:
+                yield str(devcontainer.parent), [], [devcontainer.name]
+            if "fast_test_results" in root_dirnames:
+                yield str(fast_report.parent), [], [fast_report.name]
+            if "test_workspace" in root_dirnames:
+                raise AssertionError(
+                    "ignored test_workspace subtree should be pruned before walking"
+                )
+            if "src" in root_dirnames:
+                yield str(later_file.parent), [], [later_file.name]
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["indexed_files"] == 2
+        assert result["ignored_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_files_attempted"] == 2
+        assert result["last_progress_path"] == str(later_file.resolve())
+        assert result["last_progress_path"] != str(devcontainer.resolve())
+        assert result["last_progress_path"] != str(ignored_workspace_file.resolve())
 
     def test_index_directory_keeps_halving_summary_limit_until_timeout_recovers(
         self, tmp_path, monkeypatch

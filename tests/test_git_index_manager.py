@@ -1735,6 +1735,55 @@ def test_force_full_progress_callback_preserves_last_progress_path_across_semant
     assert trace["in_flight_path"] is None
 
 
+def test_force_full_progress_callback_preserves_later_included_path_after_ignored_tail(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before=repo_info.last_indexed_commit,
+    )
+    later_file = repo / "mcp_server" / "cli" / "repository_commands.py"
+    ignored_tail = repo / "test_workspace" / "real_repos" / "search_scaling" / "package.json"
+
+    callback(
+        {
+            "stage": "lexical_walking",
+            "stage_family": "lexical",
+            "blocker_source": "lexical_mutation",
+            "lexical_stage": "walking",
+            "semantic_stage": "not_run",
+            "last_progress_path": str(later_file),
+            "in_flight_path": None,
+        }
+    )
+    callback(
+        {
+            "stage": "force_full_closeout_handoff",
+            "stage_family": "final_closeout",
+            "blocker_source": "final_closeout",
+            "lexical_stage": "completed",
+            "semantic_stage": "not_run",
+            "last_progress_path": None,
+            "in_flight_path": None,
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["stage"] == "force_full_closeout_handoff"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["last_progress_path"] == str(later_file)
+    assert trace["in_flight_path"] is None
+    assert str(ignored_tail) not in (trace.get("last_progress_path") or "")
+
+
 def test_force_full_sync_terminalizes_running_trace_when_same_devcontainer_relapse_persists(
     tmp_path,
 ):

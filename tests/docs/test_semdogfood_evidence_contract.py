@@ -22,7 +22,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMDEVRELAPSE.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMWALKGAP.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -33,6 +33,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMTESTSTALE Live Rerun Check",
         "## SEMSCRIPTABORT Live Rerun Check",
         "## SEMDEVRELAPSE Live Rerun Check",
+        "## SEMWALKGAP Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -89,6 +90,10 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T11:43:19Z",
         "2026-04-29T12:19:54Z",
         "2026-04-29T12:21:08Z",
+        "2026-04-29T12:51:58Z",
+        "2026-04-29T12:52:00Z",
+        "2026-04-29T12:53:14Z",
+        "2026-04-29T12:53:24Z",
         "098c1ad1",
         "c8b2d724",
         "a186b352",
@@ -97,6 +102,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "8870a23f",
         "7335cf35",
         "ec443d85",
+        "26a163da",
         "scripts/check_index_schema.py",
         "scripts/rerun_failed_native_tests.py",
         "scripts/quick_mcp_vs_native_validation.py",
@@ -125,6 +131,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "ai_docs/qdrant.md",
         "fast_test_results/fast_report_*.md",
         "test_workspace/real_repos/search_scaling/package.json",
+        "mcp_server/visualization/__init__.py",
+        "mcp_server/visualization/quick_charts.py",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -137,6 +145,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "Older downstream assumptions should be treated as stale",
         "roadmap now adds `SEMDEVSTALE` as the nearest downstream phase",
         "roadmap now adds downstream phase `SEMWALKGAP`",
+        "roadmap now adds downstream phase `SEMQUICKCHARTS`",
     ):
         assert expected in text
 
@@ -145,7 +154,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"devcontainer or lexical or force_full or interrupted or stale or trace or boundary\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_ignore_patterns.py tests/test_repository_commands.py -q --no-cov -k \"devcontainer or fast_report or test_workspace or lexical or force_full or trace or ignore or boundary\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
@@ -171,6 +180,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "semantic_source: \"semantic\"",
         "semantic_collection_name: \"code_index__oss_high__v1\"",
         "local multi-repo dogfooding",
-        "Phase plan: `plans/phase-plan-v7-SEMDEVRELAPSE.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMWALKGAP.md`",
+        "fixture repositories under test_workspace/ are ignored during lexical walking",
     ):
         assert expected in text

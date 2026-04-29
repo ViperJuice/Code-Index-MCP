@@ -2290,6 +2290,59 @@ exact blocker becomes visible.
 - IF-0-SEMWALKGAP-1 — post-devcontainer walk-gap recovery and evidence
   contract.
 
+### Phase 42 — Visualization Quick Charts Lexical Recovery (SEMQUICKCHARTS)
+
+**Objective**
+
+Repair the later lexical blocker exposed by SEMWALKGAP so a refreshed rerun on
+the new head no longer times out with the durable trace stalled on
+`mcp_server/visualization/__init__.py ->
+mcp_server/visualization/quick_charts.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMWALKGAP head
+      either advances durably beyond
+      `mcp_server/visualization/quick_charts.py` or emits a truthful newer
+      blocker before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the exact visualization pair
+      `mcp_server/visualization/__init__.py ->
+      mcp_server/visualization/quick_charts.py` plus the immediate
+      dispatcher/trace/status plumbing needed to prove the outcome.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMWALKGAP rerun
+      outcome and the final live verdict for the visualization blocker.
+
+**Scope notes**
+
+This phase exists only if SEMWALKGAP proves the post-devcontainer tail is
+skipped truthfully but the refreshed live rerun still remains in lexical
+walking on the later visualization pair.
+
+**Non-goals**
+
+- No reopening of the post-devcontainer ignore-tail recovery once the live
+  rerun has advanced beyond `.devcontainer/devcontainer.json`.
+- No widening into semantic-closeout or summary/vector work unless the later
+  visualization blocker is cleared first.
+- No reopening of older exact seams unless a refreshed rerun reaches them
+  again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMWALKGAP
+
+**Produces**
+- IF-0-SEMQUICKCHARTS-1 — visualization quick-charts lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2334,6 +2387,7 @@ SEMCONTRACT
   -> SEMROOTTESTABORT
   -> SEMDEVRELAPSE
   -> SEMWALKGAP
+  -> SEMQUICKCHARTS
 ```
 
 ## Execution Notes
@@ -2387,6 +2441,11 @@ SEMCONTRACT
   next unexplained gap sits in the long post-devcontainer tail, because the
   next repair is then no longer devcontainer-file-local and any older
   downstream assumption is stale.
+- SEMWALKGAP should amend the roadmap immediately if the refreshed live rerun
+  clears the post-devcontainer ignore tail but exposes a later exact lexical
+  blocker such as
+  `mcp_server/visualization/__init__.py ->
+  mcp_server/visualization/quick_charts.py`.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

@@ -86,6 +86,14 @@ class TestCustomIgnoreFile:
         assert manager.should_ignore(Path("fast_test_results/fast_report_20250628_193425.md")) is True
         assert manager.should_ignore(Path("docs/status/SEMANTIC_DOGFOOD_REBUILD.md")) is False
 
+    def test_repo_test_workspace_boundary_is_explicit_and_narrow(self):
+        manager = IgnorePatternManager(root_path=REPO_ROOT)
+        assert (
+            manager.should_ignore(Path("test_workspace/real_repos/search_scaling/package.json"))
+            is True
+        )
+        assert manager.should_ignore(Path("tests/test_repository_commands.py")) is False
+
 
 class TestGitignoreIntegration:
     """Patterns from .gitignore are also loaded and respected."""
@@ -218,6 +226,17 @@ class TestBuildWalkerFilter:
         assert f(tmp_path / "node_modules" / "pkg" / "index.js") is True
         assert f(tmp_path / "__pycache__" / "module.cpython-311.pyc") is True
         assert f(tmp_path / ".git" / "HEAD") is True
+
+    def test_repo_walker_filter_ignores_fast_report_and_test_workspace_paths(self):
+        f = build_walker_filter(REPO_ROOT)
+        assert (
+            f(REPO_ROOT / "fast_test_results" / "fast_report_20250628_193425.md") is True
+        )
+        assert (
+            f(REPO_ROOT / "test_workspace" / "real_repos" / "search_scaling" / "package.json")
+            is True
+        )
+        assert f(REPO_ROOT / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md") is False
 
 
 class TestWalkerIntegration:

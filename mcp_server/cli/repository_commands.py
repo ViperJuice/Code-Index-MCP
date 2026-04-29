@@ -188,6 +188,24 @@ def _print_fast_report_boundary(prefix: str, repo_path: Path) -> None:
             return
 
 
+def _print_test_workspace_boundary(prefix: str, repo_path: Path) -> None:
+    for ignore_name in (".mcp-index-ignore", ".gitignore"):
+        ignore_path = repo_path / ignore_name
+        if not ignore_path.exists():
+            continue
+        try:
+            for raw_line in ignore_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if line == "test_workspace/":
+                    click.echo(
+                        f"{prefix}Lexical boundary: fixture repositories under test_workspace/ "
+                        "are ignored during lexical walking"
+                    )
+                    return
+        except OSError:
+            return
+
+
 def _print_ai_docs_overview_boundary(prefix: str, repo_path: Path) -> None:
     ai_docs_dir = repo_path / "ai_docs"
     if not ai_docs_dir.is_dir():
@@ -649,6 +667,7 @@ def status(repo_id: Optional[str]):
         if status.get("last_sync_error"):
             click.echo(f"  Last sync error: {status['last_sync_error']}")
         _print_fast_report_boundary("  ", Path(status["path"]))
+        _print_test_workspace_boundary("  ", Path(status["path"]))
         _print_ai_docs_overview_boundary("  ", Path(status["path"]))
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))

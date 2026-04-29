@@ -2927,8 +2927,13 @@ class EnhancedDispatcher:
             def iter_files() -> Iterable[Path]:
                 # followlinks=False (default, made explicit) keeps us cycle-safe.
                 for current_root, dirnames, filenames in os.walk(directory, followlinks=False):
-                    dirnames[:] = [d for d in dirnames if d not in _INDEX_EXCLUDED_DIRS]
                     root_path = Path(current_root)
+                    dirnames[:] = [
+                        dirname
+                        for dirname in dirnames
+                        if dirname not in _INDEX_EXCLUDED_DIRS
+                        and not is_excluded(root_path / dirname)
+                    ]
                     for filename in filenames:
                         yield root_path / filename
 
