@@ -5543,6 +5543,70 @@ plans/phase-plan-v7-SEMGARELTAIL.md`.
 - IF-0-SEMLATEPHASEPLANTAIL-1 — later phase-plan-tail recovery and evidence
   contract.
 
+### Phase 94 — Verify/API Rebound Phase-Plan Tail Recovery (SEMVERIFYAPIREBOUNDTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the rebound phase-plan Markdown seam
+revealed after SEMLATEPHASEPLANTAIL:
+`plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMLATEPHASEPLANTAIL
+      head either advances durably beyond
+      `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+      plans/phase-plan-v7-SEMAPIDOCSTAIL.md` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] Any repair chosen for this rebound phase-plan seam stays narrow, tested,
+      and does not reopen the cleared
+      `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+      plans/phase-plan-v7-SEMGARELTAIL.md` seam without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMLATEPHASEPLANTAIL
+      rerun outcome and the final live verdict for the exact
+      `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+      plans/phase-plan-v7-SEMAPIDOCSTAIL.md` pair.
+
+**Scope notes**
+
+This phase exists only if SEMLATEPHASEPLANTAIL proves the
+`plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+plans/phase-plan-v7-SEMGARELTAIL.md` seam is not the final active blocker, but
+the refreshed live rerun on the new head still terminalizes later in lexical
+walking on the rebound phase-plan Markdown seam
+`plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+
+**Non-goals**
+
+- No reopening of the cleared
+  `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+  plans/phase-plan-v7-SEMGARELTAIL.md` seam once the live rerun has already
+  moved away from it.
+- No broad repo-wide phase-plan Markdown timeout bypass or blanket payload
+  relaxation unless the refreshed rerun proves the active blocker cannot be
+  cleared with a narrower rebound-tail repair.
+- No reopening of unrelated semantic, integration, security, or compatibility
+  seams unless the refreshed rerun proves the blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMLATEPHASEPLANTAIL
+
+**Produces**
+- IF-0-SEMVERIFYAPIREBOUNDTAIL-1 — rebound phase-plan-tail recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5639,6 +5703,7 @@ SEMCONTRACT
   -> SEMP24PLUGINGATINGTAIL
   -> SEMAPIDOCSTAIL
   -> SEMLATEPHASEPLANTAIL
+  -> SEMVERIFYAPIREBOUNDTAIL
 ```
 
 ## Execution Notes
@@ -5739,6 +5804,13 @@ SEMCONTRACT
   exposes a later exact phase-plan Markdown seam such as
   `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
   plans/phase-plan-v7-SEMGARELTAIL.md`.
+- SEMLATEPHASEPLANTAIL should amend the roadmap immediately if the live rerun
+  proves the
+  `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+  plans/phase-plan-v7-SEMGARELTAIL.md` seam is no longer the final active
+  blocker but exposes a later rebound phase-plan Markdown seam such as
+  `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+  plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during

@@ -4167,6 +4167,61 @@ Steering outcome:
   `docs/architecture/P2B-known-limits.md ->
   docs/api/API-REFERENCE.md` seam.
 
+## SEMLATEPHASEPLANTAIL Live Rerun Check
+
+SEMLATEPHASEPLANTAIL did clear its named later phase-plan Markdown seam on the
+current head. The refreshed repo-local force-full rerun no longer terminalized
+at
+`plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+plans/phase-plan-v7-SEMGARELTAIL.md`; by the time the watchdog terminated, the
+durable trace and operator-visible status had moved later into a rebound
+phase-plan surface
+`plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMLATEPHASEPLANTAIL live rerun advanced on observed commit
+  `e80ecc46df93f5a4ae1bf0966ad675737888f3c9` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T05:36:39Z`, `.mcp-index/force_full_exit_trace.json` captured
+  the watchdog-bounded rerun as a raw running snapshot with
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+- At `2026-04-30T05:36:47Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving that same later
+  lexical progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+- SQLite runtime counts after the rerun were
+  `files = 1199`, `code_chunks = 21254`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMLATEPHASEPLANTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+  plans/phase-plan-v7-SEMGARELTAIL.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  rebound phase-plan seam
+  `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+  plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+- The roadmap now adds downstream phase `SEMVERIFYAPIREBOUNDTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMLATEPHASEPLANTAIL-era
+  `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+  plans/phase-plan-v7-SEMGARELTAIL.md` seam.
+
 ## Verification
 
 Verification sequence for this SEMP24PLUGINGATINGTAIL slice:

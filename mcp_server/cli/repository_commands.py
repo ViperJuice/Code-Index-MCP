@@ -335,14 +335,14 @@ def _print_support_docs_markdown_boundary(prefix: str, repo_path: Path) -> None:
 
 def _print_late_v7_phase_plan_markdown_boundary(prefix: str, repo_path: Path) -> None:
     phase_plan_paths = (
-        repo_path / "plans" / "phase-plan-v7-SEMSYNCFIX.md",
-        repo_path / "plans" / "phase-plan-v7-SEMVISUALREPORT.md",
+        repo_path / "plans" / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md",
+        repo_path / "plans" / "phase-plan-v7-SEMGARELTAIL.md",
     )
     if all(path.is_file() for path in phase_plan_paths):
         click.echo(
             f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
-            "plans/phase-plan-v7-SEMSYNCFIX.md -> "
-            "plans/phase-plan-v7-SEMVISUALREPORT.md"
+            "plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md -> "
+            "plans/phase-plan-v7-SEMGARELTAIL.md"
         )
 
 

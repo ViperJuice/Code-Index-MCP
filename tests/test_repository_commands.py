@@ -5698,12 +5698,14 @@ def test_status_reports_exact_late_v7_phase_plan_markdown_boundary(
 ):
     runner = CliRunner()
     repo_info = _repo_info(tmp_path)
-    semsyncfix_doc = repo_info.path / "plans" / "phase-plan-v7-SEMSYNCFIX.md"
-    semvisualreport_doc = repo_info.path / "plans" / "phase-plan-v7-SEMVISUALREPORT.md"
+    semcodexlooprelapsetail_doc = (
+        repo_info.path / "plans" / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md"
+    )
+    semgareltail_doc = repo_info.path / "plans" / "phase-plan-v7-SEMGARELTAIL.md"
     later_doc = repo_info.path / "plans" / "phase-plan-v6-WATCH.md"
-    semsyncfix_doc.parent.mkdir(parents=True)
-    semsyncfix_doc.write_text("# SEMSYNCFIX\n", encoding="utf-8")
-    semvisualreport_doc.write_text("# SEMVISUALREPORT\n", encoding="utf-8")
+    semcodexlooprelapsetail_doc.parent.mkdir(parents=True)
+    semcodexlooprelapsetail_doc.write_text("# SEMCODEXLOOPRELAPSETAIL\n", encoding="utf-8")
+    semgareltail_doc.write_text("# SEMGARELTAIL\n", encoding="utf-8")
     later_doc.write_text("# WATCH\n", encoding="utf-8")
 
     class FakeRegistry:
@@ -5756,7 +5758,7 @@ def test_status_reports_exact_late_v7_phase_plan_markdown_boundary(
                     "trace_timestamp": "2026-04-29T16:07:22Z",
                     "current_commit": "fe501b9700000000000000000000000000000000",
                     "indexed_commit_before": "e2e9519800000000000000000000000000000000",
-                    "last_progress_path": str(semvisualreport_doc),
+                    "last_progress_path": str(semgareltail_doc),
                     "in_flight_path": str(later_doc),
                     "blocker_source": "lexical_mutation",
                 },
@@ -5793,10 +5795,11 @@ def test_status_reports_exact_late_v7_phase_plan_markdown_boundary(
     assert result.exit_code == 0
     assert (
         "Lexical boundary: using exact bounded Markdown indexing for "
-        "plans/phase-plan-v7-SEMSYNCFIX.md -> plans/phase-plan-v7-SEMVISUALREPORT.md"
+        "plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md -> "
+        "plans/phase-plan-v7-SEMGARELTAIL.md"
         in result.output
     )
-    assert f"Last progress path: {semvisualreport_doc}" in result.output
+    assert f"Last progress path: {semgareltail_doc}" in result.output
     assert f"In-flight path: {later_doc}" in result.output
 
 

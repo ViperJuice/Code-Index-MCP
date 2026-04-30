@@ -3638,8 +3638,10 @@ def test_get_repository_status_preserves_late_v7_phase_plan_pair_trace(tmp_path)
                 "trace_timestamp": "2026-04-29T15:51:12Z",
                 "current_commit": commit,
                 "indexed_commit_before": "older-indexed-commit",
-                "last_progress_path": str(repo / "plans" / "phase-plan-v7-SEMSYNCFIX.md"),
-                "in_flight_path": str(repo / "plans" / "phase-plan-v7-SEMVISUALREPORT.md"),
+                "last_progress_path": str(
+                    repo / "plans" / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md"
+                ),
+                "in_flight_path": str(repo / "plans" / "phase-plan-v7-SEMGARELTAIL.md"),
                 "blocker_source": "lexical_mutation",
             }
         ),
@@ -3656,10 +3658,10 @@ def test_get_repository_status_preserves_late_v7_phase_plan_pair_trace(tmp_path)
     assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
     assert status["force_full_exit_trace"]["stage_family"] == "lexical"
     assert status["force_full_exit_trace"]["last_progress_path"] == str(
-        repo / "plans" / "phase-plan-v7-SEMSYNCFIX.md"
+        repo / "plans" / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md"
     )
     assert status["force_full_exit_trace"]["in_flight_path"] == str(
-        repo / "plans" / "phase-plan-v7-SEMVISUALREPORT.md"
+        repo / "plans" / "phase-plan-v7-SEMGARELTAIL.md"
     )
     assert "phase-plan-v5-garecut.md" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
@@ -3733,8 +3735,8 @@ def test_force_full_sync_durable_trace_moves_past_late_v7_phase_plan_pair(tmp_pa
     repo_info = _make_repo_info(repo, commit)
     ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
 
-    prior_doc = repo / "plans" / "phase-plan-v7-SEMSYNCFIX.md"
-    blocked_doc = repo / "plans" / "phase-plan-v7-SEMVISUALREPORT.md"
+    prior_doc = repo / "plans" / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md"
+    blocked_doc = repo / "plans" / "phase-plan-v7-SEMGARELTAIL.md"
     later_doc = repo / "plans" / "phase-plan-v6-WATCH.md"
     later_doc.parent.mkdir(parents=True, exist_ok=True)
 
@@ -3904,7 +3906,9 @@ def test_force_full_sync_durable_trace_moves_past_historical_phase_plan_pair(tmp
     assert str(prior_doc) in {trace["last_progress_path"], trace["in_flight_path"]} or str(
         blocked_doc
     ) in {trace["last_progress_path"], trace["in_flight_path"]}
-    assert "phase-plan-v7-SEMSYNCFIX.md" not in (trace.get("last_progress_path") or "")
+    assert "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md" not in (
+        trace.get("last_progress_path") or ""
+    )
 
 
 def test_get_repository_status_preserves_historical_v1_phase_plan_pair_trace(tmp_path):

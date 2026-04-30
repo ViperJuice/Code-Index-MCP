@@ -2091,27 +2091,33 @@ class TestEnhancedDispatcherProtocolConformance:
         repo = tmp_path / "repo"
         plans_dir = repo / "plans"
         plans_dir.mkdir(parents=True)
-        semsyncfix_doc = plans_dir / "phase-plan-v7-SEMSYNCFIX.md"
-        semvisualreport_doc = plans_dir / "phase-plan-v7-SEMVISUALREPORT.md"
+        semcodexlooprelapsetail_doc = plans_dir / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md"
+        semgareltail_doc = plans_dir / "phase-plan-v7-SEMGARELTAIL.md"
         unrelated_doc = plans_dir / "phase-plan-v7-SEMUNRELATED.md"
-        semsyncfix_doc.write_text(
+        semcodexlooprelapsetail_doc.write_text(
             "---\n"
-            "title: Phase Plan v7 SEMSYNCFIX\n"
+            "title: Phase Plan v7 SEMCODEXLOOPRELAPSETAIL\n"
             "---\n"
-            "# SEMSYNCFIX Repair\n\n"
+            "# SEMCODEXLOOPRELAPSETAIL Recovery\n\n"
             "## Context\n\n"
-            "### Summary drain\n"
-            "- Preserve bounded discoverability\n",
+            "### Legacy loop rebound\n"
+            "- Preserve bounded discoverability\n\n"
+            "## Automation Handoff\n\n"
+            "### Phase-loop compatibility\n"
+            "- Preserve heading discoverability\n",
             encoding="utf-8",
         )
-        semvisualreport_doc.write_text(
+        semgareltail_doc.write_text(
             "---\n"
-            "title: Phase Plan v7 SEMVISUALREPORT\n"
+            "title: Phase Plan v7 SEMGARELTAIL\n"
             "---\n"
-            "# SEMVISUALREPORT Follow-up\n\n"
-            "## Evidence\n\n"
+            "# SEMGARELTAIL Follow-up\n\n"
+            "## Verification\n\n"
             "### Later blocker\n"
-            "- Preserve bounded discoverability\n",
+            "- Preserve bounded discoverability\n\n"
+            "## Acceptance Criteria\n\n"
+            "### Release docs seam\n"
+            "- Preserve heading discoverability\n",
             encoding="utf-8",
         )
         unrelated_doc.write_text(
@@ -2150,25 +2156,25 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["failed_files"] == 0
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] in {
-            str(semsyncfix_doc.resolve()),
-            str(semvisualreport_doc.resolve()),
+            str(semcodexlooprelapsetail_doc.resolve()),
+            str(semgareltail_doc.resolve()),
             str(unrelated_doc.resolve()),
         }
         with store._get_connection() as conn:
-            semsyncfix_symbols = [
+            semcodexlooprelapsetail_symbols = [
                 row[0]
                 for row in conn.execute(
                     "SELECT name FROM symbols WHERE file_id IN "
                     "(SELECT id FROM files WHERE relative_path = "
-                    "'plans/phase-plan-v7-SEMSYNCFIX.md') ORDER BY id"
+                    "'plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md') ORDER BY id"
                 ).fetchall()
             ]
-            semvisualreport_symbols = [
+            semgareltail_symbols = [
                 row[0]
                 for row in conn.execute(
                     "SELECT name FROM symbols WHERE file_id IN "
                     "(SELECT id FROM files WHERE relative_path = "
-                    "'plans/phase-plan-v7-SEMVISUALREPORT.md') ORDER BY id"
+                    "'plans/phase-plan-v7-SEMGARELTAIL.md') ORDER BY id"
                 ).fetchall()
             ]
             unrelated_symbols = [
@@ -2179,44 +2185,48 @@ class TestEnhancedDispatcherProtocolConformance:
                     "'plans/phase-plan-v7-SEMUNRELATED.md') ORDER BY id"
                 ).fetchall()
             ]
-            semsyncfix_chunk_count = conn.execute(
+            semcodexlooprelapsetail_chunk_count = conn.execute(
                 "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
                 "(SELECT id FROM files WHERE relative_path = "
-                "'plans/phase-plan-v7-SEMSYNCFIX.md')"
+                "'plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md')"
             ).fetchone()[0]
-            semvisualreport_chunk_count = conn.execute(
+            semgareltail_chunk_count = conn.execute(
                 "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
                 "(SELECT id FROM files WHERE relative_path = "
-                "'plans/phase-plan-v7-SEMVISUALREPORT.md')"
+                "'plans/phase-plan-v7-SEMGARELTAIL.md')"
             ).fetchone()[0]
             unrelated_chunk_count = conn.execute(
                 "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
                 "(SELECT id FROM files WHERE relative_path = "
                 "'plans/phase-plan-v7-SEMUNRELATED.md')"
             ).fetchone()[0]
-            semsyncfix_fts_rows = conn.execute(
+            semcodexlooprelapsetail_fts_rows = conn.execute(
                 "SELECT content FROM fts_code WHERE file_id IN "
                 "(SELECT id FROM files WHERE relative_path = "
-                "'plans/phase-plan-v7-SEMSYNCFIX.md')"
+                "'plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md')"
             ).fetchall()
-            semvisualreport_fts_rows = conn.execute(
+            semgareltail_fts_rows = conn.execute(
                 "SELECT content FROM fts_code WHERE file_id IN "
                 "(SELECT id FROM files WHERE relative_path = "
-                "'plans/phase-plan-v7-SEMVISUALREPORT.md')"
+                "'plans/phase-plan-v7-SEMGARELTAIL.md')"
             ).fetchall()
         store.close()
 
-        assert semsyncfix_symbols == [
-            "Phase Plan v7 SEMSYNCFIX",
-            "SEMSYNCFIX Repair",
+        assert semcodexlooprelapsetail_symbols == [
+            "Phase Plan v7 SEMCODEXLOOPRELAPSETAIL",
+            "SEMCODEXLOOPRELAPSETAIL Recovery",
             "Context",
-            "Summary drain",
+            "Legacy loop rebound",
+            "Automation Handoff",
+            "Phase-loop compatibility",
         ]
-        assert semvisualreport_symbols == [
-            "Phase Plan v7 SEMVISUALREPORT",
-            "SEMVISUALREPORT Follow-up",
-            "Evidence",
+        assert semgareltail_symbols == [
+            "Phase Plan v7 SEMGARELTAIL",
+            "SEMGARELTAIL Follow-up",
+            "Verification",
             "Later blocker",
+            "Acceptance Criteria",
+            "Release docs seam",
         ]
         assert unrelated_symbols == [
             "SEMUNRELATED Notes",
@@ -2224,13 +2234,13 @@ class TestEnhancedDispatcherProtocolConformance:
             "Scope",
             "Guardrail",
         ]
-        assert semsyncfix_chunk_count == 0
-        assert semvisualreport_chunk_count == 0
+        assert semcodexlooprelapsetail_chunk_count == 0
+        assert semgareltail_chunk_count == 0
         assert unrelated_chunk_count == 0
-        assert len(semsyncfix_fts_rows) == 1
-        assert len(semvisualreport_fts_rows) == 1
-        assert "Summary drain" in semsyncfix_fts_rows[0][0]
-        assert "Later blocker" in semvisualreport_fts_rows[0][0]
+        assert len(semcodexlooprelapsetail_fts_rows) == 1
+        assert len(semgareltail_fts_rows) == 1
+        assert "Phase-loop compatibility" in semcodexlooprelapsetail_fts_rows[0][0]
+        assert "Release docs seam" in semgareltail_fts_rows[0][0]
 
     def test_index_directory_uses_bounded_markdown_path_for_historical_phase_plan_pair(
         self, tmp_path, monkeypatch
