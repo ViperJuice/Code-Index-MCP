@@ -4398,6 +4398,46 @@ Steering outcome:
   blocker as the SEMAIDOCREADMETAIL-era
   `ai_docs/prometheus_overview.md -> ai_docs/README.md` seam.
 
+Phase plan: `plans/phase-plan-v7-SEMDEVCONTAINERPAIRTAIL.md`
+
+## SEMDEVCONTAINERPAIRTAIL Live Rerun Check
+
+SEMDEVCONTAINERPAIRTAIL did not expose a newer current-head blocker than the
+exact `.devcontainer` tail pair already observed during the refreshed
+SEMAIDOCREADMETAIL rerun. This phase instead freezes that exact
+`.devcontainer/post_create.sh -> .devcontainer/devcontainer.json` handoff
+across dispatcher progress snapshots, durable force-full traces, operator
+status wording, and this evidence report.
+
+Observed evidence carried forward for the exact pair:
+
+- The authoritative live rerun remains the refreshed repo-local force-full run
+  on observed commit `518d15a54a99a4d8872a6684bb44cfc0399157cb` invoked via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`.
+- At `2026-04-30T06:39:04Z`, `.mcp-index/force_full_exit_trace.json`
+  reported `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/post_create.sh`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`.
+- At `2026-04-30T06:39:16Z`, `repository status` preserved the same exact
+  pair while terminalizing the rerun to `Trace status: interrupted`.
+- `repository status` now makes that exact pair explicit with
+  `Devcontainer tail pair: exact bounded shell-to-JSON handoff preserved lexical progress into .devcontainer/devcontainer.json`
+  while retaining the bounded JSON boundary copy for
+  `.devcontainer/devcontainer.json`.
+- The checked-in `.devcontainer/post_create.sh` and
+  `.devcontainer/devcontainer.json` files remained unchanged during this
+  phase; no file-local repair was required to keep the blocker truthful.
+
+Final verdict:
+
+- SEMDEVCONTAINERPAIRTAIL acceptance is satisfied as a truthful blocker-capture
+  phase: the current-head live evidence remains anchored on
+  `.devcontainer/post_create.sh -> .devcontainer/devcontainer.json`, and the
+  dispatcher, durable trace, operator status, and evidence report now all
+  freeze that exact pair without regressing to the cleared
+  `ai_docs/prometheus_overview.md -> ai_docs/README.md` seam.
+
 ## Verification
 
 Verification sequence for this SEMP24PLUGINGATINGTAIL slice:

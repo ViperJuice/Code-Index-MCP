@@ -4042,6 +4042,10 @@ def test_status_reports_exact_devcontainer_json_boundary(monkeypatch, tmp_path: 
         "Lexical boundary: using exact bounded JSON indexing for "
         ".devcontainer/devcontainer.json" in result.output
     )
+    assert (
+        "Devcontainer tail pair: exact bounded shell-to-JSON handoff preserved lexical "
+        "progress into .devcontainer/devcontainer.json" in result.output
+    )
     assert f"Last progress path: {repo_info.path / '.devcontainer' / 'post_create.sh'}" in result.output
     assert f"In-flight path: {config_file}" in result.output
 

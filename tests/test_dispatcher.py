@@ -6036,6 +6036,30 @@ class TestEnhancedDispatcherProtocolConformance:
 
         monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
 
+        def _fake_index_file_with_lexical_timeout(
+            self, _ctx, path, stats, progress_callback=None
+        ):
+            stats["lexical_stage"] = "walking"
+            stats["lexical_files_attempted"] += 1
+            stats["in_flight_path"] = str(path.resolve())
+            if progress_callback is not None:
+                progress_callback("lexical_walking", "lexical", "lexical_mutation")
+            stats["lexical_files_completed"] += 1
+            stats["last_progress_path"] = str(path.resolve())
+            stats["in_flight_path"] = None
+            return IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            )
+
+        monkeypatch.setattr(
+            Dispatcher,
+            "_index_file_with_lexical_timeout",
+            _fake_index_file_with_lexical_timeout,
+        )
+
         def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
             raise RuntimeError("semantic closeout entry stalled before emitting progress")
 
@@ -6045,7 +6069,16 @@ class TestEnhancedDispatcherProtocolConformance:
             _explode_before_semantic_progress,
         )
 
-        result = Dispatcher([]).index_directory(
+        dispatcher = Dispatcher([])
+
+        class _FakeBashPlugin:
+            @staticmethod
+            def supports(path):
+                return path.name == "post_create.sh"
+
+        dispatcher._plugin_set_registry.plugins_for = lambda _repo_id: [_FakeBashPlugin()]
+
+        result = dispatcher.index_directory(
             ctx,
             repo,
             progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
@@ -6132,6 +6165,95 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/test_reindex_resume.py" not in stats["last_progress_path"]
         assert "scripts/validate_mcp_comprehensive.py" not in stats["last_progress_path"]
         assert "tests/root_tests/run_reranking_tests.py" not in stats["last_progress_path"]
+
+    def test_index_directory_emits_exact_devcontainer_tail_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        import mcp_server.dispatcher.dispatcher_enhanced as dispatcher_module
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        devcontainer_dir = repo / ".devcontainer"
+        devcontainer_dir.mkdir(parents=True)
+        post_create = devcontainer_dir / "post_create.sh"
+        config_file = devcontainer_dir / "devcontainer.json"
+        post_create.write_text("#!/bin/bash\necho devcontainer\n", encoding="utf-8")
+        config_file.write_text('{"name": "devcontainer"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_index_file_with_lexical_timeout(
+            self, _ctx, path, stats, progress_callback=None
+        ):
+            stats["lexical_stage"] = "walking"
+            stats["lexical_files_attempted"] += 1
+            stats["in_flight_path"] = str(path.resolve())
+            if progress_callback is not None:
+                progress_callback("lexical_walking", "lexical", "lexical_mutation")
+            stats["lexical_files_completed"] += 1
+            stats["last_progress_path"] = str(path.resolve())
+            stats["in_flight_path"] = None
+            return IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            )
+
+        monkeypatch.setattr(
+            Dispatcher,
+            "_index_file_with_lexical_timeout",
+            _fake_index_file_with_lexical_timeout,
+        )
+        original_get_all_extensions = dispatcher_module.get_all_extensions
+        monkeypatch.setattr(
+            dispatcher_module,
+            "get_all_extensions",
+            lambda: set(original_get_all_extensions()) | {".sh"},
+        )
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        store.close()
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        assert any(
+            snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(post_create.resolve())
+            and snapshot["in_flight_path"] == str(config_file.resolve())
+            for snapshot in snapshots
+        )
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(config_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
 
     def test_index_directory_emits_later_test_pair_before_closeout_handoff(
         self, tmp_path, monkeypatch

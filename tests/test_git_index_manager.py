@@ -1831,6 +1831,49 @@ def test_force_full_progress_callback_preserves_last_progress_path_across_semant
     assert trace["in_flight_path"] is None
 
 
+def test_force_full_progress_callback_preserves_exact_devcontainer_tail_pair(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before=repo_info.last_indexed_commit,
+    )
+    post_create = repo / ".devcontainer" / "post_create.sh"
+    config_file = repo / ".devcontainer" / "devcontainer.json"
+
+    callback(
+        {
+            "stage": "lexical_walking",
+            "stage_family": "lexical",
+            "blocker_source": "lexical_mutation",
+            "lexical_stage": "walking",
+            "semantic_stage": "not_run",
+            "last_progress_path": str(post_create),
+            "in_flight_path": str(config_file),
+            "summary_call_timed_out": False,
+            "summary_call_file_path": None,
+            "summary_call_chunk_ids": [],
+            "summary_call_timeout_seconds": None,
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["last_progress_path"] == str(post_create)
+    assert trace["in_flight_path"] == str(config_file)
+    assert "ai_docs/prometheus_overview.md" not in (trace.get("last_progress_path") or "")
+    assert "ai_docs/README.md" not in (trace.get("in_flight_path") or "")
+
+
 def test_force_full_progress_callback_preserves_later_included_path_after_ignored_tail(
     tmp_path,
 ):
@@ -1939,6 +1982,67 @@ def test_force_full_sync_terminalizes_running_trace_when_same_devcontainer_relap
     assert "tests/test_reindex_resume.py" not in (trace.get("last_progress_path") or "")
     assert "scripts/validate_mcp_comprehensive.py" not in (trace.get("last_progress_path") or "")
     assert "tests/root_tests/run_reranking_tests.py" not in (trace.get("last_progress_path") or "")
+    registry.update_indexed_commit.assert_not_called()
+
+
+def test_force_full_sync_terminalizes_running_trace_with_exact_devcontainer_tail_pair(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+    repo_info.index_path.touch()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+
+    post_create = repo / ".devcontainer" / "post_create.sh"
+    config_file = repo / ".devcontainer" / "devcontainer.json"
+
+    def _crashing_full_index(repo_id, _ctx, progress_callback=None):
+        assert progress_callback is not None
+        progress_callback(
+            {
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "blocker_source": "lexical_mutation",
+                "lexical_stage": "walking",
+                "semantic_stage": "not_run",
+                "last_progress_path": str(post_create),
+                "in_flight_path": str(config_file),
+                "summary_call_timed_out": False,
+                "summary_call_file_path": None,
+                "summary_call_chunk_ids": [],
+                "summary_call_timeout_seconds": None,
+            }
+        )
+        raise RuntimeError("synthetic crash after exact devcontainer tail pair")
+
+    manager._full_index = MagicMock(side_effect=_crashing_full_index)
+
+    with pytest.raises(RuntimeError, match="synthetic crash after exact devcontainer tail pair"):
+        manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "interrupted"
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["last_progress_path"] == str(post_create)
+    assert trace["in_flight_path"] == str(config_file)
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert "ai_docs/prometheus_overview.md" not in (trace.get("last_progress_path") or "")
+    assert "ai_docs/README.md" not in (trace.get("in_flight_path") or "")
     registry.update_indexed_commit.assert_not_called()
 
 
@@ -6013,6 +6117,27 @@ def test_force_full_sync_trace_moves_past_script_language_audit_pair(tmp_path):
 
     result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
 
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert "scripts/migrate_large_index_to_multi_repo.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+    assert "scripts/check_index_languages.py" not in (trace.get("last_progress_path") or "")
+    assert "scripts/migrate_large_index_to_multi_repo.py" not in (
+        trace.get("in_flight_path") or ""
+    )
+    assert "scripts/check_index_languages.py" not in (trace.get("in_flight_path") or "")
+    assert ".claude/commands/plan-phase.md" not in (trace.get("last_progress_path") or "")
+    assert "tests/root_tests/run_reranking_tests.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+    assert trace["last_progress_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
+    assert trace["in_flight_path"] == str(repo / "docs" / "status" / "semantic_tail.md")
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    registry.update_indexed_commit.assert_not_called()
+
 
 def test_force_full_sync_trace_moves_past_embed_consolidation_pair(tmp_path):
     repo = _make_git_repo(tmp_path)
@@ -6064,27 +6189,6 @@ def test_force_full_sync_trace_moves_past_embed_consolidation_pair(tmp_path):
     assert "consolidate_real_performance_data.py" not in (trace.get("in_flight_path") or "")
     assert trace["last_progress_path"] == str(repo / "docs" / "status" / "semantic_tail_3.md")
     assert trace["in_flight_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
-    assert trace["stage"] == "force_full_failed"
-    assert trace["stage_family"] == "final_closeout"
-    registry.update_indexed_commit.assert_not_called()
-
-    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
-    trace = json.loads(trace_path.read_text(encoding="utf-8"))
-    assert result.action == "failed"
-    assert "scripts/migrate_large_index_to_multi_repo.py" not in (
-        trace.get("last_progress_path") or ""
-    )
-    assert "scripts/check_index_languages.py" not in (trace.get("last_progress_path") or "")
-    assert "scripts/migrate_large_index_to_multi_repo.py" not in (
-        trace.get("in_flight_path") or ""
-    )
-    assert "scripts/check_index_languages.py" not in (trace.get("in_flight_path") or "")
-    assert ".claude/commands/plan-phase.md" not in (trace.get("last_progress_path") or "")
-    assert "tests/root_tests/run_reranking_tests.py" not in (
-        trace.get("last_progress_path") or ""
-    )
-    assert trace["last_progress_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
-    assert trace["in_flight_path"] == str(repo / "docs" / "status" / "semantic_tail.md")
     assert trace["stage"] == "force_full_failed"
     assert trace["stage_family"] == "final_closeout"
     registry.update_indexed_commit.assert_not_called()

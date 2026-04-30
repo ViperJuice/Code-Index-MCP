@@ -146,6 +146,15 @@ def _print_force_full_exit_trace(
     if trace.get("in_flight_path"):
         click.echo(f"{prefix}In-flight path: {trace['in_flight_path']}")
     if repo_path is not None:
+        devcontainer_script, devcontainer_json = _devcontainer_tail_pair(repo_path)
+        if (
+            trace.get("last_progress_path") == str(devcontainer_script.resolve())
+            and trace.get("in_flight_path") == str(devcontainer_json.resolve())
+        ):
+            click.echo(
+                f"{prefix}Devcontainer tail pair: exact bounded shell-to-JSON handoff "
+                f"preserved lexical progress into {devcontainer_json.relative_to(repo_path)}"
+            )
         archive_script, archive_json = _archive_tail_pair(repo_path)
         if (
             trace.get("last_progress_path") == str(archive_json.resolve())
@@ -821,6 +830,13 @@ def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
             f"{prefix}Lexical boundary: using exact bounded JSON indexing for "
             ".devcontainer/devcontainer.json"
         )
+
+
+def _devcontainer_tail_pair(repo_path: Path) -> tuple[Path, Path]:
+    return (
+        repo_path / ".devcontainer" / "post_create.sh",
+        repo_path / ".devcontainer" / "devcontainer.json",
+    )
 
 
 def _print_archive_tail_json_boundary(prefix: str, repo_path: Path) -> None:
