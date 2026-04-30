@@ -269,6 +269,26 @@ def _print_jedi_markdown_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_ai_docs_readme_tail_boundary(
+    prefix: str, repo_path: Path, trace: Optional[dict[str, Any]]
+) -> None:
+    if not trace:
+        return
+    pair_paths = (
+        repo_path / "ai_docs" / "prometheus_overview.md",
+        repo_path / "ai_docs" / "README.md",
+    )
+    if not all(path.is_file() for path in pair_paths):
+        return
+    referenced = {trace.get("last_progress_path"), trace.get("in_flight_path")}
+    resolved_pair_paths = {str(path.resolve()) for path in pair_paths}
+    if referenced == resolved_pair_paths:
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+            "ai_docs/prometheus_overview.md -> ai_docs/README.md"
+        )
+
+
 def _print_architecture_api_markdown_boundary(prefix: str, repo_path: Path) -> None:
     seam_paths = (
         repo_path / "docs" / "architecture" / "P2B-known-limits.md",
@@ -1235,6 +1255,11 @@ def status(repo_id: Optional[str]):
         _print_test_workspace_boundary("  ", Path(status["path"]))
         _print_ai_docs_overview_boundary("  ", Path(status["path"]))
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
+        _print_ai_docs_readme_tail_boundary(
+            "  ",
+            Path(status["path"]),
+            cast(Optional[dict[str, Any]], status.get("force_full_exit_trace")),
+        )
         _print_architecture_api_markdown_boundary("  ", Path(status["path"]))
         _print_validation_markdown_boundaries("  ", Path(status["path"]))
         _print_claude_command_markdown_boundary("  ", Path(status["path"]))

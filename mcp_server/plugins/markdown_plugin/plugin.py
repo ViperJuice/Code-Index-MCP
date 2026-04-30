@@ -42,6 +42,8 @@ _README_MARKDOWN_NAME_RE = re.compile(r"^(?:readme)$", re.IGNORECASE)
 _EXACT_BOUNDED_MARKDOWN_PATHS = {
     ".claude/commands/execute-lane.md": "claude_execute_lane_path",
     ".claude/commands/plan-phase.md": "claude_plan_phase_path",
+    "ai_docs/prometheus_overview.md": "ai_docs_prometheus_overview_path",
+    "ai_docs/readme.md": "ai_docs_readme_path",
     "ai_docs/jedi.md": "ai_docs_jedi_path",
     "docs/architecture/p2b-known-limits.md": "architecture_p2b_known_limits_path",
     "docs/api/api-reference.md": "api_reference_path",
@@ -59,6 +61,10 @@ _EXACT_BOUNDED_MARKDOWN_PATHS = {
     "plans/phase-plan-v1-p19.md": "historical_p19_phase_plan_path",
     "plans/phase-plan-v1-p13.md": "historical_p13_phase_plan_path",
     "plans/phase-plan-v1-p3.md": "historical_p3_phase_plan_path",
+}
+_EXACT_FENCED_CODE_HEADING_GUARD_REASONS = {
+    "ai_docs_prometheus_overview_path",
+    "ai_docs_readme_path",
 }
 
 
@@ -136,13 +142,15 @@ class MarkdownPlugin(BaseDocumentPlugin):
         return path.stem
 
     def _extract_lightweight_heading_symbols(
-        self, content: str, path: Path
+        self, content: str, path: Path, reason: str
     ) -> List[Dict[str, Any]]:
         """Extract heading/document symbols with a bounded line-based scan."""
         symbols: List[Dict[str, Any]] = []
         lines = content.splitlines()
         frontmatter_open = False
         frontmatter_closed = False
+        in_fenced_code_block = False
+        guard_fenced_code_headings = reason in _EXACT_FENCED_CODE_HEADING_GUARD_REASONS
         parent_by_level: Dict[int, str] = {}
 
         for line_number, line in enumerate(lines, start=1):
@@ -153,6 +161,12 @@ class MarkdownPlugin(BaseDocumentPlugin):
             if frontmatter_open and not frontmatter_closed:
                 if stripped == "---":
                     frontmatter_closed = True
+                continue
+
+            if guard_fenced_code_headings and re.match(r"^(```|~~~)", stripped):
+                in_fenced_code_block = not in_fenced_code_block
+                continue
+            if in_fenced_code_block:
                 continue
 
             match = re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$", line)
@@ -210,7 +224,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
                 "metadata": metadata,
             }
         ]
-        symbols.extend(self._extract_lightweight_heading_symbols(content, path))
+        symbols.extend(self._extract_lightweight_heading_symbols(content, path, reason))
         return {
             "file": str(path),
             "symbols": symbols,

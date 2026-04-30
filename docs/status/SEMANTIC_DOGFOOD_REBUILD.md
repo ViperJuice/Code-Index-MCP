@@ -4343,6 +4343,61 @@ Steering outcome:
   `scripts/reindex_current_repository.py ->
   scripts/demo_centralized_indexes.py` seam.
 
+Phase plan: `plans/phase-plan-v7-SEMAIDOCREADMETAIL.md`
+
+## SEMAIDOCREADMETAIL Live Rerun Check
+
+SEMAIDOCREADMETAIL did clear its named `ai_docs` seam on the current head. The
+refreshed repo-local force-full rerun no longer terminalized at
+`ai_docs/prometheus_overview.md -> ai_docs/README.md`; the durable trace and
+operator-visible status both moved later into the `.devcontainer` surface
+`.devcontainer/post_create.sh -> .devcontainer/devcontainer.json`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMAIDOCREADMETAIL live rerun executed on observed commit
+  `518d15a54a99a4d8872a6684bb44cfc0399157cb` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T06:39:04Z`, `.mcp-index/force_full_exit_trace.json`
+  reported the in-flight live rerun at `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/post_create.sh`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`.
+- At `2026-04-30T06:39:16Z`, `repository status` terminalized the same rerun
+  to `Trace status: interrupted` while preserving that later `.devcontainer`
+  blocker pair at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/post_create.sh`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`.
+- The same `repository status` run no longer reported the
+  `ai_docs/prometheus_overview.md -> ai_docs/README.md` blocker pair as active.
+  It continued to advertise the generic `ai_docs/*_overview.md` boundary, the
+  exact `ai_docs/jedi.md` boundary, and the later exact bounded JSON surface
+  for `.devcontainer/devcontainer.json`.
+- SQLite runtime counts after the rerun were
+  `files = 1199`, `code_chunks = 21254`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMAIDOCREADMETAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `ai_docs/prometheus_overview.md -> ai_docs/README.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  `.devcontainer` seam
+  `.devcontainer/post_create.sh -> .devcontainer/devcontainer.json`.
+- The roadmap now adds downstream phase `SEMDEVCONTAINERPAIRTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMAIDOCREADMETAIL-era
+  `ai_docs/prometheus_overview.md -> ai_docs/README.md` seam.
+
 ## Verification
 
 Verification sequence for this SEMP24PLUGINGATINGTAIL slice:

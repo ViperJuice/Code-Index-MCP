@@ -1610,6 +1610,153 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Code Completion" in symbol_names
         assert chunk_count == 0
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_ai_docs_readme_tail_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        ai_docs_dir = repo / "ai_docs"
+        ai_docs_dir.mkdir(parents=True)
+        prometheus_doc = ai_docs_dir / "prometheus_overview.md"
+        ai_docs_readme = ai_docs_dir / "README.md"
+        unrelated_doc = ai_docs_dir / "qdrant.md"
+        jedi_doc = ai_docs_dir / "jedi.md"
+        root_readme = repo / "README.md"
+        prometheus_doc.write_text(
+            "# Prometheus Overview\n\n## Introduction\n\n```python\n"
+            "# Ignore this code comment heading\n```\n\n### Monitoring surface\n"
+            "- Preserve title and heading discoverability\n",
+            encoding="utf-8",
+        )
+        ai_docs_readme.write_text(
+            "# AI Documentation Index\n\n## Core Frameworks\n\n"
+            "### [FastAPI](./fastapi_overview.md)\n- Keep the exact README tail bounded\n"
+            "\n## Security & Monitoring\n\n### [Prometheus](./prometheus_overview.md)\n"
+            "- Preserve cross-link discoverability\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# Qdrant Notes\n\n## Heavy Path\n\n### Guardrail\n"
+            "- Do not broaden the exact ai_docs pair\n",
+            encoding="utf-8",
+        )
+        jedi_doc.write_text("# Jedi Documentation\n", encoding="utf-8")
+        root_readme.write_text(
+            "# Root README\n\n## Overview\n\n### Install\n- Keep generic README handling intact\n",
+            encoding="utf-8",
+        )
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for the exact ai_docs README-tail pair"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        plugin = MarkdownPlugin()
+        assert (
+            plugin._resolve_lightweight_reason(
+                prometheus_doc, prometheus_doc.read_text(encoding="utf-8")
+            )
+            == "ai_docs_prometheus_overview_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                ai_docs_readme, ai_docs_readme.read_text(encoding="utf-8")
+            )
+            == "ai_docs_readme_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                unrelated_doc, unrelated_doc.read_text(encoding="utf-8")
+            )
+            is None
+        )
+        assert (
+            plugin._resolve_lightweight_reason(jedi_doc, jedi_doc.read_text(encoding="utf-8"))
+            == "ai_docs_jedi_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(root_readme, root_readme.read_text(encoding="utf-8"))
+            == "readme_path"
+        )
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 5
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(prometheus_doc.resolve()),
+            str(ai_docs_readme.resolve()),
+            str(unrelated_doc.resolve()),
+            str(jedi_doc.resolve()),
+            str(root_readme.resolve()),
+        }
+        with store._get_connection() as conn:
+            prometheus_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'ai_docs/prometheus_overview.md') ORDER BY id"
+                ).fetchall()
+            ]
+            ai_docs_readme_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'ai_docs/README.md') ORDER BY id"
+                ).fetchall()
+            ]
+            prometheus_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'ai_docs/prometheus_overview.md')"
+            ).fetchone()[0]
+            ai_docs_readme_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'ai_docs/README.md')"
+            ).fetchone()[0]
+        store.close()
+
+        assert prometheus_symbols == [
+            "Prometheus Overview",
+            "Prometheus Overview",
+            "Introduction",
+            "Monitoring surface",
+        ]
+        assert ai_docs_readme_symbols == [
+            "AI Documentation Index",
+            "AI Documentation Index",
+            "Core Frameworks",
+            "[FastAPI](./fastapi_overview.md)",
+            "Security & Monitoring",
+            "[Prometheus](./prometheus_overview.md)",
+        ]
+        assert prometheus_chunk_count == 0
+        assert ai_docs_readme_chunk_count == 0
+
     def test_index_directory_uses_exact_bounded_markdown_path_for_architecture_api_docs(
         self, tmp_path, monkeypatch
     ):

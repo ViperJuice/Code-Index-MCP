@@ -721,6 +721,83 @@ All notable changes to this project will be documented in this file.
         assert "MCP Server Use Cases" in symbol_names
         assert "Code Intelligence Service" in symbol_names
 
+    def test_prometheus_overview_and_ai_docs_readme_use_exact_bounded_paths(
+        self, markdown_plugin
+    ):
+        """The Prometheus README-tail pair should stay narrow and lexically visible."""
+        prometheus_content = """
+# Prometheus Overview
+
+## Introduction
+
+- Preserve document discoverability
+
+```python
+# This comment must not become a heading symbol
+```
+
+## Monitoring surface
+
+- Keep this exact overview on a bounded path
+"""
+        ai_docs_readme_content = """
+# AI Documentation Index
+
+## Core Frameworks
+
+### [FastAPI](./fastapi_overview.md)
+Modern, fast web framework.
+
+## Security & Monitoring
+
+### [Prometheus](./prometheus_overview.md)
+Metrics collection and monitoring.
+"""
+
+        prometheus_result = markdown_plugin.indexFile(
+            "ai_docs/prometheus_overview.md", prometheus_content
+        )
+        ai_docs_readme_result = markdown_plugin.indexFile(
+            "ai_docs/README.md", ai_docs_readme_content
+        )
+        root_readme_result = markdown_plugin.indexFile(
+            "README.md",
+            "# Root README\n\n## Overview\n\n### Install\n- Keep generic README handling intact\n",
+        )
+        unrelated_result = markdown_plugin.indexFile(
+            "ai_docs/qdrant.md",
+            "# Qdrant Notes\n\n## Heavy Path\n\n### Guardrail\n- Do not broaden the exact pair\n",
+        )
+
+        assert prometheus_result["metadata"]["lightweight_index"] is True
+        assert (
+            prometheus_result["metadata"]["lightweight_reason"]
+            == "ai_docs_prometheus_overview_path"
+        )
+        assert prometheus_result["chunks"] == []
+        prometheus_symbols = [symbol["symbol"] for symbol in prometheus_result["symbols"]]
+        assert "Prometheus Overview" in prometheus_symbols
+        assert "Introduction" in prometheus_symbols
+        assert "Monitoring surface" in prometheus_symbols
+        assert "This comment must not become a heading symbol" not in prometheus_symbols
+
+        assert ai_docs_readme_result["metadata"]["lightweight_index"] is True
+        assert ai_docs_readme_result["metadata"]["lightweight_reason"] == "ai_docs_readme_path"
+        assert ai_docs_readme_result["chunks"] == []
+        ai_docs_readme_symbols = [
+            symbol["symbol"] for symbol in ai_docs_readme_result["symbols"]
+        ]
+        assert "AI Documentation Index" in ai_docs_readme_symbols
+        assert "Core Frameworks" in ai_docs_readme_symbols
+        assert "[FastAPI](./fastapi_overview.md)" in ai_docs_readme_symbols
+        assert "Security & Monitoring" in ai_docs_readme_symbols
+        assert "[Prometheus](./prometheus_overview.md)" in ai_docs_readme_symbols
+
+        assert root_readme_result["metadata"]["lightweight_index"] is True
+        assert root_readme_result["metadata"]["lightweight_reason"] == "readme_path"
+        assert unrelated_result["metadata"].get("lightweight_index") is not True
+        assert unrelated_result["chunks"] != []
+
     def test_architecture_and_api_docs_use_exact_bounded_markdown_paths(self, markdown_plugin):
         """The P2B/API-reference seam should stay lightweight but lexically visible."""
         p2b_content = """

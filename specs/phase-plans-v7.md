@@ -5744,6 +5744,71 @@ ai_docs/README.md`.
 - IF-0-SEMAIDOCREADMETAIL-1 — ai_docs README tail recovery and evidence
   contract.
 
+### Phase 97 — Devcontainer Tail Pair Recovery (SEMDEVCONTAINERPAIRTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later `.devcontainer` seam revealed
+after SEMAIDOCREADMETAIL:
+`.devcontainer/post_create.sh ->
+.devcontainer/devcontainer.json`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMAIDOCREADMETAIL
+      head either advances durably beyond
+      `.devcontainer/post_create.sh ->
+      .devcontainer/devcontainer.json` or emits a truthful newer blocker before
+      the 120-second watchdog expires.
+- [ ] Any repair chosen for this later `.devcontainer` seam stays narrow,
+      tested, and does not reopen the cleared
+      `ai_docs/prometheus_overview.md ->
+      ai_docs/README.md` seam without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMAIDOCREADMETAIL rerun outcome and the final live verdict for the exact
+      `.devcontainer/post_create.sh ->
+      .devcontainer/devcontainer.json` pair.
+
+**Scope notes**
+
+This phase exists only if SEMAIDOCREADMETAIL proves the `ai_docs` seam
+`ai_docs/prometheus_overview.md ->
+ai_docs/README.md` is no longer the final active blocker, but the refreshed
+live rerun on the new head still terminalizes later in lexical walking on the
+`.devcontainer` pair
+`.devcontainer/post_create.sh ->
+.devcontainer/devcontainer.json`.
+
+**Non-goals**
+
+- No reopening of the cleared `ai_docs` seam
+  `ai_docs/prometheus_overview.md ->
+  ai_docs/README.md` once the live rerun has already moved away from it.
+- No broad repo-wide shell, JSON, or devcontainer timeout bypass unless the
+  refreshed rerun proves the active blocker cannot be cleared with a narrower
+  exact `.devcontainer` repair.
+- No reopening of unrelated semantic, integration, security, or compatibility
+  seams unless the refreshed rerun proves the blocker has moved again.
+
+**Key files**
+
+- `.devcontainer/post_create.sh`
+- `.devcontainer/devcontainer.json`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMAIDOCREADMETAIL
+
+**Produces**
+- IF-0-SEMDEVCONTAINERPAIRTAIL-1 — devcontainer tail-pair recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5843,6 +5908,7 @@ SEMCONTRACT
   -> SEMVERIFYAPIREBOUNDTAIL
   -> SEMREINDEXDEMOTAIL
   -> SEMAIDOCREADMETAIL
+  -> SEMDEVCONTAINERPAIRTAIL
 ```
 
 ## Execution Notes
