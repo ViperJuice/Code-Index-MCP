@@ -4374,6 +4374,70 @@ scripts/verify_mcp_retrieval.py`.
 - IF-0-SEMEDITRETRIEVALTAIL-1 — exact later edit-analysis/retrieval script
   recovery and evidence contract.
 
+### Phase 76 — Script Language Audit Tail Rebound Recovery (SEMSCRIPTLANGSTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later exact Python script seam
+re-exposed after SEMEDITRETRIEVALTAIL:
+`scripts/migrate_large_index_to_multi_repo.py ->
+scripts/check_index_languages.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMEDITRETRIEVALTAIL
+      head either advances durably beyond the
+      `scripts/migrate_large_index_to_multi_repo.py ->
+      scripts/check_index_languages.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later script-language rebound seam stays
+      narrow, tested, and does not reopen the already-cleared
+      `scripts/analyze_claude_code_edits.py ->
+      scripts/verify_mcp_retrieval.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMEDITRETRIEVALTAIL rerun outcome and the final live verdict for the
+      later script-language rebound pair.
+
+**Scope notes**
+
+This phase exists only if SEMEDITRETRIEVALTAIL proves the later
+edit-analysis/retrieval pair is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on
+`scripts/migrate_large_index_to_multi_repo.py ->
+scripts/check_index_languages.py`.
+
+**Non-goals**
+
+- No reopening of the cleared edit-analysis/retrieval recovery once the live
+  rerun has advanced beyond
+  `scripts/analyze_claude_code_edits.py ->
+  scripts/verify_mcp_retrieval.py`.
+- No blanket reopening of unrelated script families unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower exact-path or
+  exact-pair contract.
+- No reopening of unrelated semantic-stage or release work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/migrate_large_index_to_multi_repo.py`
+- `scripts/check_index_languages.py`
+
+**Depends on**
+- SEMEDITRETRIEVALTAIL
+
+**Produces**
+- IF-0-SEMSCRIPTLANGSTAIL-1 — exact later script-language rebound recovery
+  and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4452,6 +4516,7 @@ SEMCONTRACT
   -> SEMQDRANTREPORTTAIL
   -> SEMOPTUPLOADTAIL
   -> SEMEDITRETRIEVALTAIL
+  -> SEMSCRIPTLANGSTAIL
 ```
 
 ## Execution Notes
@@ -4676,6 +4741,20 @@ SEMCONTRACT
   edit-analysis/retrieval pair or preserve the next exact downstream blocker
   instead of reopening earlier optimized-analysis/upload, Qdrant/report,
   utility, missing-repo, or test-repo index work.
+- SEMEDITRETRIEVALTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears the later edit-analysis/retrieval pair but exposes a later
+  exact blocker such as
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- SEMSCRIPTLANGSTAIL exists only if SEMEDITRETRIEVALTAIL proves the later
+  edit-analysis/retrieval pair is cleared but the live rerun still remains in
+  lexical walking on
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`; it should repair that exact later
+  script-language rebound pair or preserve the next exact downstream blocker
+  instead of reopening earlier edit-analysis/retrieval,
+  optimized-analysis/upload, Qdrant/report, utility, missing-repo, or
+  test-repo index work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

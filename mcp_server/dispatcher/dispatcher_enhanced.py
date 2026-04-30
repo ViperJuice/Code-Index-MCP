@@ -138,6 +138,8 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     ),
     "scripts/execute_optimized_analysis.py": "exact_execute_optimized_analysis_rebound",
     "scripts/index-artifact-upload-v2.py": "exact_index_artifact_upload_v2_rebound",
+    "scripts/analyze_claude_code_edits.py": "exact_analyze_claude_code_edits_rebound",
+    "scripts/verify_mcp_retrieval.py": "exact_verify_mcp_retrieval_rebound",
     "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "scripts/verify_embeddings.py": "exact_verify_embeddings_rebound",
     "scripts/claude_code_behavior_simulator.py": "exact_claude_code_behavior_simulator_rebound",

@@ -4316,6 +4316,163 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "CompatibilityAwareUploader" in upload_fts_rows[0][0]
         assert "trigger_workflow_upload" in upload_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_edit_retrieval_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        analysis_script = scripts_dir / "analyze_claude_code_edits.py"
+        retrieval_script = scripts_dir / "verify_mcp_retrieval.py"
+        helper_script = scripts_dir / "helper.py"
+        scripts_dir.mkdir(parents=True)
+        analysis_script.write_text(
+            "class ClaudeCodeTranscriptAnalyzer:\n"
+            "    def parse_jsonl_chunk(self, chunk):\n"
+            "        return [chunk]\n\n"
+            "    def extract_tool_sequence(self, events):\n"
+            "        return events\n\n"
+            "    def identify_edit_patterns(self, tool_sequence):\n"
+            "        return tool_sequence\n\n"
+            "    def calculate_edit_metrics(self, patterns):\n"
+            "        return {'count': len(patterns)}\n\n"
+            "    async def analyze_transcript_file(self, file_path):\n"
+            "        return {'path': str(file_path)}\n\n"
+            "    async def analyze_all_transcripts(self, transcript_dir):\n"
+            "        return {'dir': str(transcript_dir)}\n\n"
+            "    def aggregate_results(self, results):\n"
+            "        return {'results': len(results)}\n\n"
+            "    def generate_insights(self, metrics):\n"
+            "        return metrics\n\n"
+            "async def main():\n"
+            "    return await ClaudeCodeTranscriptAnalyzer().analyze_all_transcripts('logs')\n",
+            encoding="utf-8",
+        )
+        retrieval_script.write_text(
+            "def test_mcp_tool(tool_name, args):\n"
+            "    return {'tool': tool_name, 'args': args}\n\n"
+            "def verify_sql_search():\n"
+            "    return {'mode': 'sql'}\n\n"
+            "def verify_semantic_search():\n"
+            "    return {'mode': 'semantic'}\n\n"
+            "def verify_hybrid_search():\n"
+            "    return {'mode': 'hybrid'}\n\n"
+            "def test_direct_mcp_api():\n"
+            "    return {'api': 'direct'}\n\n"
+            "def verify_index_availability():\n"
+            "    return True\n\n"
+            "def main():\n"
+            "    return verify_hybrid_search()\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(analysis_script.resolve()),
+            str(helper_script.resolve()),
+            str(retrieval_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            analysis_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py') ORDER BY id"
+                ).fetchall()
+            ]
+            retrieval_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            analysis_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py')"
+            ).fetchone()[0]
+            retrieval_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py')"
+            ).fetchone()[0]
+            analysis_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py'"
+            ).fetchone()[0]
+            retrieval_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            analysis_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py')"
+            ).fetchall()
+            retrieval_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py')"
+            ).fetchall()
+        store.close()
+        assert analysis_symbols == [
+            "ClaudeCodeTranscriptAnalyzer",
+            "parse_jsonl_chunk",
+            "extract_tool_sequence",
+            "identify_edit_patterns",
+            "calculate_edit_metrics",
+            "analyze_transcript_file",
+            "analyze_all_transcripts",
+            "aggregate_results",
+            "generate_insights",
+            "main",
+        ]
+        assert retrieval_symbols == [
+            "test_mcp_tool",
+            "verify_sql_search",
+            "verify_semantic_search",
+            "verify_hybrid_search",
+            "test_direct_mcp_api",
+            "verify_index_availability",
+            "main",
+        ]
+        assert helper_symbols == ["helper"]
+        assert analysis_chunk_count == 0
+        assert retrieval_chunk_count == 0
+        assert "exact_analyze_claude_code_edits_rebound" in analysis_metadata
+        assert "exact_verify_mcp_retrieval_rebound" in retrieval_metadata
+        assert "exact_analyze_claude_code_edits_rebound" not in helper_metadata
+        assert "exact_verify_mcp_retrieval_rebound" not in helper_metadata
+        assert len(analysis_fts_rows) == 1
+        assert "ClaudeCodeTranscriptAnalyzer" in analysis_fts_rows[0][0]
+        assert "generate_insights" in analysis_fts_rows[0][0]
+        assert len(retrieval_fts_rows) == 1
+        assert "verify_hybrid_search" in retrieval_fts_rows[0][0]
+        assert "verify_index_availability" in retrieval_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -6227,6 +6384,178 @@ class TestEnhancedDispatcherProtocolConformance:
                 "scripts/ensure_test_repos_indexed.py",
                 "scripts/index_missing_repos_semantic.py",
                 "scripts/identify_working_indexes.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_edit_retrieval_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        prior_file = scripts_dir / "analyze_claude_code_edits.py"
+        prior_file.write_text(
+            "class ClaudeCodeTranscriptAnalyzer:\n"
+            "    def parse_jsonl_chunk(self, chunk):\n"
+            "        return [chunk]\n\n"
+            "    def extract_tool_sequence(self, events):\n"
+            "        return events\n\n"
+            "    def identify_edit_patterns(self, tool_sequence):\n"
+            "        return tool_sequence\n\n"
+            "    def calculate_edit_metrics(self, patterns):\n"
+            "        return {'count': len(patterns)}\n\n"
+            "    async def analyze_transcript_file(self, file_path):\n"
+            "        return {'path': str(file_path)}\n\n"
+            "    async def analyze_all_transcripts(self, transcript_dir):\n"
+            "        return {'dir': str(transcript_dir)}\n\n"
+            "    def aggregate_results(self, results):\n"
+            "        return {'results': len(results)}\n\n"
+            "    def generate_insights(self, metrics):\n"
+            "        return metrics\n\n"
+            "async def main():\n"
+            "    return await ClaudeCodeTranscriptAnalyzer().analyze_all_transcripts('logs')\n",
+            encoding="utf-8",
+        )
+        blocked_file = scripts_dir / "verify_mcp_retrieval.py"
+        blocked_file.write_text(
+            "def test_mcp_tool(tool_name, args):\n"
+            "    return {'tool': tool_name, 'args': args}\n\n"
+            "def verify_sql_search():\n"
+            "    return {'mode': 'sql'}\n\n"
+            "def verify_semantic_search():\n"
+            "    return {'mode': 'semantic'}\n\n"
+            "def verify_hybrid_search():\n"
+            "    return {'mode': 'hybrid'}\n\n"
+            "def test_direct_mcp_api():\n"
+            "    return {'api': 'direct'}\n\n"
+            "def verify_index_availability():\n"
+            "    return True\n\n"
+            "def main():\n"
+            "    return verify_hybrid_search()\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(scripts_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["semantic_stage"] == "failed"
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            analysis_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py') ORDER BY id"
+                ).fetchall()
+            ]
+            retrieval_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py') ORDER BY id"
+                ).fetchall()
+            ]
+            analysis_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py')"
+            ).fetchone()[0]
+            retrieval_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py')"
+            ).fetchone()[0]
+            analysis_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/analyze_claude_code_edits.py')"
+            ).fetchall()
+            retrieval_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/verify_mcp_retrieval.py')"
+            ).fetchall()
+        store.close()
+        assert analysis_symbols == [
+            "ClaudeCodeTranscriptAnalyzer",
+            "parse_jsonl_chunk",
+            "extract_tool_sequence",
+            "identify_edit_patterns",
+            "calculate_edit_metrics",
+            "analyze_transcript_file",
+            "analyze_all_transcripts",
+            "aggregate_results",
+            "generate_insights",
+            "main",
+        ]
+        assert retrieval_symbols == [
+            "test_mcp_tool",
+            "verify_sql_search",
+            "verify_semantic_search",
+            "verify_hybrid_search",
+            "test_direct_mcp_api",
+            "verify_index_availability",
+            "main",
+        ]
+        assert analysis_chunk_count == 0
+        assert retrieval_chunk_count == 0
+        assert len(analysis_fts) == 1
+        assert "ClaudeCodeTranscriptAnalyzer" in analysis_fts[0][0]
+        assert "generate_insights" in analysis_fts[0][0]
+        assert len(retrieval_fts) == 1
+        assert "verify_hybrid_search" in retrieval_fts[0][0]
+        assert "verify_index_availability" in retrieval_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "scripts/execute_optimized_analysis.py",
+                "scripts/index-artifact-upload-v2.py",
+                "scripts/map_repos_to_qdrant.py",
+                "scripts/create_claude_code_aware_report.py",
             )
             for snapshot in snapshots
         )

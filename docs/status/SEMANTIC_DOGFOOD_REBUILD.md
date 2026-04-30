@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T23:37:50Z`.
-- Observed commit: `f1c6c282d79f8835dfc4183dba430049c2a707d2`.
+- Evidence captured: `2026-04-29T23:55:56Z`.
+- Observed commit: `cd1d50f4a7f3e563922e9eb87d2b4f6d7dd621ab`.
 - Prior SEMOPTUPLOADTAIL live-rerun anchor: `2026-04-29T23:19:22Z` on
   observed commit `2a439a39b168cb01571e0b0872016875d198b6e2`.
 - Prior SEMQDRANTREPORTTAIL live-rerun anchor: `2026-04-29T23:02:25Z` on
@@ -48,8 +48,17 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMOPTUPLOADTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMQDRANTREPORTTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMEDITRETRIEVALTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMOPTUPLOADTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMSCRIPTLANGSTAIL` after SEMEDITRETRIEVALTAIL proved the later
+  edit-analysis/retrieval seam is now cleared, but the refreshed live rerun on
+  the new head still terminalized later in lexical walking at the script
+  language-audit rebound seam, with durable progress already on
+  `scripts/check_index_languages.py` inside the exact bounded pair
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMEDITRETRIEVALTAIL` after SEMOPTUPLOADTAIL proved the later
   optimized-analysis/upload seam is now cleared, but the refreshed live rerun
@@ -2893,7 +2902,74 @@ Steering outcome:
   `scripts/execute_optimized_analysis.py ->
   scripts/index-artifact-upload-v2.py`.
 
+## SEMEDITRETRIEVALTAIL Live Rerun Check
+
+SEMEDITRETRIEVALTAIL repaired the later edit-analysis/retrieval seam on the
+current head. The refreshed repo-local force-full rerun advanced durably
+beyond that pair and re-anchored later in lexical walking on the earlier
+script language-audit exact bounded pair.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMEDITRETRIEVALTAIL live rerun advanced on observed commit
+  `cd1d50f4a7f3e563922e9eb87d2b4f6d7dd621ab` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T23:55:48Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/check_index_languages.py`,
+  and `in_flight_path=null`.
+- At `2026-04-29T23:55:57Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving the later exact
+  script-language boundary and keeping the repo semantically fail-closed.
+- The SEMEDITRETRIEVALTAIL target pair is no longer the active blocker:
+  `scripts/analyze_claude_code_edits.py ->
+  scripts/verify_mcp_retrieval.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+- `repository status` now advertises the repaired exact bounded lexical
+  surface
+  `Lexical boundary: using exact bounded Python indexing for scripts/analyze_claude_code_edits.py -> scripts/verify_mcp_retrieval.py`.
+- The durable rerun has moved later to the exact script-language surface
+  `Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py`,
+  with `last_progress_path` already anchored on the latter file and no later
+  `in_flight_path`.
+
+Steering outcome:
+
+- SEMEDITRETRIEVALTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `scripts/analyze_claude_code_edits.py ->
+  scripts/verify_mcp_retrieval.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  exact script pair
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- The roadmap now adds downstream phase `SEMSCRIPTLANGSTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMEDITRETRIEVALTAIL-era script seam
+  `scripts/analyze_claude_code_edits.py ->
+  scripts/verify_mcp_retrieval.py`.
+
 ## Verification
+
+Verification sequence for this SEMEDITRETRIEVALTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "analyze_claude_code_edits or verify_mcp_retrieval or retrieval or transcript or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "analyze_claude_code_edits or verify_mcp_retrieval or retrieval or transcript or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMEDITRETRIEVALTAIL or analyze_claude_code_edits or verify_mcp_retrieval or retrieval"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMOPTUPLOADTAIL slice:
 
