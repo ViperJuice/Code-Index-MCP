@@ -4076,6 +4076,226 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(simulator_fts_rows) == 1
         assert "ClaudeCodeSimulator" in simulator_fts_rows[0][0]
 
+    def test_index_directory_uses_bounded_markdown_path_for_rebound_phase_plan_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        plans_dir = repo / "plans"
+        plans_dir.mkdir(parents=True)
+        verifysim_doc = plans_dir / "phase-plan-v7-SEMVERIFYSIMTAIL.md"
+        apidocs_doc = plans_dir / "phase-plan-v7-SEMAPIDOCSTAIL.md"
+        unrelated_doc = plans_dir / "phase-plan-v7-SEMUNRELATED.md"
+        verifysim_doc.write_text(
+            "---\n"
+            "title: Phase Plan v7 SEMVERIFYSIMTAIL\n"
+            "---\n"
+            "# SEMVERIFYSIMTAIL Live Rerun Check\n\n"
+            "## Context\n\n"
+            "### Later Python-script blocker\n"
+            "- Preserve bounded discoverability\n\n"
+            "## Interface Freeze Gates\n\n"
+            "### Tight contract\n"
+            "- Keep frontmatter-derived title discoverable\n\n"
+            "## Lane Index & Dependencies\n\n"
+            "### Serial recovery\n"
+            "- Keep heading discoverability bounded\n\n"
+            "## Verification\n\n"
+            "### Rerun proof\n"
+            "- Preserve lexical evidence\n\n"
+            "## Acceptance Criteria\n\n"
+            "### Steering\n"
+            "- Keep document-level discoverability\n\n"
+            "## Automation Handoff\n\n"
+            "### Downstream note\n"
+            "- Preserve rebound phase context\n",
+            encoding="utf-8",
+        )
+        apidocs_doc.write_text(
+            "---\n"
+            "title: Phase Plan v7 SEMAPIDOCSTAIL\n"
+            "---\n"
+            "# SEMAPIDOCSTAIL Live Rerun Check\n\n"
+            "## Context\n\n"
+            "### Earlier docs blocker\n"
+            "- Preserve bounded discoverability\n\n"
+            "## Interface Freeze Gates\n\n"
+            "### Exact seam\n"
+            "- Preserve title and heading discoverability\n\n"
+            "## Lane Index & Dependencies\n\n"
+            "### Sequential proof\n"
+            "- Keep lexical storage discoverable\n\n"
+            "## Verification\n\n"
+            "### Status proof\n"
+            "- Preserve operator headings\n\n"
+            "## Acceptance Criteria\n\n"
+            "### Rebound verdict\n"
+            "- Keep file-level storage discoverable\n\n"
+            "## Automation Handoff\n\n"
+            "### Stale downstream warning\n"
+            "- Preserve rebound phase context\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# SEMUNRELATED Notes\n\n"
+            "## Scope\n\n"
+            "### Guardrail\n"
+            "- Keep generic phase-plan handling intact\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for rebound phase-plan files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        plugin = MarkdownPlugin()
+        assert (
+            plugin._resolve_lightweight_reason(
+                verifysim_doc, verifysim_doc.read_text(encoding="utf-8")
+            )
+            == "roadmap_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                apidocs_doc, apidocs_doc.read_text(encoding="utf-8")
+            )
+            == "roadmap_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                unrelated_doc, unrelated_doc.read_text(encoding="utf-8")
+            )
+            == "roadmap_path"
+        )
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(verifysim_doc.resolve()),
+            str(apidocs_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            verifysim_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMVERIFYSIMTAIL.md') ORDER BY id"
+                ).fetchall()
+            ]
+            apidocs_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMAPIDOCSTAIL.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMUNRELATED.md') ORDER BY id"
+                ).fetchall()
+            ]
+            verifysim_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMVERIFYSIMTAIL.md')"
+            ).fetchone()[0]
+            apidocs_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMAPIDOCSTAIL.md')"
+            ).fetchone()[0]
+            unrelated_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMUNRELATED.md')"
+            ).fetchone()[0]
+            verifysim_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMVERIFYSIMTAIL.md')"
+            ).fetchall()
+            apidocs_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMAPIDOCSTAIL.md')"
+            ).fetchall()
+        store.close()
+
+        assert verifysim_symbols == [
+            "Phase Plan v7 SEMVERIFYSIMTAIL",
+            "SEMVERIFYSIMTAIL Live Rerun Check",
+            "Context",
+            "Later Python-script blocker",
+            "Interface Freeze Gates",
+            "Tight contract",
+            "Lane Index & Dependencies",
+            "Serial recovery",
+            "Verification",
+            "Rerun proof",
+            "Acceptance Criteria",
+            "Steering",
+            "Automation Handoff",
+            "Downstream note",
+        ]
+        assert apidocs_symbols == [
+            "Phase Plan v7 SEMAPIDOCSTAIL",
+            "SEMAPIDOCSTAIL Live Rerun Check",
+            "Context",
+            "Earlier docs blocker",
+            "Interface Freeze Gates",
+            "Exact seam",
+            "Lane Index & Dependencies",
+            "Sequential proof",
+            "Verification",
+            "Status proof",
+            "Acceptance Criteria",
+            "Rebound verdict",
+            "Automation Handoff",
+            "Stale downstream warning",
+        ]
+        assert unrelated_symbols == [
+            "SEMUNRELATED Notes",
+            "SEMUNRELATED Notes",
+            "Scope",
+            "Guardrail",
+        ]
+        assert verifysim_chunk_count == 0
+        assert apidocs_chunk_count == 0
+        assert unrelated_chunk_count == 0
+        assert len(verifysim_fts_rows) == 1
+        assert len(apidocs_fts_rows) == 1
+        assert "Automation Handoff" in verifysim_fts_rows[0][0]
+        assert "Acceptance Criteria" in apidocs_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_pair_for_embed_consolidation_tail(
         self, tmp_path, monkeypatch
     ):

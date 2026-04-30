@@ -5607,6 +5607,75 @@ plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
 - IF-0-SEMVERIFYAPIREBOUNDTAIL-1 — rebound phase-plan-tail recovery and
   evidence contract.
 
+### Phase 95 — Reindex/Demo Script Tail Recovery (SEMREINDEXDEMOTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later script-family seam revealed
+after SEMVERIFYAPIREBOUNDTAIL:
+`scripts/reindex_current_repository.py ->
+scripts/demo_centralized_indexes.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMVERIFYAPIREBOUNDTAIL
+      head either advances durably beyond
+      `scripts/reindex_current_repository.py ->
+      scripts/demo_centralized_indexes.py` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] Any repair chosen for this later script seam stays narrow, tested, and
+      does not reopen the cleared
+      `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+      plans/phase-plan-v7-SEMAPIDOCSTAIL.md` rebound seam without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMVERIFYAPIREBOUNDTAIL rerun outcome and the final live verdict for the
+      exact
+      `scripts/reindex_current_repository.py ->
+      scripts/demo_centralized_indexes.py` pair.
+
+**Scope notes**
+
+This phase exists only if SEMVERIFYAPIREBOUNDTAIL proves the rebound
+phase-plan seam
+`plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+plans/phase-plan-v7-SEMAPIDOCSTAIL.md` is no longer the final active blocker,
+but the refreshed live rerun on the new head still terminalizes later in
+lexical walking on the script pair
+`scripts/reindex_current_repository.py ->
+scripts/demo_centralized_indexes.py`.
+
+**Non-goals**
+
+- No reopening of the cleared rebound phase-plan seam
+  `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+  plans/phase-plan-v7-SEMAPIDOCSTAIL.md` once the live rerun has already moved
+  away from it.
+- No broad repo-wide Python timeout bypass or blanket script-family relaxation
+  unless the refreshed rerun proves the active blocker cannot be cleared with a
+  narrower exact script-tail repair.
+- No reopening of unrelated semantic, integration, security, or compatibility
+  seams unless the refreshed rerun proves the blocker has moved again.
+
+**Key files**
+
+- `scripts/reindex_current_repository.py`
+- `scripts/demo_centralized_indexes.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMVERIFYAPIREBOUNDTAIL
+
+**Produces**
+- IF-0-SEMREINDEXDEMOTAIL-1 — reindex/demo tail recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5704,6 +5773,7 @@ SEMCONTRACT
   -> SEMAPIDOCSTAIL
   -> SEMLATEPHASEPLANTAIL
   -> SEMVERIFYAPIREBOUNDTAIL
+  -> SEMREINDEXDEMOTAIL
 ```
 
 ## Execution Notes

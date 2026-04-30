@@ -1,7 +1,10 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T04:59:53Z`.
-- Observed commit: `d48e0d2ed5cd89906f1b24c70298e300eabce87c`.
+- Evidence captured: `2026-04-30T05:58:46Z`.
+- Observed commit: `544d98442507df5d5971a31e9e8f116b4cb5a0c9`.
+- Prior SEMLATEPHASEPLANTAIL live-rerun anchor:
+  `2026-04-30T05:36:47Z` on observed commit
+  `e80ecc46df93f5a4ae1bf0966ad675737888f3c9`.
 - Prior SEMP24PLUGINGATINGTAIL live-rerun anchor:
   `2026-04-30T04:41:42Z` on observed commit
   `c4419ef3ddc58e74e4f39cc140665d1e42baf765`.
@@ -11,6 +14,10 @@
 - Prior SEMCODEXLOOPCIFLOWEXECRELAPSETAIL live-rerun anchor:
   `2026-04-30T04:05:03Z` on observed commit
   `ee2e04c606a9e7737dc875b4c25e9af685a96220`.
+- Phase plan: `plans/phase-plan-v7-SEMVERIFYAPIREBOUNDTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMLATEPHASEPLANTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMLATEPHASEPLANTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md`.
@@ -4221,6 +4228,65 @@ Steering outcome:
   blocker as the SEMLATEPHASEPLANTAIL-era
   `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
   plans/phase-plan-v7-SEMGARELTAIL.md` seam.
+
+## SEMVERIFYAPIREBOUNDTAIL Live Rerun Check
+
+SEMVERIFYAPIREBOUNDTAIL did clear its named rebound phase-plan seam on the
+current head. The refreshed repo-local force-full rerun no longer terminalized
+at
+`plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+plans/phase-plan-v7-SEMAPIDOCSTAIL.md`; by the time the watchdog terminated,
+the durable trace and operator-visible status had moved later into the script
+surface
+`scripts/reindex_current_repository.py ->
+scripts/demo_centralized_indexes.py`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMVERIFYAPIREBOUNDTAIL live rerun started at
+  `2026-04-30T05:56:32Z` on observed commit
+  `544d98442507df5d5971a31e9e8f116b4cb5a0c9` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124` at `2026-04-30T05:58:45Z`.
+- At `2026-04-30T05:58:46Z`, `.mcp-index/force_full_exit_trace.json`
+  terminalized the watchdog-bounded rerun to `status: interrupted`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/reindex_current_repository.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/demo_centralized_indexes.py`.
+- The matching `repository status` run reported the same later script pair
+  while keeping the rebound phase-plan seam authoritative on the operator
+  surface:
+  `Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMVERIFYSIMTAIL.md -> plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+- The same `repository status` run now advertises the newly active later
+  blocker family as scripts, not the cleared rebound phase-plan seam:
+  `Last progress path: /home/viperjuice/code/Code-Index-MCP/scripts/reindex_current_repository.py`
+  and
+  `In-flight path: /home/viperjuice/code/Code-Index-MCP/scripts/demo_centralized_indexes.py`.
+- SQLite runtime counts after the rerun were
+  `files = 1199`, `code_chunks = 21254`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMVERIFYAPIREBOUNDTAIL acceptance is satisfied for its named blocker: the
+  live watchdog no longer terminalizes on
+  `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+  plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  script seam
+  `scripts/reindex_current_repository.py ->
+  scripts/demo_centralized_indexes.py`.
+- The roadmap now adds downstream phase `SEMREINDEXDEMOTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMVERIFYAPIREBOUNDTAIL-era
+  `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
+  plans/phase-plan-v7-SEMAPIDOCSTAIL.md` seam.
 
 ## Verification
 

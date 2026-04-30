@@ -5803,6 +5803,116 @@ def test_status_reports_exact_late_v7_phase_plan_markdown_boundary(
     assert f"In-flight path: {later_doc}" in result.output
 
 
+def test_status_reports_exact_rebound_phase_plan_markdown_boundary(
+    monkeypatch, tmp_path: Path
+):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+    verifysim_doc = repo_info.path / "plans" / "phase-plan-v7-SEMVERIFYSIMTAIL.md"
+    apidocs_doc = repo_info.path / "plans" / "phase-plan-v7-SEMAPIDOCSTAIL.md"
+    later_doc = repo_info.path / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
+    verifysim_doc.parent.mkdir(parents=True)
+    later_doc.parent.mkdir(parents=True)
+    verifysim_doc.write_text("# SEMVERIFYSIMTAIL\n", encoding="utf-8")
+    apidocs_doc.write_text("# SEMAPIDOCSTAIL\n", encoding="utf-8")
+    later_doc.write_text("# Evidence\n", encoding="utf-8")
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required lexical mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "summaries_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                "force_full_exit_trace": {
+                    "status": "interrupted",
+                    "stage": "lexical_walking",
+                    "stage_family": "lexical",
+                    "trace_timestamp": "2026-04-30T05:36:47Z",
+                    "current_commit": "e80ecc4600000000000000000000000000000000",
+                    "indexed_commit_before": "d9db21d700000000000000000000000000000000",
+                    "last_progress_path": str(verifysim_doc),
+                    "in_flight_path": str(apidocs_doc),
+                    "blocker_source": "lexical_mutation",
+                },
+                "features": {"semantic": {"readiness": {"evidence": {}}, "preflight": {}}},
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: SimpleNamespace(
+            to_dict=lambda: {
+                "overall_ready": True,
+                "can_write_semantic_vectors": True,
+                "effective_config": {
+                    "selected_profile": "oss_high",
+                    "collection_name": "code_index__oss_high__v1",
+                },
+            }
+        ),
+    )
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert (
+        "Lexical boundary: using exact bounded Markdown indexing for "
+        "plans/phase-plan-v7-SEMVERIFYSIMTAIL.md -> "
+        "plans/phase-plan-v7-SEMAPIDOCSTAIL.md"
+        in result.output
+    )
+    assert "plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->" not in result.output
+    assert f"Last progress path: {verifysim_doc}" in result.output
+    assert f"In-flight path: {apidocs_doc}" in result.output
+
+
 def test_status_reports_exact_historical_phase_plan_markdown_boundary(
     monkeypatch, tmp_path: Path
 ):

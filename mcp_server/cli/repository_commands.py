@@ -346,6 +346,53 @@ def _print_late_v7_phase_plan_markdown_boundary(prefix: str, repo_path: Path) ->
         )
 
 
+def _trace_references_path(trace: Optional[dict[str, Any]], path: Path) -> bool:
+    if not trace:
+        return False
+    normalized = str(path.resolve())
+    return normalized in {
+        trace.get("last_progress_path"),
+        trace.get("in_flight_path"),
+    }
+
+
+def _print_rebound_phase_plan_markdown_boundary(
+    prefix: str, repo_path: Path, trace: Optional[dict[str, Any]]
+) -> bool:
+    phase_plan_paths = (
+        repo_path / "plans" / "phase-plan-v7-SEMVERIFYSIMTAIL.md",
+        repo_path / "plans" / "phase-plan-v7-SEMAPIDOCSTAIL.md",
+    )
+    if not all(path.is_file() for path in phase_plan_paths):
+        return False
+    if trace and any(
+        _trace_references_path(
+            trace,
+            path,
+        )
+        for path in (
+            repo_path / "plans" / "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md",
+            repo_path / "plans" / "phase-plan-v7-SEMGARELTAIL.md",
+        )
+    ):
+        return False
+    click.echo(
+        f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+        "plans/phase-plan-v7-SEMVERIFYSIMTAIL.md -> "
+        "plans/phase-plan-v7-SEMAPIDOCSTAIL.md"
+    )
+    return True
+
+
+def _print_phase_plan_markdown_boundaries(
+    prefix: str, repo_path: Path, trace: Optional[dict[str, Any]]
+) -> None:
+    if _print_rebound_phase_plan_markdown_boundary(prefix, repo_path, trace):
+        return
+
+    _print_late_v7_phase_plan_markdown_boundary(prefix, repo_path)
+
+
 def _print_historical_phase_plan_markdown_boundary(prefix: str, repo_path: Path) -> None:
     phase_plan_paths = (
         repo_path / "plans" / "phase-plan-v6-WATCH.md",
@@ -1180,7 +1227,9 @@ def status(repo_id: Optional[str]):
         _print_claude_command_markdown_boundary("  ", Path(status["path"]))
         _print_benchmark_markdown_boundary("  ", Path(status["path"]))
         _print_support_docs_markdown_boundary("  ", Path(status["path"]))
-        _print_late_v7_phase_plan_markdown_boundary("  ", Path(status["path"]))
+        _print_phase_plan_markdown_boundaries(
+            "  ", Path(status["path"]), status.get("force_full_exit_trace")
+        )
         _print_historical_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_historical_v1_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_mixed_version_phase_plan_markdown_boundary("  ", Path(status["path"]))
