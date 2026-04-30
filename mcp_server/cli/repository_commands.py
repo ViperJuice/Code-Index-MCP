@@ -431,6 +431,19 @@ def _print_swift_database_efficiency_python_boundary(prefix: str, repo_path: Pat
         )
 
 
+def _print_route_auth_sandbox_python_boundary(prefix: str, repo_path: Path) -> None:
+    test_paths = (
+        repo_path / "tests" / "security" / "test_route_auth_coverage.py",
+        repo_path / "tests" / "security" / "test_p24_sandbox_degradation.py",
+    )
+    if all(path.is_file() for path in test_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "tests/security/test_route_auth_coverage.py -> "
+            "tests/security/test_p24_sandbox_degradation.py"
+        )
+
+
 def _print_script_language_audit_python_boundary(prefix: str, repo_path: Path) -> None:
     script_paths = (
         repo_path / "scripts" / "migrate_large_index_to_multi_repo.py",
@@ -1151,6 +1164,7 @@ def status(repo_id: Optional[str]):
         _print_validate_mcp_comprehensive_python_boundary("  ", Path(status["path"]))
         _print_run_reranking_tests_python_boundary("  ", Path(status["path"]))
         _print_swift_database_efficiency_python_boundary("  ", Path(status["path"]))
+        _print_route_auth_sandbox_python_boundary("  ", Path(status["path"]))
         _print_script_language_audit_python_boundary("  ", Path(status["path"]))
         _print_preflight_upgrade_script_boundary("  ", Path(status["path"]))
         _print_verify_simulator_script_boundary("  ", Path(status["path"]))

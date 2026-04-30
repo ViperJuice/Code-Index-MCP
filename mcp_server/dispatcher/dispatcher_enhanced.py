@@ -125,6 +125,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/root_tests/test_mcp_database_efficiency.py": (
         "exact_test_mcp_database_efficiency_rebound"
     ),
+    "tests/security/test_route_auth_coverage.py": "exact_test_route_auth_coverage_rebound",
+    "tests/security/test_p24_sandbox_degradation.py": (
+        "exact_test_p24_sandbox_degradation_rebound"
+    ),
     "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
     "scripts/migrate_large_index_to_multi_repo.py": "exact_migrate_large_index_to_multi_repo_rebound",
     "scripts/check_index_languages.py": "exact_check_index_languages_rebound",

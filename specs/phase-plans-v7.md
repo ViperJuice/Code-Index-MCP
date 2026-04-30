@@ -4945,6 +4945,74 @@ tests/security/test_p24_sandbox_degradation.py`.
 - IF-0-SEMSECAUTHSANDBOXTAIL-1 — later security-test lexical recovery and
   evidence contract.
 
+### Phase 85 — Legacy Codex Phase-Loop Heartbeat Tail Recovery (SEMCODEXLOOPHEARTBEATTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later legacy `.codex/phase-loop`
+compatibility-runtime seam exposed after SEMSECAUTHSANDBOXTAIL:
+`.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMSECAUTHSANDBOXTAIL
+      head either advances durably beyond
+      `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+      .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for this later legacy compatibility-runtime seam stays
+      narrow, tested, and does not reopen the cleared
+      `tests/security/test_route_auth_coverage.py ->
+      tests/security/test_p24_sandbox_degradation.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMSECAUTHSANDBOXTAIL rerun outcome and the final live verdict for the
+      `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+      .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`
+      seam.
+
+**Scope notes**
+
+This phase exists only if SEMSECAUTHSANDBOXTAIL proves the later security-test
+seam
+`tests/security/test_route_auth_coverage.py ->
+tests/security/test_p24_sandbox_degradation.py` is cleared, but the refreshed
+live rerun still terminalizes later in lexical walking on the re-exposed
+legacy `.codex/phase-loop` compatibility-runtime pair
+`.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
+
+**Non-goals**
+
+- No reopening of the cleared route-auth/sandbox-degradation seam once the
+  live rerun has advanced beyond
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py`.
+- No broad reopening of unrelated legacy runtime, release, semantic-stage, or
+  security work unless the refreshed rerun proves the active blocker has moved
+  again.
+- No widening into a blanket `.codex/phase-loop/**/*.json*` shortcut unless the
+  refreshed rerun proves the current exact pair cannot be cleared with a
+  narrower lexical repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMSECAUTHSANDBOXTAIL
+
+**Produces**
+- IF-0-SEMCODEXLOOPHEARTBEATTAIL-1 — later legacy `.codex/phase-loop`
+  heartbeat-pair lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5032,6 +5100,7 @@ SEMCONTRACT
   -> SEMCODEXLOOPRELAPSETAIL
   -> SEMSWIFTDBEFFTAIL
   -> SEMSECAUTHSANDBOXTAIL
+  -> SEMCODEXLOOPHEARTBEATTAIL
 ```
 
 ## Execution Notes
@@ -5073,6 +5142,14 @@ SEMCONTRACT
   but exposes a later exact security-test blocker such as
   `tests/security/test_route_auth_coverage.py ->
   tests/security/test_p24_sandbox_degradation.py`.
+- SEMSECAUTHSANDBOXTAIL should amend the roadmap immediately if the live
+  rerun clears
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py`
+  but exposes a later exact legacy `.codex/phase-loop` compatibility-runtime
+  blocker such as
+  `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during

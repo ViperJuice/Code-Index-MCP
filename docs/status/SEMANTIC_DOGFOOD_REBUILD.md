@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T02:33:57Z`.
-- Observed commit: `748d4b870b7a68408260745d0777f108a197dc37`.
+- Evidence captured: `2026-04-30T02:53:44Z`.
+- Observed commit: `d9d15fd5005b47a8cf5d5a6682b85e6e21330fec`.
 - Prior SEMQUERYFULLREBOUNDTAIL live-rerun anchor: `2026-04-30T01:52:29Z`
   on observed commit `250dcd0f5bda80db857ee8f33159b323b7872faf`.
 - Prior SEMCENTRALIZETAIL live-rerun anchor: `2026-04-30T01:35:03Z` on
@@ -58,8 +58,21 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
+- Phase plan: `plans/phase-plan-v7-SEMSECAUTHSANDBOXTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMSWIFTDBEFFTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMSWIFTDBEFFTAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLREBOUNDTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMCODEXLOOPHEARTBEATTAIL` after SEMSECAUTHSANDBOXTAIL proved the later
+  security-test seam is now cleared, but the refreshed live rerun on the new
+  head still terminalized later in lexical walking on the re-exposed legacy
+  `.codex/phase-loop` compatibility-runtime seam
+  `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
+  Older downstream assumptions should be treated as stale after this roadmap
+  amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMSECAUTHSANDBOXTAIL` after SEMSWIFTDBEFFTAIL proved the later
   Swift/database-efficiency seam is now cleared, but the refreshed live rerun
@@ -3475,7 +3488,79 @@ Steering outcome:
   blocker as the SEMSWIFTDBEFFTAIL-era Swift/database-efficiency root-test
   seam.
 
+## SEMSECAUTHSANDBOXTAIL Live Rerun Check
+
+SEMSECAUTHSANDBOXTAIL verified that the later security route-auth/sandbox
+seam is no longer the active blocker on the current head. The refreshed
+repo-local force-full rerun advanced durably beyond
+`tests/security/test_route_auth_coverage.py ->
+tests/security/test_p24_sandbox_degradation.py`
+and later terminalized on a re-exposed legacy `.codex/phase-loop`
+compatibility-runtime pair.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMSECAUTHSANDBOXTAIL live rerun advanced on observed commit
+  `d9d15fd5005b47a8cf5d5a6682b85e6e21330fec` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T02:53:28Z`, `.mcp-index/force_full_exit_trace.json` still
+  showed a durable raw running snapshot with `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`,
+  proving the rerun had already advanced beyond the
+  SEMSECAUTHSANDBOXTAIL target seam before the watchdog terminated the run.
+- At `2026-04-30T02:53:44Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving later durable
+  progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
+- `repository status` now advertises the repaired exact bounded lexical
+  surface for the cleared security seam:
+  `Lexical boundary: using exact bounded Python indexing for tests/security/test_route_auth_coverage.py -> tests/security/test_p24_sandbox_degradation.py`.
+- The SEMSECAUTHSANDBOXTAIL target pair is no longer the active blocker:
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMSECAUTHSANDBOXTAIL acceptance is satisfied for its named blocker: the
+  live watchdog no longer terminalizes on the
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py` seam.
+- The final authoritative rerun for this phase moved later and now reaches the
+  re-exposed legacy `.codex/phase-loop` compatibility-runtime seam
+  `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
+- The roadmap now adds downstream phase `SEMCODEXLOOPHEARTBEATTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMSECAUTHSANDBOXTAIL-era security route-auth/sandbox seam.
+
 ## Verification
+
+Verification sequence for this SEMSECAUTHSANDBOXTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "route_auth or sandbox_degradation or security or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "route_auth or sandbox_degradation or security or interrupted or boundary or closeout_handoff"
+uv run pytest tests/security/test_route_auth_coverage.py tests/security/test_p24_sandbox_degradation.py -q --no-cov
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMSWIFTDBEFFTAIL or SEMSECAUTHSANDBOXTAIL or route_auth or sandbox_degradation or security"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMSWIFTDBEFFTAIL slice:
 

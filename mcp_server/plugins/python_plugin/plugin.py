@@ -45,6 +45,8 @@ class Plugin(IPlugin):
         "tests/docs/test_garel_ga_release_contract.py",
         "tests/docs/test_p23_doc_truth.py",
         "tests/docs/test_semdogfood_evidence_contract.py",
+        "tests/security/test_route_auth_coverage.py",
+        "tests/security/test_p24_sandbox_degradation.py",
         "tests/security/fixtures/mock_plugin/plugin.py",
         "tests/security/fixtures/mock_plugin/__init__.py",
         "mcp_server/visualization/quick_charts.py",

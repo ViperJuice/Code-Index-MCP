@@ -3268,6 +3268,142 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "DatabaseEfficiencyTester" in db_efficiency_fts_rows[0][0]
         assert "main" in db_efficiency_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_route_auth_sandbox_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.python_plugin.plugin import Plugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        security_dir = repo / "tests" / "security"
+        security_dir.mkdir(parents=True)
+        route_auth = security_dir / "test_route_auth_coverage.py"
+        sandbox_degradation = security_dir / "test_p24_sandbox_degradation.py"
+        control = security_dir / "test_control.py"
+        route_auth.write_text(
+            "def _protected_routes():\n"
+            "    return [('GET', '/search/capabilities')]\n\n"
+            "def _has_auth_dependency(route):\n"
+            "    return bool(route)\n\n"
+            "def test_search_capabilities_requires_auth():\n"
+            "    assert True\n\n"
+            "def test_all_protected_routes_return_401_without_token():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        sandbox_degradation.write_text(
+            "def _caps():\n"
+            "    return {'network': False}\n\n"
+            "def test_worker_missing_extra_failure_has_capability_state():\n"
+            "    assert _caps()['network'] is False\n\n"
+            "def test_csharp_aliases_construct_in_sandbox():\n"
+            "    assert True\n\n"
+            "def test_specific_plugin_alias_exports_construct_in_sandbox():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        control.write_text("def test_control():\n    assert True\n", encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(route_auth.resolve()),
+            str(sandbox_degradation.resolve()),
+            str(control.resolve()),
+        }
+        with store._get_connection() as conn:
+            route_auth_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_route_auth_coverage.py') ORDER BY id"
+                ).fetchall()
+            ]
+            sandbox_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_p24_sandbox_degradation.py') ORDER BY id"
+                ).fetchall()
+            ]
+            control_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_control.py') ORDER BY id"
+                ).fetchall()
+            ]
+            route_auth_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_route_auth_coverage.py')"
+            ).fetchone()[0]
+            sandbox_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_p24_sandbox_degradation.py')"
+            ).fetchone()[0]
+            route_auth_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'tests/security/test_route_auth_coverage.py'"
+            ).fetchone()[0]
+            sandbox_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'tests/security/test_p24_sandbox_degradation.py'"
+            ).fetchone()[0]
+            control_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'tests/security/test_control.py'"
+            ).fetchone()[0]
+            route_auth_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_route_auth_coverage.py')"
+            ).fetchall()
+            sandbox_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/test_p24_sandbox_degradation.py')"
+            ).fetchall()
+        store.close()
+        assert route_auth_symbols == [
+            "_protected_routes",
+            "_has_auth_dependency",
+            "test_search_capabilities_requires_auth",
+            "test_all_protected_routes_return_401_without_token",
+        ]
+        assert sandbox_symbols == [
+            "_caps",
+            "test_worker_missing_extra_failure_has_capability_state",
+            "test_csharp_aliases_construct_in_sandbox",
+            "test_specific_plugin_alias_exports_construct_in_sandbox",
+        ]
+        assert control_symbols == ["test_control"]
+        assert route_auth_chunk_count == 0
+        assert sandbox_chunk_count == 0
+        assert "exact_test_route_auth_coverage_rebound" in route_auth_metadata
+        assert "exact_test_p24_sandbox_degradation_rebound" in sandbox_metadata
+        assert "exact_test_route_auth_coverage_rebound" not in control_metadata
+        assert "exact_test_p24_sandbox_degradation_rebound" not in control_metadata
+        assert len(route_auth_fts) == 1
+        assert "_protected_routes" in route_auth_fts[0][0]
+        assert "_has_auth_dependency" in route_auth_fts[0][0]
+        assert "test_search_capabilities_requires_auth" in route_auth_fts[0][0]
+        assert "test_all_protected_routes_return_401_without_token" in route_auth_fts[0][0]
+        assert len(sandbox_fts) == 1
+        assert "_caps" in sandbox_fts[0][0]
+        assert "test_worker_missing_extra_failure_has_capability_state" in sandbox_fts[0][0]
+        assert "test_csharp_aliases_construct_in_sandbox" in sandbox_fts[0][0]
+        assert "test_specific_plugin_alias_exports_construct_in_sandbox" in sandbox_fts[0][0]
+        assert "tests/security/test_route_auth_coverage.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/security/test_p24_sandbox_degradation.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/security/fixtures/mock_plugin/plugin.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/security/fixtures/mock_plugin/__init__.py" in Plugin._BOUNDED_CHUNK_PATHS
+
     def test_index_directory_uses_exact_bounded_python_path_for_integration_obs_smoke_pair(
         self, tmp_path, monkeypatch
     ):

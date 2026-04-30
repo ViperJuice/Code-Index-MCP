@@ -1737,6 +1737,53 @@ def test_force_full_progress_callback_persists_swift_database_efficiency_pair_sn
     assert trace["trace_timestamp"]
 
 
+def test_force_full_progress_callback_persists_route_auth_sandbox_pair_snapshot(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before=repo_info.last_indexed_commit,
+    )
+    prior_file = repo / "tests" / "security" / "test_route_auth_coverage.py"
+    blocked_file = repo / "tests" / "security" / "test_p24_sandbox_degradation.py"
+
+    callback(
+        {
+            "stage": "lexical_walking",
+            "stage_family": "lexical",
+            "blocker_source": "lexical_mutation",
+            "lexical_stage": "walking",
+            "semantic_stage": "not_run",
+            "last_progress_path": str(prior_file),
+            "in_flight_path": str(blocked_file),
+            "summary_call_timed_out": False,
+            "summary_call_file_path": None,
+            "summary_call_chunk_ids": [],
+            "summary_call_timeout_seconds": None,
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "running"
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["last_progress_path"] == str(prior_file)
+    assert trace["in_flight_path"] == str(blocked_file)
+    assert "tests/root_tests/test_swift_plugin.py" not in (trace.get("last_progress_path") or "")
+    assert "tests/security/fixtures/mock_plugin/plugin.py" not in (
+        trace.get("in_flight_path") or ""
+    )
+    assert trace["trace_timestamp"]
+
+
 def test_force_full_progress_callback_preserves_last_progress_path_across_semantic_handoff(
     tmp_path,
 ):
@@ -3462,6 +3509,55 @@ def test_get_repository_status_preserves_mock_plugin_fixture_pair_trace(tmp_path
         status["force_full_exit_trace"]["last_progress_path"] or ""
     )
     assert "consolidate_real_performance_data.py" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
+
+
+def test_get_repository_status_preserves_route_auth_sandbox_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-30T02:33:57Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(
+                    repo / "tests" / "security" / "test_route_auth_coverage.py"
+                ),
+                "in_flight_path": str(
+                    repo / "tests" / "security" / "test_p24_sandbox_degradation.py"
+                ),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "tests" / "security" / "test_route_auth_coverage.py"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "tests" / "security" / "test_p24_sandbox_degradation.py"
+    )
+    assert "test_swift_plugin.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+    assert "fixtures/mock_plugin/plugin.py" not in (
         status["force_full_exit_trace"]["in_flight_path"] or ""
     )
 
