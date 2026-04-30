@@ -11,6 +11,8 @@
 - Prior SEMCODEXLOOPCIFLOWEXECRELAPSETAIL live-rerun anchor:
   `2026-04-30T04:05:03Z` on observed commit
   `ee2e04c606a9e7737dc875b4c25e9af685a96220`.
+- Phase plan: `plans/phase-plan-v7-SEMAPIDOCSTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL.md`.
@@ -4106,6 +4108,64 @@ Steering outcome:
   blocker as the SEMP24PLUGINGATINGTAIL-era
   `tests/test_p24_plugin_availability.py ->
   tests/test_dispatcher_extension_gating.py` seam.
+
+## SEMAPIDOCSTAIL Live Rerun Check
+
+SEMAPIDOCSTAIL did clear its named later Markdown-docs seam on the current
+head. The refreshed repo-local force-full rerun no longer terminalized at
+`docs/architecture/P2B-known-limits.md ->
+docs/api/API-REFERENCE.md`; by the time the watchdog terminated, the durable
+trace and operator-visible status had moved later into the phase-plan
+Markdown surface
+`plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+plans/phase-plan-v7-SEMGARELTAIL.md`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMAPIDOCSTAIL live rerun advanced on observed commit
+  `d9db21d7424dac72129b0d625b10d45f95b2d826` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T05:19:42Z`, `.mcp-index/force_full_exit_trace.json`
+  terminalized the watchdog-bounded rerun to `status: interrupted`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMGARELTAIL.md`.
+- The matching `repository status` run reported the same later lexical pair at
+  `2026-04-30T05:19:42Z` while also advertising the repaired Markdown-docs
+  boundary:
+  `Lexical boundary: using exact bounded Markdown indexing for docs/architecture/P2B-known-limits.md -> docs/api/API-REFERENCE.md`.
+- The same `repository status` run now advertises the newly active later
+  blocker family as phase-plan docs, not the cleared architecture/API-docs
+  seam:
+  `Last progress path: /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`
+  and
+  `In-flight path: /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMGARELTAIL.md`.
+- SQLite runtime counts after the rerun were
+  `files = 1199`, `code_chunks = 21254`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMAPIDOCSTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `docs/architecture/P2B-known-limits.md ->
+  docs/api/API-REFERENCE.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  phase-plan Markdown seam
+  `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+  plans/phase-plan-v7-SEMGARELTAIL.md`.
+- The roadmap now adds downstream phase `SEMLATEPHASEPLANTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMAPIDOCSTAIL-era
+  `docs/architecture/P2B-known-limits.md ->
+  docs/api/API-REFERENCE.md` seam.
 
 ## Verification
 

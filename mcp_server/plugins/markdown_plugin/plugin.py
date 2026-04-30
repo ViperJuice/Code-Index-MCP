@@ -43,6 +43,8 @@ _EXACT_BOUNDED_MARKDOWN_PATHS = {
     ".claude/commands/execute-lane.md": "claude_execute_lane_path",
     ".claude/commands/plan-phase.md": "claude_plan_phase_path",
     "ai_docs/jedi.md": "ai_docs_jedi_path",
+    "docs/architecture/p2b-known-limits.md": "architecture_p2b_known_limits_path",
+    "docs/api/api-reference.md": "api_reference_path",
     "docs/validation/ga-closeout-decision.md": "validation_ga_closeout_path",
     "docs/validation/mre2e-evidence.md": "validation_mre2e_path",
     "docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md": "benchmark_fullrepo_rerun_path",

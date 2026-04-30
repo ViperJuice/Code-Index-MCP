@@ -5479,6 +5479,70 @@ docs/api/API-REFERENCE.md`.
 **Produces**
 - IF-0-SEMAPIDOCSTAIL-1 — later docs-tail recovery and evidence contract.
 
+### Phase 93 — Late Phase-Plan Markdown Tail Recovery (SEMLATEPHASEPLANTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later phase-plan Markdown seam
+revealed after SEMAPIDOCSTAIL:
+`plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+plans/phase-plan-v7-SEMGARELTAIL.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMAPIDOCSTAIL head
+      either advances durably beyond
+      `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+      plans/phase-plan-v7-SEMGARELTAIL.md` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] Any repair chosen for this later phase-plan seam stays narrow, tested,
+      and does not reopen the cleared
+      `docs/architecture/P2B-known-limits.md ->
+      docs/api/API-REFERENCE.md` seam without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMAPIDOCSTAIL
+      rerun outcome and the final live verdict for the exact
+      `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+      plans/phase-plan-v7-SEMGARELTAIL.md` pair.
+
+**Scope notes**
+
+This phase exists only if SEMAPIDOCSTAIL proves the
+`docs/architecture/P2B-known-limits.md ->
+docs/api/API-REFERENCE.md` seam is not the final active blocker, but the
+refreshed live rerun on the new head still terminalizes later in lexical
+walking on the newer phase-plan Markdown seam
+`plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+plans/phase-plan-v7-SEMGARELTAIL.md`.
+
+**Non-goals**
+
+- No reopening of the cleared
+  `docs/architecture/P2B-known-limits.md ->
+  docs/api/API-REFERENCE.md` seam once the live rerun has already moved away
+  from it.
+- No broad repo-wide phase-plan Markdown timeout bypass or blanket payload
+  relaxation unless the refreshed rerun proves the active blocker cannot be
+  cleared with a narrower phase-plan-tail repair.
+- No reopening of unrelated semantic, integration, security, or compatibility
+  seams unless the refreshed rerun proves the blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMAPIDOCSTAIL
+
+**Produces**
+- IF-0-SEMLATEPHASEPLANTAIL-1 — later phase-plan-tail recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5574,6 +5638,7 @@ SEMCONTRACT
   -> SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL
   -> SEMP24PLUGINGATINGTAIL
   -> SEMAPIDOCSTAIL
+  -> SEMLATEPHASEPLANTAIL
 ```
 
 ## Execution Notes
@@ -5667,6 +5732,13 @@ SEMCONTRACT
   active blocker but exposes a later exact Markdown docs seam such as
   `docs/architecture/P2B-known-limits.md ->
   docs/api/API-REFERENCE.md`.
+- SEMAPIDOCSTAIL should amend the roadmap immediately if the live rerun proves
+  the
+  `docs/architecture/P2B-known-limits.md ->
+  docs/api/API-REFERENCE.md` seam is no longer the final active blocker but
+  exposes a later exact phase-plan Markdown seam such as
+  `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md ->
+  plans/phase-plan-v7-SEMGARELTAIL.md`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during

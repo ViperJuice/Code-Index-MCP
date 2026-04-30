@@ -269,6 +269,18 @@ def _print_jedi_markdown_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_architecture_api_markdown_boundary(prefix: str, repo_path: Path) -> None:
+    seam_paths = (
+        repo_path / "docs" / "architecture" / "P2B-known-limits.md",
+        repo_path / "docs" / "api" / "API-REFERENCE.md",
+    )
+    if all(path.is_file() for path in seam_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+            "docs/architecture/P2B-known-limits.md -> docs/api/API-REFERENCE.md"
+        )
+
+
 def _print_validation_markdown_boundaries(prefix: str, repo_path: Path) -> None:
     for relative_path in (
         "docs/validation/ga-closeout-decision.md",
@@ -1163,6 +1175,7 @@ def status(repo_id: Optional[str]):
         _print_test_workspace_boundary("  ", Path(status["path"]))
         _print_ai_docs_overview_boundary("  ", Path(status["path"]))
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
+        _print_architecture_api_markdown_boundary("  ", Path(status["path"]))
         _print_validation_markdown_boundaries("  ", Path(status["path"]))
         _print_claude_command_markdown_boundary("  ", Path(status["path"]))
         _print_benchmark_markdown_boundary("  ", Path(status["path"]))

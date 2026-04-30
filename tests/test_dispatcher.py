@@ -1610,6 +1610,165 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Code Completion" in symbol_names
         assert chunk_count == 0
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_architecture_api_docs(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        architecture_dir = repo / "docs" / "architecture"
+        api_dir = repo / "docs" / "api"
+        architecture_dir.mkdir(parents=True)
+        api_dir.mkdir(parents=True)
+        p2b_doc = architecture_dir / "P2B-known-limits.md"
+        api_doc = api_dir / "API-REFERENCE.md"
+        unrelated_doc = api_dir / "OTHER.md"
+        p2b_doc.write_text(
+            "# P2B Known Limits - Deferred Per-Repo Global State\n\n"
+            "## Status\n\n"
+            "### Deferred: Process-Global Dispatcher State\n"
+            "- Preserve exact bounded lexical discoverability\n\n"
+            "## Impact\n\n"
+            "## Resolution Plan\n",
+            encoding="utf-8",
+        )
+        api_doc.write_text(
+            "# Code-Index-MCP API Reference\n\n"
+            "## Overview\n\n"
+            "## Authentication\n\n"
+            "## API Endpoints\n\n"
+            "#### POST /auth/login\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# Other API Notes\n\n"
+            "## Scope\n\n"
+            "### Guardrail\n"
+            "- Keep unrelated docs on the heavy Markdown path\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for the exact P2B/API-reference pair"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        plugin = MarkdownPlugin()
+        assert (
+            plugin._resolve_lightweight_reason(p2b_doc, p2b_doc.read_text(encoding="utf-8"))
+            == "architecture_p2b_known_limits_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(api_doc, api_doc.read_text(encoding="utf-8"))
+            == "api_reference_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                unrelated_doc, unrelated_doc.read_text(encoding="utf-8")
+            )
+            is None
+        )
+
+        result = Dispatcher([]).index_directory(ctx, repo / "docs")
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(p2b_doc.resolve()),
+            str(api_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            p2b_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/architecture/P2B-known-limits.md') ORDER BY id"
+                ).fetchall()
+            ]
+            api_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/api/API-REFERENCE.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = 'docs/api/OTHER.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            p2b_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/architecture/P2B-known-limits.md')"
+            ).fetchone()[0]
+            api_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'docs/api/API-REFERENCE.md')"
+            ).fetchone()[0]
+            unrelated_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'docs/api/OTHER.md')"
+            ).fetchone()[0]
+            p2b_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/architecture/P2B-known-limits.md')"
+            ).fetchall()
+            api_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'docs/api/API-REFERENCE.md')"
+            ).fetchall()
+        store.close()
+
+        assert p2b_symbols[0] == "P2B Known Limits - Deferred Per-Repo Global State"
+        assert "Status" in p2b_symbols
+        assert "Deferred: Process-Global Dispatcher State" in p2b_symbols
+        assert "Impact" in p2b_symbols
+        assert "Resolution Plan" in p2b_symbols
+        assert api_symbols[0] == "Code-Index-MCP API Reference"
+        assert "Overview" in api_symbols
+        assert "Authentication" in api_symbols
+        assert "API Endpoints" in api_symbols
+        assert "POST /auth/login" in api_symbols
+        assert "Other API Notes" in unrelated_symbols
+        assert "Scope" in unrelated_symbols
+        assert "Guardrail" in unrelated_symbols
+        assert p2b_chunk_count == 0
+        assert api_chunk_count == 0
+        assert unrelated_chunk_count > 0
+        assert len(p2b_fts_rows) == 1
+        assert len(api_fts_rows) == 1
+        assert "Deferred: Process-Global Dispatcher State" in p2b_fts_rows[0][0]
+        assert "Resolution Plan" in p2b_fts_rows[0][0]
+        assert "Authentication" in api_fts_rows[0][0]
+        assert "POST /auth/login" in api_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_markdown_path_for_validation_docs(
         self, tmp_path, monkeypatch
     ):

@@ -721,6 +721,67 @@ All notable changes to this project will be documented in this file.
         assert "MCP Server Use Cases" in symbol_names
         assert "Code Intelligence Service" in symbol_names
 
+    def test_architecture_and_api_docs_use_exact_bounded_markdown_paths(self, markdown_plugin):
+        """The P2B/API-reference seam should stay lightweight but lexically visible."""
+        p2b_content = """
+# P2B Known Limits - Deferred Per-Repo Global State
+
+## Status
+
+### Deferred: Process-Global Dispatcher State
+- Preserve the later docs-tail seam on a bounded path
+
+## Impact
+
+## Resolution Plan
+"""
+        api_content = """
+# Code-Index-MCP API Reference
+
+## Overview
+
+## Authentication
+
+## API Endpoints
+
+#### POST /auth/login
+"""
+
+        p2b_result = markdown_plugin.indexFile(
+            "docs/architecture/P2B-known-limits.md", p2b_content
+        )
+        api_result = markdown_plugin.indexFile("docs/api/API-REFERENCE.md", api_content)
+        unrelated_result = markdown_plugin.indexFile(
+            "docs/api/OTHER.md",
+            "# Other API Notes\n\n## Scope\n\n### Guardrail\n- Keep generic Markdown handling intact\n",
+        )
+
+        assert p2b_result["metadata"]["lightweight_index"] is True
+        assert (
+            p2b_result["metadata"]["lightweight_reason"]
+            == "architecture_p2b_known_limits_path"
+        )
+        assert p2b_result["chunks"] == []
+        p2b_symbols = [symbol["symbol"] for symbol in p2b_result["symbols"]]
+        assert "P2B Known Limits - Deferred Per-Repo Global State" in p2b_symbols
+        assert "Status" in p2b_symbols
+        assert "Deferred: Process-Global Dispatcher State" in p2b_symbols
+        assert "Impact" in p2b_symbols
+        assert "Resolution Plan" in p2b_symbols
+
+        assert api_result["metadata"]["lightweight_index"] is True
+        assert api_result["metadata"]["lightweight_reason"] == "api_reference_path"
+        assert api_result["chunks"] == []
+        api_symbols = [symbol["symbol"] for symbol in api_result["symbols"]]
+        assert "Code-Index-MCP API Reference" in api_symbols
+        assert "Overview" in api_symbols
+        assert "Authentication" in api_symbols
+        assert "API Endpoints" in api_symbols
+        assert "POST /auth/login" in api_symbols
+
+        assert unrelated_result["metadata"].get("lightweight_index") is not True
+        assert unrelated_result["chunks"] != []
+
     def test_later_ai_docs_overview_pair_uses_generic_bounded_markdown_path(
         self, markdown_plugin
     ):
