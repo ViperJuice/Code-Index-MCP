@@ -1,9 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T00:30:24Z`.
-- Observed commit: `230557ff39fcb4ec8c494fa13af413b4e8b04ca6`.
-- Prior SEMQUERYFULLTAIL live-rerun anchor: `2026-04-30T00:12:27Z` on
-  observed commit `96bc35b08ac83baafd50192cd8a56a22d9601a0d`.
+- Evidence captured: `2026-04-30T00:46:51Z`.
+- Observed commit: `f6ef98c76ee35a4d702edd5eea019430b3735f9a`.
+- Prior SEMQUERYFULLTAIL live-rerun anchor: `2026-04-30T00:30:24Z` on
+  observed commit `230557ff39fcb4ec8c494fa13af413b4e8b04ca6`.
 - Prior SEMSCRIPTLANGSTAIL live-rerun anchor: `2026-04-29T23:55:57Z` on
   observed commit `cd1d50f4a7f3e563922e9eb87d2b4f6d7dd621ab`.
 - Prior SEMOPTUPLOADTAIL live-rerun anchor: `2026-04-29T23:19:22Z` on
@@ -52,8 +52,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGSTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMINTEGRATIONTAIL` after SEMCODEXLOOPREBOUNDTAIL proved the re-exposed
+  legacy `.codex/phase-loop` compatibility-runtime seam is now cleared, but
+  the refreshed live rerun on the new head still terminalized later in
+  lexical walking on `tests/integration/__init__.py ->
+  tests/integration/obs/test_obs_smoke.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMCODEXLOOPREBOUNDTAIL` after SEMQUERYFULLTAIL proved the later
   comprehensive-query/full-sync seam is now cleared, but the refreshed live
@@ -3093,7 +3100,75 @@ Steering outcome:
   `scripts/run_comprehensive_query_test.py ->
   scripts/index_all_repos_semantic_full.py`.
 
+## SEMCODEXLOOPREBOUNDTAIL Live Rerun Check
+
+SEMCODEXLOOPREBOUNDTAIL verified that the later re-exposed legacy
+`.codex/phase-loop` compatibility-runtime seam is no longer the active blocker
+on the current head. The refreshed repo-local force-full rerun advanced
+durably beyond
+`.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`
+and later terminalized on a newer integration-test tail.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCODEXLOOPREBOUNDTAIL live rerun advanced on observed commit
+  `f6ef98c76ee35a4d702edd5eea019430b3735f9a` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T00:45:43Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/test_disk_full.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/test_incremental_indexer.py`.
+- At `2026-04-30T00:46:51Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving later durable
+  progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/integration/__init__.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/integration/obs/test_obs_smoke.py`.
+- `repository status` on the same head still advertises the repaired legacy
+  lexical boundary
+  `Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative`
+  while the durable trace has moved later.
+- The SEMCODEXLOOPREBOUNDTAIL target pair is no longer the active blocker:
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCODEXLOOPREBOUNDTAIL acceptance is satisfied for its named blocker: the
+  live watchdog no longer terminalizes on the later legacy `.codex/phase-loop`
+  rebound pair.
+- The final authoritative rerun for this phase moved later and now reaches
+  `tests/integration/__init__.py ->
+  tests/integration/obs/test_obs_smoke.py`.
+- The roadmap now adds downstream phase `SEMINTEGRATIONTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCODEXLOOPREBOUNDTAIL-era legacy `.codex/phase-loop`
+  rebound seam.
+
 ## Verification
+
+Verification sequence for this SEMCODEXLOOPREBOUNDTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "garc or idxsafe or legacy_codex_phase_loop or terminal_summary or launch or bounded or phase_loop"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "garc or idxsafe or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMQUERYFULLTAIL or SEMCODEXLOOPREBOUNDTAIL or phase_loop or garc or idxsafe"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMQUERYFULLTAIL slice:
 

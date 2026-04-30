@@ -17,13 +17,13 @@ def _normalized(path: Path) -> str:
     return " ".join(_read(path).split())
 
 
-def test_semdogfood_report_exists_and_names_required_evidence_sections():
+def test_semdogfood_phase_loop_report_exists_and_names_required_evidence_sections():
     text = _read(EVIDENCE)
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGSTAIL.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDTAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -70,6 +70,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMEDITRETRIEVALTAIL Live Rerun Check",
         "## SEMSCRIPTLANGSTAIL Live Rerun Check",
         "## SEMQUERYFULLTAIL Live Rerun Check",
+        "## SEMCODEXLOOPREBOUNDTAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -80,7 +81,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         assert expected in text
 
 
-def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering():
+def test_semdogfood_phase_loop_report_records_trace_freshness_recovery_and_roadmap_steering():
     text = _normalized(EVIDENCE)
 
     for expected in (
@@ -252,6 +253,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json",
         ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/launch.json",
         ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json",
+        ".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json",
+        ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json",
         "tests/docs/test_semincr_contract.py",
         "tests/docs/test_gabase_ga_readiness_contract.py",
         "tests/docs/test_garc_rc_soak_contract.py",
@@ -344,6 +347,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMEDITRETRIEVALTAIL`",
         "roadmap now adds downstream phase `SEMSCRIPTLANGSTAIL`",
         "roadmap now adds downstream phase `SEMQUERYFULLTAIL`",
+        "roadmap now adds downstream phase `SEMINTEGRATIONTAIL`",
         "2026-04-29T21:15:40Z",
         "2026-04-29T21:15:52Z",
         "2026-04-29T21:34:54Z",
@@ -368,6 +372,10 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T23:55:57Z",
         "2026-04-30T00:12:10Z",
         "2026-04-30T00:12:27Z",
+        "2026-04-30T00:30:12Z",
+        "2026-04-30T00:30:24Z",
+        "2026-04-30T00:45:43Z",
+        "2026-04-30T00:46:51Z",
         "0195d3c",
         "d0732db6",
         "490ad260833a7a12c10e8be9a1c656f789247f9c",
@@ -391,11 +399,15 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "scripts/verify_mcp_retrieval.py",
         "scripts/run_comprehensive_query_test.py",
         "scripts/index_all_repos_semantic_full.py",
+        "tests/test_disk_full.py",
+        "tests/test_incremental_indexer.py",
+        "tests/integration/__init__.py",
+        "tests/integration/obs/test_obs_smoke.py",
     ):
         assert expected in text
 
 
-def test_semdogfood_report_preserves_command_level_verification_and_runtime_paths():
+def test_semdogfood_phase_loop_report_preserves_command_level_verification_and_runtime_paths():
     text = _normalized(EVIDENCE)
 
     for expected in (
@@ -510,8 +522,12 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMOPTUPLOADTAIL acceptance is satisfied for its named blocker",
         "SEMEDITRETRIEVALTAIL acceptance is satisfied for its named blocker",
         "SEMSCRIPTLANGSTAIL acceptance is satisfied for its named blocker",
-        "Phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGSTAIL.md`",
+        "SEMCODEXLOOPREBOUNDTAIL acceptance is satisfied for its named blocker",
+        "Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDTAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`",
+        "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"garc or idxsafe or legacy_codex_phase_loop or terminal_summary or launch or bounded or phase_loop\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"garc or idxsafe or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop\"",
+        "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k \"SEMQUERYFULLTAIL or SEMCODEXLOOPREBOUNDTAIL or phase_loop or garc or idxsafe\"",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"migrate_large_index_to_multi_repo or check_index_languages or script_language_audit or rebound or closeout_handoff or bounded\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"migrate_large_index_to_multi_repo or check_index_languages or script_language_audit or rebound or closeout or interrupted or boundary\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k \"SEMSCRIPTLANGSTAIL or SEMEDITRETRIEVALTAIL or migrate_large_index_to_multi_repo or check_index_languages or script_language_audit\"",

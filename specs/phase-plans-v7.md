@@ -4566,6 +4566,66 @@ rerun still terminalizes later in lexical walking on a re-exposed legacy
 - IF-0-SEMCODEXLOOPREBOUNDTAIL-1 — re-exposed legacy `.codex/phase-loop`
   lexical recovery and evidence contract.
 
+### Phase 79 — Integration Test Tail Recovery (SEMINTEGRATIONTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later integration-test blocker
+exposed after SEMCODEXLOOPREBOUNDTAIL:
+`tests/integration/__init__.py -> tests/integration/obs/test_obs_smoke.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMCODEXLOOPREBOUNDTAIL
+      head either advances durably beyond
+      `tests/integration/__init__.py ->
+      tests/integration/obs/test_obs_smoke.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later integration-test seam stays narrow,
+      tested, and does not reopen the repaired legacy `.codex/phase-loop`
+      compatibility-runtime rebound without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMCODEXLOOPREBOUNDTAIL rerun outcome and the final live verdict for the
+      later integration-test pair.
+
+**Scope notes**
+
+This phase exists only if SEMCODEXLOOPREBOUNDTAIL proves the later legacy
+`.codex/phase-loop` rebound pair is cleared, but the refreshed live rerun
+still terminalizes later in lexical walking on
+`tests/integration/__init__.py ->
+tests/integration/obs/test_obs_smoke.py`.
+
+**Non-goals**
+
+- No reopening of the repaired legacy `.codex/phase-loop`
+  compatibility-runtime rebound once the live rerun has advanced beyond
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- No broad reopening of earlier docs, script-family, or phase-plan tail work
+  unless the refreshed rerun proves the active blocker has moved again.
+- No reopening of semantic-stage or release work unless the refreshed rerun
+  proves the next blocker is no longer integration-test-local.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `tests/integration/__init__.py`
+- `tests/integration/obs/test_obs_smoke.py`
+
+**Depends on**
+- SEMCODEXLOOPREBOUNDTAIL
+
+**Produces**
+- IF-0-SEMINTEGRATIONTAIL-1 — later integration-test lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4647,6 +4707,7 @@ SEMCONTRACT
   -> SEMSCRIPTLANGSTAIL
   -> SEMQUERYFULLTAIL
   -> SEMCODEXLOOPREBOUNDTAIL
+  -> SEMINTEGRATIONTAIL
 ```
 
 ## Execution Notes
@@ -5112,6 +5173,12 @@ SEMCONTRACT
   compatibility-runtime blocker such as
   `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
   .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- SEMCODEXLOOPREBOUNDTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears the re-exposed legacy `.codex/phase-loop`
+  compatibility-runtime blocker but exposes a later exact integration-test
+  blocker such as
+  `tests/integration/__init__.py ->
+  tests/integration/obs/test_obs_smoke.py`.
 - SEMDOCCONTRACTTAIL should amend the roadmap immediately if the refreshed live
   rerun clears
   `tests/docs/test_semincr_contract.py ->
