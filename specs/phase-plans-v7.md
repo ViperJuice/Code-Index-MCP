@@ -4438,6 +4438,70 @@ scripts/check_index_languages.py`.
 - IF-0-SEMSCRIPTLANGSTAIL-1 — exact later script-language rebound recovery
   and evidence contract.
 
+### Phase 77 — Comprehensive Query And Full Semantic Script Tail Recovery (SEMQUERYFULLTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later exact script pair exposed by
+SEMSCRIPTLANGSTAIL:
+`scripts/run_comprehensive_query_test.py ->
+scripts/index_all_repos_semantic_full.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMSCRIPTLANGSTAIL
+      head either advances durably beyond
+      `scripts/run_comprehensive_query_test.py ->
+      scripts/index_all_repos_semantic_full.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later comprehensive-query/full-sync script
+      seam stays narrow, tested, and does not reopen the already-cleared
+      `scripts/migrate_large_index_to_multi_repo.py ->
+      scripts/check_index_languages.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMSCRIPTLANGSTAIL rerun outcome and the final live verdict for the
+      later comprehensive-query/full-sync pair.
+
+**Scope notes**
+
+This phase exists only if SEMSCRIPTLANGSTAIL proves the later
+script-language rebound pair is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on
+`scripts/run_comprehensive_query_test.py ->
+scripts/index_all_repos_semantic_full.py`.
+
+**Non-goals**
+
+- No reopening of the cleared script-language rebound recovery once the live
+  rerun has advanced beyond
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- No blanket reopening of unrelated script, test, or phase-loop families
+  unless the refreshed rerun proves the active blocker cannot be cleared with
+  a narrower exact-path or exact-pair contract.
+- No reopening of unrelated semantic-stage or release work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/run_comprehensive_query_test.py`
+- `scripts/index_all_repos_semantic_full.py`
+
+**Depends on**
+- SEMSCRIPTLANGSTAIL
+
+**Produces**
+- IF-0-SEMQUERYFULLTAIL-1 — exact later comprehensive-query/full-sync script
+  recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4517,6 +4581,7 @@ SEMCONTRACT
   -> SEMOPTUPLOADTAIL
   -> SEMEDITRETRIEVALTAIL
   -> SEMSCRIPTLANGSTAIL
+  -> SEMQUERYFULLTAIL
 ```
 
 ## Execution Notes
@@ -4753,6 +4818,22 @@ SEMCONTRACT
   scripts/check_index_languages.py`; it should repair that exact later
   script-language rebound pair or preserve the next exact downstream blocker
   instead of reopening earlier edit-analysis/retrieval,
+  optimized-analysis/upload, Qdrant/report, utility, missing-repo, or
+  test-repo index work.
+- SEMSCRIPTLANGSTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py` but exposes a later exact script blocker
+  such as
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`.
+- SEMQUERYFULLTAIL exists only if SEMSCRIPTLANGSTAIL proves the later
+  script-language rebound pair is cleared but the live rerun still remains in
+  lexical walking on
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`; it should repair that exact later
+  script pair or preserve the next exact downstream blocker instead of
+  reopening earlier script-language, edit-analysis/retrieval,
   optimized-analysis/upload, Qdrant/report, utility, missing-repo, or
   test-repo index work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is

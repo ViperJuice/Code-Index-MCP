@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T23:55:56Z`.
-- Observed commit: `cd1d50f4a7f3e563922e9eb87d2b4f6d7dd621ab`.
+- Evidence captured: `2026-04-30T00:12:27Z`.
+- Observed commit: `96bc35b08ac83baafd50192cd8a56a22d9601a0d`.
+- Prior SEMSCRIPTLANGSTAIL live-rerun anchor: `2026-04-29T23:55:57Z` on
+  observed commit `cd1d50f4a7f3e563922e9eb87d2b4f6d7dd621ab`.
 - Prior SEMOPTUPLOADTAIL live-rerun anchor: `2026-04-29T23:19:22Z` on
   observed commit `2a439a39b168cb01571e0b0872016875d198b6e2`.
 - Prior SEMQDRANTREPORTTAIL live-rerun anchor: `2026-04-29T23:02:25Z` on
@@ -48,8 +50,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMEDITRETRIEVALTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMOPTUPLOADTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGSTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMEDITRETRIEVALTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMQUERYFULLTAIL` after SEMSCRIPTLANGSTAIL proved the later
+  script-language rebound seam is now cleared, but the refreshed live rerun
+  on the new head still terminalized later in lexical walking on
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMSCRIPTLANGSTAIL` after SEMEDITRETRIEVALTAIL proved the later
   edit-analysis/retrieval seam is now cleared, but the refreshed live rerun on
@@ -2957,7 +2966,80 @@ Steering outcome:
   `scripts/analyze_claude_code_edits.py ->
   scripts/verify_mcp_retrieval.py`.
 
+## SEMSCRIPTLANGSTAIL Live Rerun Check
+
+SEMSCRIPTLANGSTAIL verified that the later script-language rebound seam is no
+longer the active blocker on the current head. The refreshed repo-local
+force-full rerun advanced durably beyond
+`scripts/migrate_large_index_to_multi_repo.py ->
+scripts/check_index_languages.py` and later terminalized on a newer exact
+script pair.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMSCRIPTLANGSTAIL live rerun advanced on observed commit
+  `96bc35b08ac83baafd50192cd8a56a22d9601a0d` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- During the rerun, the durable lexical trace moved well beyond the
+  SEMSCRIPTLANGSTAIL target pair, later crossing root-test, legacy
+  `.codex/phase-loop`, and additional script-family surfaces before the
+  watchdog expired.
+- At `2026-04-30T00:12:10Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/run_comprehensive_query_test.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/index_all_repos_semantic_full.py`.
+- At `2026-04-30T00:12:27Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving that later exact
+  script pair and keeping the repo semantically fail-closed.
+- The SEMSCRIPTLANGSTAIL target pair is no longer the active blocker:
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+- `repository status` still advertises the exact bounded lexical surface for
+  the cleared earlier pair
+  `Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py`,
+  while the durable trace now shows the authoritative later blocker as
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`.
+
+Steering outcome:
+
+- SEMSCRIPTLANGSTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  exact script pair
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`.
+- The roadmap now adds downstream phase `SEMQUERYFULLTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMSCRIPTLANGSTAIL-era script seam
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+
 ## Verification
+
+Verification sequence for this SEMSCRIPTLANGSTAIL slice:
+
+```bash
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py -q --no-cov -k "migrate_large_index_to_multi_repo or check_index_languages or script_language_audit or rebound or closeout_handoff or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "migrate_large_index_to_multi_repo or check_index_languages or script_language_audit or rebound or closeout or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMSCRIPTLANGSTAIL or SEMEDITRETRIEVALTAIL or migrate_large_index_to_multi_repo or check_index_languages or script_language_audit"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMEDITRETRIEVALTAIL slice:
 
