@@ -4688,6 +4688,73 @@ scripts/migrate_to_centralized.py`.
 - IF-0-SEMCENTRALIZETAIL-1 — later script-family lexical recovery and
   evidence contract.
 
+### Phase 81 — Comprehensive Query Tail Rebound Recovery (SEMQUERYFULLREBOUNDTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later re-exposed
+comprehensive-query/full-sync script blocker exposed after
+SEMCENTRALIZETAIL:
+`scripts/run_comprehensive_query_test.py ->
+scripts/index_all_repos_semantic_full.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMCENTRALIZETAIL
+      head either advances durably beyond
+      `scripts/run_comprehensive_query_test.py ->
+      scripts/index_all_repos_semantic_full.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for the re-exposed comprehensive-query/full-sync seam
+      stays narrow, tested, and does not reopen the repaired
+      `scripts/real_strategic_recommendations.py ->
+      scripts/migrate_to_centralized.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMCENTRALIZETAIL rerun outcome and the final live verdict for the
+      re-exposed comprehensive-query/full-sync pair.
+
+**Scope notes**
+
+This phase exists only if SEMCENTRALIZETAIL proves the later
+`scripts/real_strategic_recommendations.py ->
+scripts/migrate_to_centralized.py`
+boundary is cleared, but the refreshed live rerun still terminalizes later in
+lexical walking on the re-exposed comprehensive-query/full-sync pair
+`scripts/run_comprehensive_query_test.py ->
+scripts/index_all_repos_semantic_full.py`.
+
+**Non-goals**
+
+- No reopening of the repaired centralization-script seam once the live rerun
+  has advanced beyond
+  `scripts/real_strategic_recommendations.py ->
+  scripts/migrate_to_centralized.py`.
+- No broad reopening of earlier `.codex/phase-loop`, integration-test, or
+  script-language tail work unless the refreshed rerun proves the active
+  blocker has moved again.
+- No reopening of semantic-stage or release work unless the refreshed rerun
+  proves the next blocker is no longer comprehensive-query/full-sync-local.
+
+**Key files**
+
+- `scripts/run_comprehensive_query_test.py`
+- `scripts/index_all_repos_semantic_full.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCENTRALIZETAIL
+
+**Produces**
+- IF-0-SEMQUERYFULLREBOUNDTAIL-1 — re-exposed comprehensive-query/full-sync
+  lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4771,6 +4838,7 @@ SEMCONTRACT
   -> SEMCODEXLOOPREBOUNDTAIL
   -> SEMINTEGRATIONTAIL
   -> SEMCENTRALIZETAIL
+  -> SEMQUERYFULLREBOUNDTAIL
 ```
 
 ## Execution Notes
@@ -5249,6 +5317,13 @@ SEMCONTRACT
   but exposes a later exact script-family blocker such as
   `scripts/real_strategic_recommendations.py ->
   scripts/migrate_to_centralized.py`.
+- SEMCENTRALIZETAIL should amend the roadmap immediately if the refreshed
+  live rerun clears
+  `scripts/real_strategic_recommendations.py ->
+  scripts/migrate_to_centralized.py`
+  but exposes a later exact comprehensive-query/full-sync blocker such as
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`.
 - SEMDOCCONTRACTTAIL should amend the roadmap immediately if the refreshed live
   rerun clears
   `tests/docs/test_semincr_contract.py ->

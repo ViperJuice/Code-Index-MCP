@@ -3088,6 +3088,113 @@ def test_status_reports_integration_obs_smoke_python_boundary(monkeypatch, tmp_p
     assert "tests/security/fixtures/mock_plugin/__init__.py" not in result.output
 
 
+def test_status_reports_centralization_python_boundary(monkeypatch, tmp_path: Path):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+    previous_script = repo_info.path / "scripts" / "real_strategic_recommendations.py"
+    blocked_script = repo_info.path / "scripts" / "migrate_to_centralized.py"
+    later_file = repo_info.path / "docs" / "status" / "semantic_tail_12.md"
+    previous_script.parent.mkdir(parents=True, exist_ok=True)
+    later_file.parent.mkdir(parents=True, exist_ok=True)
+    previous_script.write_text(
+        "class RealStrategicRecommendationGenerator:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+    blocked_script.write_text(
+        "def migrate_repository_index(repo_path, dry_run=False):\n"
+        "    return repo_path, dry_run\n",
+        encoding="utf-8",
+    )
+    later_file.write_text("# Semantic tail 12\n", encoding="utf-8")
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required lexical mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "summaries_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                "force_full_exit_trace": {
+                    "status": "interrupted",
+                    "stage": "lexical_walking",
+                    "stage_family": "lexical",
+                    "trace_timestamp": "2026-04-30T01:13:41Z",
+                    "current_commit": "fd89efec",
+                    "indexed_commit_before": "oldercommit",
+                    "last_progress_path": str(previous_script),
+                    "in_flight_path": str(blocked_script),
+                    "blocker_source": "lexical_mutation",
+                },
+                "features": {"semantic": {"readiness": {"evidence": {}}, "preflight": {}}},
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: _semantic_preflight_ready(),
+    )
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert f"Last progress path: {previous_script}" in result.output
+    assert f"In-flight path: {blocked_script}" in result.output
+    assert (
+        "Lexical boundary: using exact bounded Python indexing for "
+        "scripts/real_strategic_recommendations.py -> "
+        "scripts/migrate_to_centralized.py" in result.output
+    )
+    assert "tests/integration/__init__.py" not in result.output
+    assert "tests/integration/obs/test_obs_smoke.py" not in result.output
+
+
 def test_status_reports_docs_contract_tail_python_boundary(monkeypatch, tmp_path: Path):
     runner = CliRunner()
     repo_info = _repo_info(tmp_path)

@@ -144,6 +144,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "scripts/index_all_repos_semantic_full.py": (
         "exact_index_all_repos_semantic_full_rebound"
     ),
+    "scripts/real_strategic_recommendations.py": (
+        "exact_real_strategic_recommendations_rebound"
+    ),
+    "scripts/migrate_to_centralized.py": "exact_migrate_to_centralized_rebound",
     "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "scripts/verify_embeddings.py": "exact_verify_embeddings_rebound",
     "scripts/claude_code_behavior_simulator.py": "exact_claude_code_behavior_simulator_rebound",

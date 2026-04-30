@@ -4736,6 +4736,151 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "find_test_repositories" in semantic_fts_rows[0][0]
         assert calls == []
 
+    def test_index_directory_uses_exact_bounded_python_path_for_centralization_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        strategic_script = scripts_dir / "real_strategic_recommendations.py"
+        migration_script = scripts_dir / "migrate_to_centralized.py"
+        helper_script = scripts_dir / "helper.py"
+        strategic_script.write_text(
+            "from dataclasses import dataclass\n"
+            "from enum import Enum\n\n"
+            "class RecommendationPriority(Enum):\n"
+            "    CRITICAL = 'critical'\n\n"
+            "class RecommendationCategory(Enum):\n"
+            "    IMPLEMENTATION = 'implementation'\n\n"
+            "@dataclass\n"
+            "class StrategicRecommendation:\n"
+            "    id: str\n\n"
+            "@dataclass\n"
+            "class ImplementationRoadmap:\n"
+            "    phase_name: str\n\n"
+            "class RealStrategicRecommendationGenerator:\n"
+            "    def build(self):\n"
+            "        return []\n\n"
+            "def main():\n"
+            "    return RealStrategicRecommendationGenerator()\n",
+            encoding="utf-8",
+        )
+        migration_script.write_text(
+            "from pathlib import Path\n\n"
+            "def migrate_repository_index(repo_path: Path, dry_run: bool = False):\n"
+            "    return repo_path, dry_run\n\n"
+            "def main():\n"
+            "    return migrate_repository_index(Path('.'))\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text("def helper():\n    return True\n", encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(strategic_script.resolve()),
+            str(migration_script.resolve()),
+            str(helper_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            strategic_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/real_strategic_recommendations.py') ORDER BY id"
+                ).fetchall()
+            ]
+            migration_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_to_centralized.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            strategic_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/real_strategic_recommendations.py')"
+            ).fetchone()[0]
+            migration_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_to_centralized.py')"
+            ).fetchone()[0]
+            strategic_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/real_strategic_recommendations.py'"
+            ).fetchone()[0]
+            migration_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/migrate_to_centralized.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            strategic_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/real_strategic_recommendations.py')"
+            ).fetchall()
+            migration_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_to_centralized.py')"
+            ).fetchall()
+        store.close()
+        assert strategic_symbols == [
+            "RecommendationPriority",
+            "RecommendationCategory",
+            "StrategicRecommendation",
+            "ImplementationRoadmap",
+            "RealStrategicRecommendationGenerator",
+            "build",
+            "main",
+        ]
+        assert migration_symbols == ["migrate_repository_index", "main"]
+        assert helper_symbols == ["helper"]
+        assert strategic_chunk_count == 0
+        assert migration_chunk_count == 0
+        assert "exact_real_strategic_recommendations_rebound" in strategic_metadata
+        assert "exact_migrate_to_centralized_rebound" in migration_metadata
+        assert "exact_real_strategic_recommendations_rebound" not in helper_metadata
+        assert "exact_migrate_to_centralized_rebound" not in helper_metadata
+        assert len(strategic_fts_rows) == 1
+        assert "RecommendationPriority" in strategic_fts_rows[0][0]
+        assert "RealStrategicRecommendationGenerator" in strategic_fts_rows[0][0]
+        assert len(migration_fts_rows) == 1
+        assert "migrate_repository_index" in migration_fts_rows[0][0]
+        assert "main" in migration_fts_rows[0][0]
+        assert calls == []
+        assert (
+            "scripts/real_strategic_recommendations.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        )
+        assert "scripts/migrate_to_centralized.py" in _EXACT_BOUNDED_PYTHON_PATHS
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):

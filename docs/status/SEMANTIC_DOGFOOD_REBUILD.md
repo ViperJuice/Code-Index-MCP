@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T01:13:41Z`.
-- Observed commit: `fd89efece1ff8ed78635fe1af3476c7896e96c26`.
+- Evidence captured: `2026-04-30T01:35:03Z`.
+- Observed commit: `fe5fc6f1340da6b74fc6bd0433970ad3f568ecc0`.
+- Prior SEMINTEGRATIONTAIL live-rerun anchor: `2026-04-30T01:13:41Z` on
+  observed commit `fd89efece1ff8ed78635fe1af3476c7896e96c26`.
 - Prior SEMQUERYFULLTAIL live-rerun anchor: `2026-04-30T00:30:24Z` on
   observed commit `230557ff39fcb4ec8c494fa13af413b4e8b04ca6`.
 - Prior SEMSCRIPTLANGSTAIL live-rerun anchor: `2026-04-29T23:55:57Z` on
@@ -52,8 +54,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMINTEGRATIONTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMCENTRALIZETAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMINTEGRATIONTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMQUERYFULLREBOUNDTAIL` after SEMCENTRALIZETAIL proved the later
+  script-family seam is now cleared, but the refreshed live rerun on the new
+  head still terminalized later in lexical walking on
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMCENTRALIZETAIL` after SEMINTEGRATIONTAIL proved the later
   integration-test seam is now cleared, but the refreshed live rerun on the
@@ -3216,7 +3225,72 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the SEMINTEGRATIONTAIL-era integration-test seam.
 
+## SEMCENTRALIZETAIL Live Rerun Check
+
+SEMCENTRALIZETAIL verified that the later centralization-script seam is no
+longer the active blocker on the current head. The refreshed repo-local
+force-full rerun advanced durably beyond
+`scripts/real_strategic_recommendations.py ->
+scripts/migrate_to_centralized.py`
+and later terminalized on a re-exposed comprehensive-query/full-sync tail.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCENTRALIZETAIL live rerun advanced on observed commit
+  `fe5fc6f1340da6b74fc6bd0433970ad3f568ecc0` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T01:34:55Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/run_comprehensive_query_test.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/index_all_repos_semantic_full.py`.
+- At `2026-04-30T01:35:03Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving the same later durable
+  comprehensive-query/full-sync progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/run_comprehensive_query_test.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/index_all_repos_semantic_full.py`.
+- `repository status` on the same head still advertises the repaired exact
+  bounded centralization-script lexical surface
+  `Lexical boundary: using exact bounded Python indexing for scripts/real_strategic_recommendations.py -> scripts/migrate_to_centralized.py`
+  while the durable trace has moved later.
+- The SEMCENTRALIZETAIL target pair is no longer the active blocker:
+  `scripts/real_strategic_recommendations.py ->
+  scripts/migrate_to_centralized.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCENTRALIZETAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on the later centralization-script seam.
+- The final authoritative rerun for this phase moved later and now reaches
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`.
+- The roadmap now adds downstream phase `SEMQUERYFULLREBOUNDTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCENTRALIZETAIL-era centralization-script seam.
+
 ## Verification
+
+Verification sequence for this SEMCENTRALIZETAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "real_strategic or migrate_to_centralized or centralize_tail or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "real_strategic or migrate_to_centralized or centralize_tail or interrupted or boundary or closeout_handoff"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMINTEGRATIONTAIL or SEMCENTRALIZETAIL or real_strategic or migrate_to_centralized"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMINTEGRATIONTAIL slice:
 
