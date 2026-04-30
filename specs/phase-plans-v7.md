@@ -5078,6 +5078,73 @@ still terminalizes later in lexical walking on the re-exposed legacy
 - IF-0-SEMCODEXLOOPRELAPSEREBOUNDTAIL-1 — re-exposed legacy
   `.codex/phase-loop` relapse lexical recovery and evidence contract.
 
+### Phase 87 — Legacy Codex Phase-Loop GARECUT Heartbeat Tail Recovery (SEMCODEXLOOPGARECUTHEARTBEATTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later legacy `.codex/phase-loop`
+heartbeat seam exposed after SEMCODEXLOOPRELAPSEREBOUNDTAIL:
+`.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json ->
+.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the
+      post-SEMCODEXLOOPRELAPSEREBOUNDTAIL head either advances durably beyond
+      the exact
+      `.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json ->
+      .codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for this later legacy `.codex/phase-loop` heartbeat
+      seam stays narrow, tested, keeps canonical `.phase-loop/`
+      authoritative, and does not reopen the cleared
+      `.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+      .codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`
+      relapse seam without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMCODEXLOOPRELAPSEREBOUNDTAIL rerun outcome and the final live verdict
+      for the exact `garecut-execute launch.json -> heartbeat.json` pair.
+
+**Scope notes**
+
+This phase exists only if SEMCODEXLOOPRELAPSEREBOUNDTAIL proves the re-exposed
+legacy `.codex/phase-loop` compatibility-runtime relapse seam
+`.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`
+is no longer the active blocker, but the refreshed live rerun still
+terminalizes later in lexical walking on the exact legacy heartbeat seam
+`.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json ->
+.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json`.
+
+**Non-goals**
+
+- No reopening of the cleared `ciflow-plan terminal-summary.json ->
+  launch.json` seam once the live rerun has advanced beyond it.
+- No broad reopening of canonical `.phase-loop/` runtime behavior unless the
+  refreshed rerun proves the active blocker cannot be cleared with a narrower
+  legacy `.codex/phase-loop` heartbeat repair.
+- No reopening of unrelated release, roadmap-markdown, semantic-stage, or
+  earlier legacy `.codex/phase-loop` work unless the refreshed rerun proves
+  the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCODEXLOOPRELAPSEREBOUNDTAIL
+
+**Produces**
+- IF-0-SEMCODEXLOOPGARECUTHEARTBEATTAIL-1 — later legacy
+  `.codex/phase-loop` heartbeat lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5167,6 +5234,7 @@ SEMCONTRACT
   -> SEMSECAUTHSANDBOXTAIL
   -> SEMCODEXLOOPHEARTBEATTAIL
   -> SEMCODEXLOOPRELAPSEREBOUNDTAIL
+  -> SEMCODEXLOOPGARECUTHEARTBEATTAIL
 ```
 
 ## Execution Notes
@@ -5222,6 +5290,12 @@ SEMCONTRACT
   compatibility-runtime blocker such as
   `.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
   .codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`.
+- SEMCODEXLOOPRELAPSEREBOUNDTAIL should amend the roadmap immediately if the
+  live rerun proves the `ciflow-plan terminal-summary.json -> launch.json`
+  seam is no longer active but exposes a later exact legacy `.codex/phase-loop`
+  heartbeat blocker such as
+  `.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json ->
+  .codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during
