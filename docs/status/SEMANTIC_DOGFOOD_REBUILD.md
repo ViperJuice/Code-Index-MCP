@@ -1,7 +1,10 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T03:26:49Z`.
-- Observed commit: `2366eb4bc22bad1e7aaa56ceee17ac8cd77d139b`.
+- Evidence captured: `2026-04-30T04:05:03Z`.
+- Observed commit: `ee2e04c606a9e7737dc875b4c25e9af685a96220`.
+- Prior SEMCODEXLOOPREBOUNDRELAPSETAIL live-rerun anchor:
+  `2026-04-30T03:45:14Z` on observed commit
+  `518e8a23e5914cf05a3ad3175459aa446bf8aaee`.
 - Prior SEMCODEXLOOPHEARTBEATTAIL live-rerun anchor: `2026-04-30T03:10:06Z`
   on observed commit `3406d1562464c017e5a42c9d0bcd405a07d84b96`.
 - Prior SEMQUERYFULLREBOUNDTAIL live-rerun anchor: `2026-04-30T01:52:29Z`
@@ -60,6 +63,8 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
+- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDRELAPSETAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARECUTHEARTBEATTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARECUTHEARTBEATTAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSEREBOUNDTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSEREBOUNDTAIL.md`.
@@ -72,6 +77,18 @@
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLREBOUNDTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMCODEXLOOPCIFLOWEXECRELAPSETAIL` after
+  SEMCODEXLOOPREBOUNDRELAPSETAIL proved the re-exposed earlier legacy
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`
+  seam is no longer the active blocker, but the refreshed live rerun on the
+  new head still terminalized later in lexical walking on the newer legacy
+  `.codex/phase-loop` compatibility-runtime execute relapse seam
+  `.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json`.
+  Older downstream assumptions should be treated as stale after this roadmap
+  amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMCODEXLOOPGARECUTHEARTBEATTAIL` after
   SEMCODEXLOOPRELAPSEREBOUNDTAIL proved the re-exposed legacy
@@ -3780,6 +3797,78 @@ Steering outcome:
   blocker as the SEMCODEXLOOPGARECUTHEARTBEATTAIL-era
   `garecut-execute launch.json -> heartbeat.json` seam.
 
+## SEMCODEXLOOPREBOUNDRELAPSETAIL Live Rerun Check
+
+SEMCODEXLOOPREBOUNDRELAPSETAIL confirmed that the re-exposed earlier legacy
+rebound seam
+`.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`
+is no longer the active current-head blocker. The bounded repo-local
+force-full rerun advanced later in lexical walking and terminalized on a newer
+legacy `.codex/phase-loop` execute relapse seam
+`.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json ->
+.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCODEXLOOPREBOUNDRELAPSETAIL live rerun advanced on observed
+  commit `ee2e04c606a9e7737dc875b4c25e9af685a96220` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T04:03:43Z`, `.mcp-index/force_full_exit_trace.json` still
+  showed a durable raw running snapshot with `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/test_delta_chain_resolver.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/test_reranking_metadata_preservation.py`,
+  proving the rerun had already advanced beyond the
+  `garc-plan -> idxsafe-repair` pair before the watchdog terminated the run.
+- At `2026-04-30T04:04:54Z`, `.mcp-index/force_full_exit_trace.json` had
+  advanced further to a raw running snapshot with
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json`.
+- At `2026-04-30T04:05:03Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving the same newer
+  execute-relapse progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json`.
+- `repository status` on the same head still advertises the bounded legacy
+  compatibility surface
+  `Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative`
+  while the durable trace has moved later.
+- The SEMCODEXLOOPREBOUNDRELAPSETAIL target pair is no longer the active
+  blocker:
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- The current authoritative blocker has moved later to the newer legacy
+  execute relapse pair
+  `.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCODEXLOOPREBOUNDRELAPSETAIL acceptance is satisfied for its named
+  blocker: the live watchdog no longer terminalizes on the re-exposed earlier
+  `garc-plan -> idxsafe-repair` pair.
+- The final authoritative rerun for this phase moved later and now reaches
+  the exact legacy execute relapse seam
+  `.codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json`.
+- The roadmap now adds downstream phase `SEMCODEXLOOPCIFLOWEXECRELAPSETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCODEXLOOPREBOUNDRELAPSETAIL-era
+  `garc-plan launch.json -> idxsafe-repair terminal-summary.json` seam.
+
 ## Verification
 
 Verification sequence for this SEMSECAUTHSANDBOXTAIL slice:
@@ -3840,6 +3929,18 @@ uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SE
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "garecut or heartbeat or legacy_codex_phase_loop or bounded or phase_loop"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "garecut or heartbeat or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMCODEXLOOPRELAPSEREBOUNDTAIL or SEMCODEXLOOPGARECUTHEARTBEATTAIL or garecut or phase_loop"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMCODEXLOOPREBOUNDRELAPSETAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "garc or idxsafe or garecut or legacy_codex_phase_loop or terminal_summary or launch or bounded or phase_loop"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "garc or idxsafe or garecut or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMCODEXLOOPGARECUTHEARTBEATTAIL or SEMCODEXLOOPREBOUNDRELAPSETAIL or garc or idxsafe or phase_loop"
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sed -n '1,240p' .mcp-index/force_full_exit_trace.json
