@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T01:52:29Z`.
-- Observed commit: `250dcd0f5bda80db857ee8f33159b323b7872faf`.
+- Evidence captured: `2026-04-30T02:14:12Z`.
+- Observed commit: `5117d854f9272dd6c15cf071ba81d493da2d6315`.
+- Prior SEMQUERYFULLREBOUNDTAIL live-rerun anchor: `2026-04-30T01:52:29Z`
+  on observed commit `250dcd0f5bda80db857ee8f33159b323b7872faf`.
 - Prior SEMCENTRALIZETAIL live-rerun anchor: `2026-04-30T01:35:03Z` on
   observed commit `fe5fc6f1340da6b74fc6bd0433970ad3f568ecc0`.
 - Prior SEMINTEGRATIONTAIL live-rerun anchor: `2026-04-30T01:13:41Z` on
@@ -56,8 +58,8 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMQUERYFULLREBOUNDTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMCENTRALIZETAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLREBOUNDTAIL.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMCODEXLOOPRELAPSETAIL` after SEMQUERYFULLREBOUNDTAIL proved the
   re-exposed comprehensive-query/full-sync seam is now cleared, but the
@@ -3350,7 +3352,77 @@ Steering outcome:
   blocker as the SEMQUERYFULLREBOUNDTAIL-era comprehensive-query/full-sync
   seam.
 
+## SEMCODEXLOOPRELAPSETAIL Live Rerun Check
+
+SEMCODEXLOOPRELAPSETAIL verified that the re-exposed legacy
+`.codex/phase-loop` compatibility-runtime relapse is no longer the active
+blocker on the current head. The refreshed repo-local force-full rerun
+advanced durably beyond
+`.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`
+and later terminalized on a newer exact root-test seam.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCODEXLOOPRELAPSETAIL live rerun advanced on observed commit
+  `5117d854f9272dd6c15cf071ba81d493da2d6315` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`.
+- At `2026-04-30T02:13:36Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_swift_plugin.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_mcp_database_efficiency.py`,
+  proving the rerun had already advanced beyond the SEMCODEXLOOPRELAPSETAIL
+  target pair before the watchdog terminated the run.
+- At `2026-04-30T02:14:12Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving later durable
+  progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_swift_plugin.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_mcp_database_efficiency.py`.
+- `repository status` on the same head still advertises the bounded legacy
+  compatibility surface
+  `Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative`
+  while the durable trace has moved later.
+- The SEMCODEXLOOPRELAPSETAIL target pair is no longer the active blocker:
+  `.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCODEXLOOPRELAPSETAIL acceptance is satisfied for its named blocker: the
+  live watchdog no longer terminalizes on the re-exposed legacy
+  `.codex/phase-loop` compatibility-runtime relapse pair.
+- The final authoritative rerun for this phase moved later and now reaches the
+  exact root-test seam
+  `tests/root_tests/test_swift_plugin.py ->
+  tests/root_tests/test_mcp_database_efficiency.py`.
+- The roadmap now adds downstream phase `SEMSWIFTDBEFFTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCODEXLOOPRELAPSETAIL-era legacy `.codex/phase-loop`
+  compatibility-runtime seam.
+
 ## Verification
+
+Verification sequence for this SEMCODEXLOOPRELAPSETAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "ciflow or legacy_codex_phase_loop or terminal_summary or launch or bounded or phase_loop"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "ciflow or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMQUERYFULLREBOUNDTAIL or SEMCODEXLOOPRELAPSETAIL or phase_loop"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMQUERYFULLREBOUNDTAIL slice:
 

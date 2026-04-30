@@ -7714,6 +7714,106 @@ class TestEnhancedDispatcherProtocolConformance:
             ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
         ]
 
+    def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_relapse_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        terminal_file = (
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260427T081107Z-08-ciflow-plan"
+            / "terminal-summary.json"
+        )
+        launch_file = (
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260427T081107Z-08-ciflow-plan"
+            / "launch.json"
+        )
+        for path in (terminal_file, launch_file):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        terminal_file.write_text(
+            '{"artifact_paths": {"terminal": "terminal-summary.json"}, "terminal_status": "interrupted", "next_action": "repair", "current_phase": "SEMQUERYFULLREBOUNDTAIL"}\n',
+            encoding="utf-8",
+        )
+        launch_file.write_text(
+            '{"command": ["codex", "plan"], "phase": "SEMCODEXLOOPRELAPSETAIL", ".codex/phase-loop": "legacy"}\n',
+            encoding="utf-8",
+        )
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected_json_plugin_load(_self, language):
+            if language == "json":
+                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+            return None
+
+        monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        with store._get_connection() as conn:
+            chunk_counts = conn.execute(
+                "SELECT relative_path, COUNT(*) FROM code_chunks "
+                "JOIN files ON code_chunks.file_id = files.id "
+                "GROUP BY relative_path"
+            ).fetchall()
+            fts_rows = dict(
+                conn.execute(
+                    "SELECT relative_path, content FROM fts_code "
+                    "JOIN files ON fts_code.file_id = files.id"
+                ).fetchall()
+            )
+        store.close()
+        assert chunk_counts == []
+        assert (
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+            in fts_rows
+        )
+        assert "artifact_paths" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+        ]
+        assert "terminal_status" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+        ]
+        assert "next_action" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+        ]
+        assert "current_phase" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+        ]
+        assert ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json" in fts_rows
+        assert "command" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"
+        ]
+        assert "phase" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"
+        ]
+        assert ".codex/phase-loop" in fts_rows[
+            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"
+        ]
+
     def test_index_directory_keeps_canonical_phase_loop_json_on_normal_plugin_path(
         self, tmp_path, monkeypatch
     ):

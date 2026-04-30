@@ -4819,6 +4819,67 @@ rerun still terminalizes later in lexical walking on a re-exposed legacy
 - IF-0-SEMCODEXLOOPRELAPSETAIL-1 — re-exposed legacy `.codex/phase-loop`
   relapse lexical recovery and evidence contract.
 
+### Phase 83 — Swift Plugin / MCP Database Efficiency Tail Recovery (SEMSWIFTDBEFFTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later exact root-test seam exposed
+after SEMCODEXLOOPRELAPSETAIL:
+`tests/root_tests/test_swift_plugin.py ->
+tests/root_tests/test_mcp_database_efficiency.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the
+      post-SEMCODEXLOOPRELAPSETAIL head either advances durably beyond
+      `tests/root_tests/test_swift_plugin.py ->
+      tests/root_tests/test_mcp_database_efficiency.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for this later root-test seam stays narrow, tested,
+      and does not reopen the cleared legacy `.codex/phase-loop`
+      compatibility-runtime relapse without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMCODEXLOOPRELAPSETAIL rerun outcome and the final live verdict for the
+      `tests/root_tests/test_swift_plugin.py ->
+      tests/root_tests/test_mcp_database_efficiency.py` seam.
+
+**Scope notes**
+
+This phase exists only if SEMCODEXLOOPRELAPSETAIL proves the later legacy
+`.codex/phase-loop` compatibility-runtime pair is cleared, but the refreshed
+live rerun still terminalizes later in lexical walking on
+`tests/root_tests/test_swift_plugin.py ->
+tests/root_tests/test_mcp_database_efficiency.py`.
+
+**Non-goals**
+
+- No reopening of the cleared legacy `.codex/phase-loop` compatibility-runtime
+  relapse once the live rerun has advanced beyond
+  `.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`.
+- No broad reopening of unrelated root-test, semantic-stage, integration-test,
+  or release work unless the refreshed rerun proves the active blocker has
+  moved again.
+- No reopening of canonical `.phase-loop/` runtime steering unless a later
+  rerun proves the current root-test seam cannot be cleared with a narrower
+  lexical repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCODEXLOOPRELAPSETAIL
+
+**Produces**
+- IF-0-SEMSWIFTDBEFFTAIL-1 — later root-test lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4904,6 +4965,7 @@ SEMCONTRACT
   -> SEMCENTRALIZETAIL
   -> SEMQUERYFULLREBOUNDTAIL
   -> SEMCODEXLOOPRELAPSETAIL
+  -> SEMSWIFTDBEFFTAIL
 ```
 
 ## Execution Notes
@@ -4933,6 +4995,11 @@ SEMCONTRACT
 - SEMDEVREBOUND should amend the roadmap immediately if the live rerun clears
   `.devcontainer/devcontainer.json` but exposes a later exact blocker such as
   `scripts/quick_mcp_vs_native_validation.py`.
+- SEMCODEXLOOPRELAPSETAIL should amend the roadmap immediately if the live
+  rerun clears the re-exposed legacy `.codex/phase-loop` compatibility-runtime
+  pair but exposes a later exact blocker such as
+  `tests/root_tests/test_swift_plugin.py ->
+  tests/root_tests/test_mcp_database_efficiency.py`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during
