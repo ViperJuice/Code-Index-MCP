@@ -1,13 +1,18 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T04:41:42Z`.
-- Observed commit: `c4419ef3ddc58e74e4f39cc140665d1e42baf765`.
+- Evidence captured: `2026-04-30T04:59:53Z`.
+- Observed commit: `d48e0d2ed5cd89906f1b24c70298e300eabce87c`.
+- Prior SEMP24PLUGINGATINGTAIL live-rerun anchor:
+  `2026-04-30T04:41:42Z` on observed commit
+  `c4419ef3ddc58e74e4f39cc140665d1e42baf765`.
 - Prior SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL live-rerun anchor:
   `2026-04-30T04:22:02Z` on observed commit
   `f32c2ac34f878a3bf7d60e87db7674ae0da3a76f`.
 - Prior SEMCODEXLOOPCIFLOWEXECRELAPSETAIL live-rerun anchor:
   `2026-04-30T04:05:03Z` on observed commit
   `ee2e04c606a9e7737dc875b4c25e9af685a96220`.
+- Phase plan: `plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPCIFLOWEXECRELAPSETAIL.md`.
 - Prior SEMCODEXLOOPREBOUNDRELAPSETAIL live-rerun anchor:
@@ -4039,7 +4044,83 @@ Steering outcome:
   blocker as the SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL-era
   `garel-execute heartbeat.json -> garecut-plan launch.json` seam.
 
+## SEMP24PLUGINGATINGTAIL Live Rerun Check
+
+SEMP24PLUGINGATINGTAIL did clear its named later test-pair seam on the current
+head. The refreshed repo-local force-full rerun no longer terminalized at
+`tests/test_p24_plugin_availability.py ->
+tests/test_dispatcher_extension_gating.py`; by the time the watchdog
+terminated, the durable trace and operator-visible status had moved later into
+the Markdown docs surface
+`docs/architecture/P2B-known-limits.md ->
+docs/api/API-REFERENCE.md`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMP24PLUGINGATINGTAIL live rerun advanced on observed commit
+  `d48e0d2ed5cd89906f1b24c70298e300eabce87c` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- During the same watchdog-bounded run, lexical indexing hit at least one
+  large-file sandbox payload failure while indexing
+  `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`:
+  `ProtocolError: envelope too large: 21168277 > 16777216 bytes`.
+  That was not the final authoritative blocker for the run because lexical
+  progress continued after the error.
+- At `2026-04-30T04:59:38Z`, `.mcp-index/force_full_exit_trace.json` still
+  showed a durable raw running snapshot with `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/docs/architecture/P2B-known-limits.md`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/docs/api/API-REFERENCE.md`.
+- At `2026-04-30T04:59:53Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving that same later
+  lexical progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/docs/architecture/P2B-known-limits.md`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/docs/api/API-REFERENCE.md`.
+- The same `repository status` run still advertises the repaired later test
+  boundary:
+  `Lexical boundary: using exact bounded Python indexing for tests/test_p24_plugin_availability.py -> tests/test_dispatcher_extension_gating.py`.
+- SQLite runtime counts after the rerun were
+  `files = 1198`, `code_chunks = 21254`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMP24PLUGINGATINGTAIL acceptance is satisfied for its named blocker: the
+  live watchdog no longer terminalizes on
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  Markdown docs seam
+  `docs/architecture/P2B-known-limits.md ->
+  docs/api/API-REFERENCE.md`.
+- The roadmap now adds downstream phase `SEMAPIDOCSTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMP24PLUGINGATINGTAIL-era
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py` seam.
+
 ## Verification
+
+Verification sequence for this SEMP24PLUGINGATINGTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "p24 or plugin_availability or extension_gating or bounded or lexical or discoverability"
+uv run pytest tests/test_p24_plugin_availability.py tests/test_dispatcher_extension_gating.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "p24 or plugin_availability or extension_gating or interrupted or boundary or lexical"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMP24PLUGINGATINGTAIL or SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL or plugin_availability or extension_gating"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMSECAUTHSANDBOXTAIL slice:
 

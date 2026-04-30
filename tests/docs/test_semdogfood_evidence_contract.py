@@ -22,6 +22,7 @@ def test_semdogfood_phase_loop_report_exists_and_names_required_evidence_section
 
     for expected in (
         "# Semantic Dogfood Rebuild",
+        "Phase plan: `plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md`",
         "Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL.md`",
         "Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPCIFLOWEXECRELAPSETAIL.md`",
         "Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPCIFLOWEXECRELAPSETAIL.md`",
@@ -90,6 +91,7 @@ def test_semdogfood_phase_loop_report_exists_and_names_required_evidence_section
         "## SEMCODEXLOOPREBOUNDRELAPSETAIL Live Rerun Check",
         "## SEMCODEXLOOPCIFLOWEXECRELAPSETAIL Live Rerun Check",
         "## SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL Live Rerun Check",
+        "## SEMP24PLUGINGATINGTAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -306,6 +308,7 @@ def test_semdogfood_phase_loop_report_records_trace_freshness_recovery_and_roadm
         "tests/docs/test_garel_ga_release_contract.py",
         "tests/docs/test_p23_doc_truth.py",
         "tests/docs/test_semdogfood_evidence_contract.py",
+        "plans/phase-plan-v7-SEMP24PLUGINGATINGTAIL.md",
         "docs/markdown-table-of-contents.md",
         "docs/SUPPORT_MATRIX.md",
         "plans/phase-plan-v1-p13.md",
@@ -550,6 +553,7 @@ def test_semdogfood_phase_loop_report_preserves_command_level_verification_and_r
         "Lexical boundary: using exact bounded Python indexing for tests/docs/test_semincr_contract.py -> tests/docs/test_gabase_ga_readiness_contract.py",
         "Lexical boundary: using exact bounded Python indexing for tests/docs/test_garc_rc_soak_contract.py -> tests/docs/test_garel_ga_release_contract.py",
         "Lexical boundary: using exact bounded Python indexing for tests/docs/test_p23_doc_truth.py -> tests/docs/test_semdogfood_evidence_contract.py",
+        "Lexical boundary: using exact bounded Python indexing for tests/test_p24_plugin_availability.py -> tests/test_dispatcher_extension_gating.py",
         "Lexical boundary: using exact bounded Python indexing for tests/security/test_route_auth_coverage.py -> tests/security/test_p24_sandbox_degradation.py",
         "Lexical boundary: using exact bounded Python indexing for tests/security/fixtures/mock_plugin/plugin.py -> tests/security/fixtures/mock_plugin/__init__.py",
         "Lexical boundary: using exact bounded Markdown indexing for .claude/commands/execute-lane.md -> .claude/commands/plan-phase.md",

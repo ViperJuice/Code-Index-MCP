@@ -5415,6 +5415,70 @@ tests/test_dispatcher_extension_gating.py`.
 - IF-0-SEMP24PLUGINGATINGTAIL-1 — later lexical test-pair recovery and
   evidence contract.
 
+### Phase 92 — API Docs Markdown Tail Recovery (SEMAPIDOCSTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later Markdown docs seam revealed
+after SEMP24PLUGINGATINGTAIL:
+`docs/architecture/P2B-known-limits.md ->
+docs/api/API-REFERENCE.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMP24PLUGINGATINGTAIL
+      head either advances durably beyond
+      `docs/architecture/P2B-known-limits.md ->
+      docs/api/API-REFERENCE.md` or emits a truthful newer blocker before the
+      120-second watchdog expires.
+- [ ] Any repair chosen for this later docs seam stays narrow, tested, and
+      does not reopen the cleared
+      `tests/test_p24_plugin_availability.py ->
+      tests/test_dispatcher_extension_gating.py` seam without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMP24PLUGINGATINGTAIL rerun outcome and the final live verdict for the
+      exact `docs/architecture/P2B-known-limits.md ->
+      docs/api/API-REFERENCE.md` pair.
+
+**Scope notes**
+
+This phase exists only if SEMP24PLUGINGATINGTAIL proves the
+`tests/test_p24_plugin_availability.py ->
+tests/test_dispatcher_extension_gating.py` seam is not the final active
+blocker, but the refreshed live rerun on the new head still terminalizes later
+in lexical walking on the newer Markdown docs seam
+`docs/architecture/P2B-known-limits.md ->
+docs/api/API-REFERENCE.md`.
+
+**Non-goals**
+
+- No reopening of the cleared
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py` seam once the live rerun has
+  already moved away from it.
+- No broad repo-wide Markdown timeout bypass or blanket sandbox payload
+  relaxation unless the refreshed rerun proves the active blocker cannot be
+  cleared with a narrower docs-tail repair.
+- No reopening of unrelated semantic, integration, security, or compatibility
+  seams unless the refreshed rerun proves the blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMP24PLUGINGATINGTAIL
+
+**Produces**
+- IF-0-SEMAPIDOCSTAIL-1 — later docs-tail recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5509,6 +5573,7 @@ SEMCONTRACT
   -> SEMCODEXLOOPCIFLOWEXECRELAPSETAIL
   -> SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL
   -> SEMP24PLUGINGATINGTAIL
+  -> SEMAPIDOCSTAIL
 ```
 
 ## Execution Notes
@@ -5595,6 +5660,13 @@ SEMCONTRACT
   exposes a later exact test-pair seam such as
   `tests/test_p24_plugin_availability.py ->
   tests/test_dispatcher_extension_gating.py`.
+- SEMP24PLUGINGATINGTAIL should amend the roadmap immediately if the live
+  rerun proves the
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py` seam is no longer the final
+  active blocker but exposes a later exact Markdown docs seam such as
+  `docs/architecture/P2B-known-limits.md ->
+  docs/api/API-REFERENCE.md`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during

@@ -6323,6 +6323,148 @@ class TestEnhancedDispatcherProtocolConformance:
             for snapshot in snapshots
         )
 
+    def test_index_directory_emits_p24_plugin_tail_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        tests_dir = repo / "tests"
+        tests_dir.mkdir(parents=True)
+        prior_file = tests_dir / "test_p24_plugin_availability.py"
+        prior_file.write_text(
+            "P24_FIELDS = {'language', 'state'}\n\n"
+            "def test_availability_has_one_stable_row_per_supported_language():\n"
+            "    assert P24_FIELDS\n\n"
+            "def test_missing_optional_dependency_is_machine_readable():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        blocked_file = tests_dir / "test_dispatcher_extension_gating.py"
+        blocked_file.write_text(
+            "REPO_ID = 'test-gating-repo'\n\n"
+            "def _make_db():\n"
+            "    return None\n\n"
+            "def _make_ctx():\n"
+            "    return None\n\n"
+            "class FakePyPlugin:\n"
+            "    pass\n\n"
+            "class SpyPlugin:\n"
+            "    pass\n\n"
+            "def test_py_extension_gating_no_plugin_instantiation():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(tests_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            p24_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_p24_plugin_availability.py') ORDER BY id"
+                ).fetchall()
+            ]
+            gating_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_dispatcher_extension_gating.py') ORDER BY id"
+                ).fetchall()
+            ]
+            p24_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_p24_plugin_availability.py')"
+            ).fetchone()[0]
+            gating_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_dispatcher_extension_gating.py')"
+            ).fetchone()[0]
+            p24_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_p24_plugin_availability.py')"
+            ).fetchall()
+            gating_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_dispatcher_extension_gating.py')"
+            ).fetchall()
+        store.close()
+        assert (
+            "test_availability_has_one_stable_row_per_supported_language" in p24_symbols
+        )
+        assert "test_missing_optional_dependency_is_machine_readable" in p24_symbols
+        assert "_make_db" in gating_symbols
+        assert "_make_ctx" in gating_symbols
+        assert "FakePyPlugin" in gating_symbols
+        assert "SpyPlugin" in gating_symbols
+        assert "test_py_extension_gating_no_plugin_instantiation" in gating_symbols
+        assert p24_chunk_count == 0
+        assert gating_chunk_count == 0
+        assert len(p24_fts) == 1
+        assert "P24_FIELDS" in p24_fts[0][0]
+        assert len(gating_fts) == 1
+        assert "REPO_ID" in gating_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert "tests/test_p24_plugin_availability.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        assert "tests/test_dispatcher_extension_gating.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        assert "tests/docs/test_garel_ga_release_contract.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "tests/docs/test_semincr_contract.py",
+                "tests/docs/test_gabase_ga_readiness_contract.py",
+                "tests/security/fixtures/mock_plugin/plugin.py",
+                "tests/security/fixtures/mock_plugin/__init__.py",
+            )
+            for snapshot in snapshots
+        )
+
     def test_index_directory_emits_test_repo_index_pair_before_closeout_handoff(
         self, tmp_path, monkeypatch
     ):
