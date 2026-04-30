@@ -4523,6 +4523,120 @@ def test_status_reports_legacy_codex_phase_loop_garecut_heartbeat_pair(
     assert ".phase-loop/runs/" not in result.output
 
 
+def test_status_reports_legacy_codex_phase_loop_ciflow_execute_relapse_pair(
+    monkeypatch, tmp_path: Path
+):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+    terminal_file = (
+        repo_info.path
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T081704Z-09-ciflow-execute"
+        / "terminal-summary.json"
+    )
+    launch_file = (
+        repo_info.path
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T081704Z-09-ciflow-execute"
+        / "launch.json"
+    )
+    archive_events = (
+        repo_info.path / ".codex" / "phase-loop" / "archive" / "20260424T211515Z" / "events.jsonl"
+    )
+    archive_state = (
+        repo_info.path / ".codex" / "phase-loop" / "archive" / "20260424T211515Z" / "state.json"
+    )
+    for path in (terminal_file, launch_file, archive_events, archive_state):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required lexical mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "summaries_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                "force_full_exit_trace": {
+                    "status": "interrupted",
+                    "stage": "lexical_walking",
+                    "stage_family": "lexical",
+                    "trace_timestamp": "2026-04-30T04:05:03Z",
+                    "current_commit": "ee2e04c606a9e7737dc875b4c25e9af685a96220",
+                    "indexed_commit_before": "oldercommit",
+                    "last_progress_path": str(terminal_file),
+                    "in_flight_path": str(launch_file),
+                    "blocker_source": "lexical_mutation",
+                },
+                "features": {"semantic": {"readiness": {"evidence": {}}, "preflight": {}}},
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: _semantic_preflight_ready(),
+    )
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert f"Last progress path: {terminal_file}" in result.output
+    assert f"In-flight path: {launch_file}" in result.output
+    assert ".phase-loop/runs/" not in result.output
+    assert "20260424T190651Z-01-garc-plan" not in result.output
+    assert "20260427T075236Z-05-idxsafe-repair" not in result.output
+
+
 def test_status_reports_same_devcontainer_relapse_without_older_or_later_boundaries(
     monkeypatch, tmp_path: Path
 ):
