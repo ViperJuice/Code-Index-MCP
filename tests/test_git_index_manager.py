@@ -3058,6 +3058,75 @@ def test_get_repository_status_preserves_later_legacy_codex_phase_loop_rebound_p
         / "20260427T075236Z-05-idxsafe-repair"
         / "terminal-summary.json"
     )
+
+
+def test_get_repository_status_preserves_legacy_codex_phase_loop_relapse_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-30T01:52:29Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(
+                    repo
+                    / ".codex"
+                    / "phase-loop"
+                    / "runs"
+                    / "20260427T081107Z-08-ciflow-plan"
+                    / "terminal-summary.json"
+                ),
+                "in_flight_path": str(
+                    repo
+                    / ".codex"
+                    / "phase-loop"
+                    / "runs"
+                    / "20260427T081107Z-08-ciflow-plan"
+                    / "launch.json"
+                ),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T081107Z-08-ciflow-plan"
+        / "terminal-summary.json"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T081107Z-08-ciflow-plan"
+        / "launch.json"
+    )
+    assert "run_comprehensive_query_test.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+    assert "index_all_repos_semantic_full.py" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
     assert "test_garc_rc_soak_contract.py" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
     )
