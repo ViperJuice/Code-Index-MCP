@@ -5519,6 +5519,129 @@ class TestEnhancedDispatcherProtocolConformance:
         )
         assert "scripts/migrate_to_centralized.py" in _EXACT_BOUNDED_PYTHON_PATHS
 
+    def test_index_directory_uses_exact_bounded_python_path_for_reindex_demo_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        reindex_script = scripts_dir / "reindex_current_repository.py"
+        demo_script = scripts_dir / "demo_centralized_indexes.py"
+        helper_script = scripts_dir / "helper.py"
+        reindex_script.write_text(
+            "from pathlib import Path\n\n"
+            "def reindex_current_repo():\n"
+            "    return Path('.').resolve()\n\n"
+            "def update_registry(repo_hash: str, repo_path: Path):\n"
+            "    return repo_hash, repo_path\n",
+            encoding="utf-8",
+        )
+        demo_script.write_text(
+            "from pathlib import Path\n\n"
+            "def demo_centralized_storage():\n"
+            "    return Path('.').name\n\n"
+            "def demo_storage_strategies():\n"
+            "    return ['centralized', 'portable', 'inline']\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text("def helper():\n    return True\n", encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(reindex_script.resolve()),
+            str(demo_script.resolve()),
+            str(helper_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            reindex_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/reindex_current_repository.py') ORDER BY id"
+                ).fetchall()
+            ]
+            demo_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/demo_centralized_indexes.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            reindex_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/reindex_current_repository.py')"
+            ).fetchone()[0]
+            demo_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/demo_centralized_indexes.py')"
+            ).fetchone()[0]
+            reindex_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/reindex_current_repository.py'"
+            ).fetchone()[0]
+            demo_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/demo_centralized_indexes.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            reindex_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/reindex_current_repository.py')"
+            ).fetchall()
+            demo_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/demo_centralized_indexes.py')"
+            ).fetchall()
+        store.close()
+        assert reindex_symbols == ["reindex_current_repo", "update_registry"]
+        assert demo_symbols == ["demo_centralized_storage", "demo_storage_strategies"]
+        assert helper_symbols == ["helper"]
+        assert reindex_chunk_count == 0
+        assert demo_chunk_count == 0
+        assert "exact_reindex_current_repository_rebound" in reindex_metadata
+        assert "exact_demo_centralized_indexes_rebound" in demo_metadata
+        assert "exact_reindex_current_repository_rebound" not in helper_metadata
+        assert "exact_demo_centralized_indexes_rebound" not in helper_metadata
+        assert len(reindex_fts_rows) == 1
+        assert "reindex_current_repo" in reindex_fts_rows[0][0]
+        assert "update_registry" in reindex_fts_rows[0][0]
+        assert len(demo_fts_rows) == 1
+        assert "demo_centralized_storage" in demo_fts_rows[0][0]
+        assert "demo_storage_strategies" in demo_fts_rows[0][0]
+        assert calls == []
+        assert "scripts/reindex_current_repository.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        assert "scripts/demo_centralized_indexes.py" in _EXACT_BOUNDED_PYTHON_PATHS
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):

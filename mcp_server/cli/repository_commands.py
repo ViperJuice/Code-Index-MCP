@@ -659,6 +659,19 @@ def _print_centralization_script_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_reindex_demo_script_boundary(prefix: str, repo_path: Path) -> None:
+    script_paths = (
+        repo_path / "scripts" / "reindex_current_repository.py",
+        repo_path / "scripts" / "demo_centralized_indexes.py",
+    )
+    if all(path.is_file() for path in script_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "scripts/reindex_current_repository.py -> "
+            "scripts/demo_centralized_indexes.py"
+        )
+
+
 def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -> None:
     test_path = repo_path / "tests" / "test_artifact_publish_race.py"
     if test_path.is_file():
@@ -1252,6 +1265,7 @@ def status(repo_id: Optional[str]):
         _print_edit_retrieval_script_boundary("  ", Path(status["path"]))
         _print_comprehensive_query_full_sync_script_boundary("  ", Path(status["path"]))
         _print_centralization_script_boundary("  ", Path(status["path"]))
+        _print_reindex_demo_script_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_docs_governance_contract_python_boundary("  ", Path(status["path"]))

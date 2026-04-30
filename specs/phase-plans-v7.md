@@ -5676,6 +5676,74 @@ scripts/demo_centralized_indexes.py`.
 - IF-0-SEMREINDEXDEMOTAIL-1 — reindex/demo tail recovery and evidence
   contract.
 
+### Phase 96 — AI Docs README Tail Recovery (SEMAIDOCREADMETAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later `ai_docs` seam revealed after
+SEMREINDEXDEMOTAIL:
+`ai_docs/prometheus_overview.md ->
+ai_docs/README.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMREINDEXDEMOTAIL
+      head either advances durably beyond
+      `ai_docs/prometheus_overview.md ->
+      ai_docs/README.md` or emits a truthful newer blocker before the
+      120-second watchdog expires.
+- [ ] Any repair chosen for this later `ai_docs` seam stays narrow, tested,
+      and does not reopen the cleared
+      `scripts/reindex_current_repository.py ->
+      scripts/demo_centralized_indexes.py` seam without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMREINDEXDEMOTAIL rerun outcome and the final live verdict for the
+      exact
+      `ai_docs/prometheus_overview.md ->
+      ai_docs/README.md` pair.
+
+**Scope notes**
+
+This phase exists only if SEMREINDEXDEMOTAIL proves the reindex/demo script
+seam
+`scripts/reindex_current_repository.py ->
+scripts/demo_centralized_indexes.py` is no longer the final active blocker,
+but the refreshed live rerun on the new head still terminalizes later in
+lexical walking on the `ai_docs` pair
+`ai_docs/prometheus_overview.md ->
+ai_docs/README.md`.
+
+**Non-goals**
+
+- No reopening of the cleared reindex/demo script seam
+  `scripts/reindex_current_repository.py ->
+  scripts/demo_centralized_indexes.py` once the live rerun has already moved
+  away from it.
+- No broad repo-wide Markdown timeout bypass or blanket `ai_docs/*` relaxation
+  unless the refreshed rerun proves the active blocker cannot be cleared with a
+  narrower exact `ai_docs` repair.
+- No reopening of unrelated semantic, integration, security, or compatibility
+  seams unless the refreshed rerun proves the blocker has moved again.
+
+**Key files**
+
+- `ai_docs/prometheus_overview.md`
+- `ai_docs/README.md`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMREINDEXDEMOTAIL
+
+**Produces**
+- IF-0-SEMAIDOCREADMETAIL-1 — ai_docs README tail recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5774,6 +5842,7 @@ SEMCONTRACT
   -> SEMLATEPHASEPLANTAIL
   -> SEMVERIFYAPIREBOUNDTAIL
   -> SEMREINDEXDEMOTAIL
+  -> SEMAIDOCREADMETAIL
 ```
 
 ## Execution Notes

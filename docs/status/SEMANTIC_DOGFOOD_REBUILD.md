@@ -1,7 +1,8 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T05:58:46Z`.
-- Observed commit: `544d98442507df5d5971a31e9e8f116b4cb5a0c9`.
+- Evidence captured: `2026-04-30T06:17:40Z`.
+- Observed commit: `e0e62cbc0ef0a912db3d8cd11e802abe9eb1974b`.
+- Phase plan: `plans/phase-plan-v7-SEMREINDEXDEMOTAIL.md`.
 - Prior SEMLATEPHASEPLANTAIL live-rerun anchor:
   `2026-04-30T05:36:47Z` on observed commit
   `e80ecc46df93f5a4ae1bf0966ad675737888f3c9`.
@@ -4287,6 +4288,60 @@ Steering outcome:
   blocker as the SEMVERIFYAPIREBOUNDTAIL-era
   `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md ->
   plans/phase-plan-v7-SEMAPIDOCSTAIL.md` seam.
+
+## SEMREINDEXDEMOTAIL Live Rerun Check
+
+SEMREINDEXDEMOTAIL did clear its named reindex/demo script seam on the current
+head. The refreshed repo-local force-full rerun no longer terminalized at
+`scripts/reindex_current_repository.py ->
+scripts/demo_centralized_indexes.py`; the durable trace and operator-visible
+status both moved later into the `ai_docs` surface
+`ai_docs/prometheus_overview.md -> ai_docs/README.md`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMREINDEXDEMOTAIL live rerun executed on observed commit
+  `e0e62cbc0ef0a912db3d8cd11e802abe9eb1974b` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T06:17:31Z`, `.mcp-index/force_full_exit_trace.json`
+  reported the in-flight live rerun at `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/prometheus_overview.md`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/README.md`.
+- At `2026-04-30T06:17:40Z`, `repository status` terminalized the same rerun
+  to `Trace status: interrupted` while preserving that later `ai_docs` blocker
+  pair at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/prometheus_overview.md`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/README.md`.
+- The same `repository status` run continued to advertise the repaired exact
+  bounded script surface for the cleared script seam:
+  `Lexical boundary: using exact bounded Python indexing for scripts/reindex_current_repository.py -> scripts/demo_centralized_indexes.py`.
+- SQLite runtime counts after the rerun were
+  `files = 1199`, `code_chunks = 21254`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMREINDEXDEMOTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `scripts/reindex_current_repository.py ->
+  scripts/demo_centralized_indexes.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  `ai_docs` seam
+  `ai_docs/prometheus_overview.md -> ai_docs/README.md`.
+- The roadmap now adds downstream phase `SEMAIDOCREADMETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMREINDEXDEMOTAIL-era
+  `scripts/reindex_current_repository.py ->
+  scripts/demo_centralized_indexes.py` seam.
 
 ## Verification
 

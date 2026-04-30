@@ -4687,6 +4687,51 @@ def test_get_repository_status_preserves_centralization_pair_trace(tmp_path):
     )
 
 
+def test_get_repository_status_preserves_reindex_demo_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-30T05:58:46Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "scripts" / "reindex_current_repository.py"),
+                "in_flight_path": str(repo / "scripts" / "demo_centralized_indexes.py"),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "scripts" / "reindex_current_repository.py"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "scripts" / "demo_centralized_indexes.py"
+    )
+    assert "plans/phase-plan-v7-SEMVERIFYSIMTAIL.md" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+    assert "plans/phase-plan-v7-SEMAPIDOCSTAIL.md" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
+
+
 def test_force_full_sync_durable_trace_moves_past_comprehensive_query_pair(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
