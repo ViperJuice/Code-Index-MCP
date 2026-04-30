@@ -27,6 +27,7 @@ from mcp_server.dispatcher.dispatcher_enhanced import (
     IndexResult,
     IndexResultStatus,
     SemanticSearchFailure,
+    _EXACT_BOUNDED_PYTHON_PATHS,
 )
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.dispatcher.query_intent import QueryIntent, classify
@@ -3153,6 +3154,117 @@ class TestEnhancedDispatcherProtocolConformance:
         assert calls == []
         assert len(fts_rows) == 1
         assert "test_root_contract" in fts_rows[0][0]
+
+    def test_index_directory_uses_exact_bounded_python_path_for_integration_obs_smoke_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        integration_dir = repo / "tests" / "integration"
+        obs_dir = integration_dir / "obs"
+        obs_dir.mkdir(parents=True)
+        init_file = integration_dir / "__init__.py"
+        obs_smoke = obs_dir / "test_obs_smoke.py"
+        control_file = obs_dir / "test_control.py"
+        init_file.write_text('"""Integration tests for Code-Index-MCP."""\n', encoding="utf-8")
+        obs_smoke.write_text(
+            "import pytest\n\n"
+            "def _find_repo_root():\n"
+            "    return 'repo'\n\n"
+            "@pytest.fixture(scope='module')\n"
+            "def gateway_proc():\n"
+            "    return ('proc', 'http://127.0.0.1:8000', 8000)\n\n"
+            "@pytest.fixture(scope='module')\n"
+            "def admin_token(gateway_proc):\n"
+            "    return 'token'\n\n"
+            "def test_json_log_parse_rate(gateway_proc):\n"
+            "    assert gateway_proc[1].startswith('http')\n\n"
+            "def test_metrics_endpoint_reachable(gateway_proc):\n"
+            "    assert gateway_proc[2] == 8000\n\n"
+            "def test_secret_redaction_via_http(admin_token):\n"
+            "    assert admin_token == 'token'\n",
+            encoding="utf-8",
+        )
+        control_file.write_text(
+            "def test_control_boundary():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(init_file.resolve()),
+            str(obs_smoke.resolve()),
+            str(control_file.resolve()),
+        }
+        with store._get_connection() as conn:
+            init_symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'tests/integration/__init__.py')"
+            ).fetchone()[0]
+            init_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'tests/integration/__init__.py')"
+            ).fetchone()[0]
+            init_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'tests/integration/__init__.py')"
+            ).fetchall()
+            obs_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'tests/integration/obs/test_obs_smoke.py') ORDER BY id"
+                ).fetchall()
+            ]
+            obs_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'tests/integration/obs/test_obs_smoke.py')"
+            ).fetchone()[0]
+            obs_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'tests/integration/obs/test_obs_smoke.py')"
+            ).fetchall()
+        store.close()
+        assert init_symbol_count == 0
+        assert init_chunk_count == 0
+        assert len(init_fts_rows) == 1
+        assert "Integration tests for Code-Index-MCP" in init_fts_rows[0][0]
+        assert "_find_repo_root" in obs_symbols
+        assert "gateway_proc" in obs_symbols
+        assert "admin_token" in obs_symbols
+        assert "test_json_log_parse_rate" in obs_symbols
+        assert "test_metrics_endpoint_reachable" in obs_symbols
+        assert "test_secret_redaction_via_http" in obs_symbols
+        assert obs_chunk_count == 0
+        assert len(obs_fts_rows) == 1
+        assert "test_secret_redaction_via_http" in obs_fts_rows[0][0]
+        assert "tests/integration/__init__.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        assert "tests/integration/obs/test_obs_smoke.py" in _EXACT_BOUNDED_PYTHON_PATHS
+        assert "tests/integration/obs/test_control.py" not in _EXACT_BOUNDED_PYTHON_PATHS
 
     def test_index_directory_uses_exact_bounded_python_path_for_migration_script(
         self, tmp_path, monkeypatch

@@ -170,6 +170,8 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     ),
     "tests/security/fixtures/mock_plugin/plugin.py": "exact_mock_plugin_fixture_rebound",
     "tests/security/fixtures/mock_plugin/__init__.py": "exact_mock_plugin_fixture_init_rebound",
+    "tests/integration/__init__.py": "exact_integration_package_marker_rebound",
+    "tests/integration/obs/test_obs_smoke.py": "exact_integration_obs_smoke_rebound",
 }
 
 _EXACT_BOUNDED_SHELL_PATHS = {

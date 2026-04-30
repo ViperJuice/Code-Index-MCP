@@ -4626,6 +4626,68 @@ tests/integration/obs/test_obs_smoke.py`.
 - IF-0-SEMINTEGRATIONTAIL-1 — later integration-test lexical recovery and
   evidence contract.
 
+### Phase 80 — Centralization Script Tail Recovery (SEMCENTRALIZETAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later script-family blocker exposed
+after SEMINTEGRATIONTAIL:
+`scripts/real_strategic_recommendations.py ->
+scripts/migrate_to_centralized.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMINTEGRATIONTAIL
+      head either advances durably beyond
+      `scripts/real_strategic_recommendations.py ->
+      scripts/migrate_to_centralized.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for the later script-family seam stays narrow, tested,
+      and does not reopen the repaired integration-test boundary without
+      direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMINTEGRATIONTAIL rerun outcome and the final live verdict for the
+      later script-family pair.
+
+**Scope notes**
+
+This phase exists only if SEMINTEGRATIONTAIL proves the later integration-test
+boundary is cleared, but the refreshed live rerun still terminalizes later in
+lexical walking on
+`scripts/real_strategic_recommendations.py ->
+scripts/migrate_to_centralized.py`.
+
+**Non-goals**
+
+- No reopening of the repaired integration-test seam once the live rerun has
+  advanced beyond
+  `tests/integration/__init__.py ->
+  tests/integration/obs/test_obs_smoke.py`.
+- No broad reopening of earlier `.codex/phase-loop`, script-language, or
+  docs-contract tail work unless the refreshed rerun proves the active blocker
+  has moved again.
+- No reopening of semantic-stage or release work unless the refreshed rerun
+  proves the next blocker is no longer script-family-local.
+
+**Key files**
+
+- `scripts/real_strategic_recommendations.py`
+- `scripts/migrate_to_centralized.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMINTEGRATIONTAIL
+
+**Produces**
+- IF-0-SEMCENTRALIZETAIL-1 — later script-family lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4708,6 +4770,7 @@ SEMCONTRACT
   -> SEMQUERYFULLTAIL
   -> SEMCODEXLOOPREBOUNDTAIL
   -> SEMINTEGRATIONTAIL
+  -> SEMCENTRALIZETAIL
 ```
 
 ## Execution Notes
@@ -5179,6 +5242,13 @@ SEMCONTRACT
   blocker such as
   `tests/integration/__init__.py ->
   tests/integration/obs/test_obs_smoke.py`.
+- SEMINTEGRATIONTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears
+  `tests/integration/__init__.py ->
+  tests/integration/obs/test_obs_smoke.py`
+  but exposes a later exact script-family blocker such as
+  `scripts/real_strategic_recommendations.py ->
+  scripts/migrate_to_centralized.py`.
 - SEMDOCCONTRACTTAIL should amend the roadmap immediately if the refreshed live
   rerun clears
   `tests/docs/test_semincr_contract.py ->

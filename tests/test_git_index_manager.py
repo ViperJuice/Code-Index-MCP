@@ -3974,6 +3974,49 @@ def test_get_repository_status_preserves_support_docs_pair_trace(tmp_path):
     )
 
 
+def test_get_repository_status_preserves_integration_obs_smoke_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    integration_init = repo / "tests" / "integration" / "__init__.py"
+    obs_smoke = repo / "tests" / "integration" / "obs" / "test_obs_smoke.py"
+    obs_smoke.parent.mkdir(parents=True, exist_ok=True)
+    integration_init.write_text('"""Integration tests for Code-Index-MCP."""\n', encoding="utf-8")
+    obs_smoke.write_text("def test_secret_redaction_via_http():\n    assert True\n", encoding="utf-8")
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-30T00:46:51Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(integration_init),
+                "in_flight_path": str(obs_smoke),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(integration_init)
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(obs_smoke)
+    assert ".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+
+
 def test_force_full_sync_durable_trace_moves_past_support_docs_pair(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

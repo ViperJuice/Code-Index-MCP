@@ -657,6 +657,19 @@ def _print_mock_plugin_fixture_python_boundary(prefix: str, repo_path: Path) -> 
         )
 
 
+def _print_integration_obs_smoke_python_boundary(prefix: str, repo_path: Path) -> None:
+    test_paths = (
+        repo_path / "tests" / "integration" / "__init__.py",
+        repo_path / "tests" / "integration" / "obs" / "test_obs_smoke.py",
+    )
+    if all(path.is_file() for path in test_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "tests/integration/__init__.py -> "
+            "tests/integration/obs/test_obs_smoke.py"
+        )
+
+
 def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
     config_path = repo_path / ".devcontainer" / "devcontainer.json"
     if config_path.is_file():
@@ -1130,6 +1143,7 @@ def status(repo_id: Optional[str]):
         _print_ga_release_docs_tail_python_boundary("  ", Path(status["path"]))
         _print_docs_truth_tail_python_boundary("  ", Path(status["path"]))
         _print_mock_plugin_fixture_python_boundary("  ", Path(status["path"]))
+        _print_integration_obs_smoke_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_archive_tail_json_boundary("  ", Path(status["path"]))
         _print_optimized_final_report_boundary("  ", Path(status["path"]))

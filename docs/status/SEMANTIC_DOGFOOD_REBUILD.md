@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T00:46:51Z`.
-- Observed commit: `f6ef98c76ee35a4d702edd5eea019430b3735f9a`.
+- Evidence captured: `2026-04-30T01:13:41Z`.
+- Observed commit: `fd89efece1ff8ed78635fe1af3476c7896e96c26`.
 - Prior SEMQUERYFULLTAIL live-rerun anchor: `2026-04-30T00:30:24Z` on
   observed commit `230557ff39fcb4ec8c494fa13af413b4e8b04ca6`.
 - Prior SEMSCRIPTLANGSTAIL live-rerun anchor: `2026-04-29T23:55:57Z` on
@@ -52,8 +52,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMINTEGRATIONTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPREBOUNDTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMCENTRALIZETAIL` after SEMINTEGRATIONTAIL proved the later
+  integration-test seam is now cleared, but the refreshed live rerun on the
+  new head still terminalized later in lexical walking on
+  `scripts/real_strategic_recommendations.py ->
+  scripts/migrate_to_centralized.py`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMINTEGRATIONTAIL` after SEMCODEXLOOPREBOUNDTAIL proved the re-exposed
   legacy `.codex/phase-loop` compatibility-runtime seam is now cleared, but
@@ -3156,7 +3163,72 @@ Steering outcome:
   blocker as the SEMCODEXLOOPREBOUNDTAIL-era legacy `.codex/phase-loop`
   rebound seam.
 
+## SEMINTEGRATIONTAIL Live Rerun Check
+
+SEMINTEGRATIONTAIL verified that the later integration-test seam is no longer
+the active blocker on the current head. The refreshed repo-local force-full
+rerun advanced durably beyond
+`tests/integration/__init__.py ->
+tests/integration/obs/test_obs_smoke.py`
+and later terminalized on a newer script-family tail.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMINTEGRATIONTAIL live rerun advanced on observed commit
+  `fd89efece1ff8ed78635fe1af3476c7896e96c26` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T01:13:32Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/real_strategic_recommendations.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/migrate_to_centralized.py`.
+- At `2026-04-30T01:13:41Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving the same later durable
+  script-family progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/real_strategic_recommendations.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/migrate_to_centralized.py`.
+- `repository status` on the same head still advertises the repaired exact
+  bounded integration-test lexical surface
+  `Lexical boundary: using exact bounded Python indexing for tests/integration/__init__.py -> tests/integration/obs/test_obs_smoke.py`
+  while the durable trace has moved later.
+- The SEMINTEGRATIONTAIL target pair is no longer the active blocker:
+  `tests/integration/__init__.py ->
+  tests/integration/obs/test_obs_smoke.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMINTEGRATIONTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on the later integration-test seam.
+- The final authoritative rerun for this phase moved later and now reaches
+  `scripts/real_strategic_recommendations.py ->
+  scripts/migrate_to_centralized.py`.
+- The roadmap now adds downstream phase `SEMCENTRALIZETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMINTEGRATIONTAIL-era integration-test seam.
+
 ## Verification
+
+Verification sequence for this SEMINTEGRATIONTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "integration_init or obs_smoke or integration_tail or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "integration_init or obs_smoke or integration_tail or interrupted or boundary or closeout_handoff"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMINTEGRATIONTAIL or SEMCODEXLOOPREBOUNDTAIL or obs_smoke or integration"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMCODEXLOOPREBOUNDTAIL slice:
 
