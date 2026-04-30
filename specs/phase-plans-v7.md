@@ -4880,6 +4880,71 @@ tests/root_tests/test_mcp_database_efficiency.py`.
 - IF-0-SEMSWIFTDBEFFTAIL-1 — later root-test lexical recovery and evidence
   contract.
 
+### Phase 84 — Security Route/Auth Sandbox Tail Recovery (SEMSECAUTHSANDBOXTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later security-test seam exposed
+after SEMSWIFTDBEFFTAIL:
+`tests/security/test_route_auth_coverage.py ->
+tests/security/test_p24_sandbox_degradation.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMSWIFTDBEFFTAIL
+      head either advances durably beyond
+      `tests/security/test_route_auth_coverage.py ->
+      tests/security/test_p24_sandbox_degradation.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for this later security-test seam stays narrow,
+      tested, and does not reopen the cleared
+      `tests/root_tests/test_swift_plugin.py ->
+      tests/root_tests/test_mcp_database_efficiency.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMSWIFTDBEFFTAIL rerun outcome and the final live verdict for the
+      `tests/security/test_route_auth_coverage.py ->
+      tests/security/test_p24_sandbox_degradation.py` seam.
+
+**Scope notes**
+
+This phase exists only if SEMSWIFTDBEFFTAIL proves the later root-test seam
+`tests/root_tests/test_swift_plugin.py ->
+tests/root_tests/test_mcp_database_efficiency.py` is cleared, but the
+refreshed live rerun still terminalizes later in lexical walking on
+`tests/security/test_route_auth_coverage.py ->
+tests/security/test_p24_sandbox_degradation.py`.
+
+**Non-goals**
+
+- No reopening of the cleared Swift/database-efficiency seam once the live
+  rerun has advanced beyond
+  `tests/root_tests/test_swift_plugin.py ->
+  tests/root_tests/test_mcp_database_efficiency.py`.
+- No broad reopening of unrelated security, integration, semantic-stage, or
+  release work unless the refreshed rerun proves the active blocker has moved
+  again.
+- No widening into a blanket `tests/security/**/*.py` shortcut unless the
+  refreshed rerun proves the current exact pair cannot be cleared with a
+  narrower lexical repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMSWIFTDBEFFTAIL
+
+**Produces**
+- IF-0-SEMSECAUTHSANDBOXTAIL-1 — later security-test lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4966,6 +5031,7 @@ SEMCONTRACT
   -> SEMQUERYFULLREBOUNDTAIL
   -> SEMCODEXLOOPRELAPSETAIL
   -> SEMSWIFTDBEFFTAIL
+  -> SEMSECAUTHSANDBOXTAIL
 ```
 
 ## Execution Notes
@@ -5000,6 +5066,13 @@ SEMCONTRACT
   pair but exposes a later exact blocker such as
   `tests/root_tests/test_swift_plugin.py ->
   tests/root_tests/test_mcp_database_efficiency.py`.
+- SEMSWIFTDBEFFTAIL should amend the roadmap immediately if the live rerun
+  clears
+  `tests/root_tests/test_swift_plugin.py ->
+  tests/root_tests/test_mcp_database_efficiency.py`
+  but exposes a later exact security-test blocker such as
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during

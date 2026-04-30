@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T02:14:12Z`.
-- Observed commit: `5117d854f9272dd6c15cf071ba81d493da2d6315`.
+- Evidence captured: `2026-04-30T02:33:57Z`.
+- Observed commit: `748d4b870b7a68408260745d0777f108a197dc37`.
 - Prior SEMQUERYFULLREBOUNDTAIL live-rerun anchor: `2026-04-30T01:52:29Z`
   on observed commit `250dcd0f5bda80db857ee8f33159b323b7872faf`.
 - Prior SEMCENTRALIZETAIL live-rerun anchor: `2026-04-30T01:35:03Z` on
@@ -58,8 +58,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLREBOUNDTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSWIFTDBEFFTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMSECAUTHSANDBOXTAIL` after SEMSWIFTDBEFFTAIL proved the later
+  Swift/database-efficiency seam is now cleared, but the refreshed live rerun
+  on the new head still terminalized later in lexical walking on
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py`. Older downstream
+  assumptions should be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMCODEXLOOPRELAPSETAIL` after SEMQUERYFULLREBOUNDTAIL proved the
   re-exposed comprehensive-query/full-sync seam is now cleared, but the
@@ -3410,7 +3417,77 @@ Steering outcome:
   blocker as the SEMCODEXLOOPRELAPSETAIL-era legacy `.codex/phase-loop`
   compatibility-runtime seam.
 
+## SEMSWIFTDBEFFTAIL Live Rerun Check
+
+SEMSWIFTDBEFFTAIL verified that the later Swift/database-efficiency root-test
+seam is no longer the active blocker on the current head. The refreshed
+repo-local force-full rerun advanced durably beyond
+`tests/root_tests/test_swift_plugin.py ->
+tests/root_tests/test_mcp_database_efficiency.py`
+and later terminalized on a newer security-test seam.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMSWIFTDBEFFTAIL live rerun advanced on observed commit
+  `748d4b870b7a68408260745d0777f108a197dc37` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`.
+- At `2026-04-30T02:33:46Z`, `.mcp-index/force_full_exit_trace.json` still
+  showed a durable raw running snapshot with `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/security/test_route_auth_coverage.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/security/test_p24_sandbox_degradation.py`,
+  proving the rerun had already advanced beyond the SEMSWIFTDBEFFTAIL target
+  seam before the watchdog terminated the run.
+- At `2026-04-30T02:33:57Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving later durable
+  progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/security/test_route_auth_coverage.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/security/test_p24_sandbox_degradation.py`.
+- `repository status` now advertises the repaired exact bounded lexical
+  surface for the cleared root-test seam:
+  `Lexical boundary: using exact bounded Python indexing for tests/root_tests/test_swift_plugin.py -> tests/root_tests/test_mcp_database_efficiency.py`.
+- The SEMSWIFTDBEFFTAIL target pair is no longer the active blocker:
+  `tests/root_tests/test_swift_plugin.py ->
+  tests/root_tests/test_mcp_database_efficiency.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMSWIFTDBEFFTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on the
+  `tests/root_tests/test_swift_plugin.py ->
+  tests/root_tests/test_mcp_database_efficiency.py` seam.
+- The final authoritative rerun for this phase moved later and now reaches the
+  security-test seam
+  `tests/security/test_route_auth_coverage.py ->
+  tests/security/test_p24_sandbox_degradation.py`.
+- The roadmap now adds downstream phase `SEMSECAUTHSANDBOXTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMSWIFTDBEFFTAIL-era Swift/database-efficiency root-test
+  seam.
+
 ## Verification
+
+Verification sequence for this SEMSWIFTDBEFFTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "swift_plugin or database_efficiency or root_test or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "swift_plugin or database_efficiency or root_test or interrupted or boundary or closeout_handoff"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMCODEXLOOPRELAPSETAIL or SEMSWIFTDBEFFTAIL or swift_plugin or database_efficiency"
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMCODEXLOOPRELAPSETAIL slice:
 

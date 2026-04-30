@@ -1688,6 +1688,55 @@ def test_force_full_progress_callback_persists_later_root_test_pair_snapshot(tmp
     assert trace["trace_timestamp"]
 
 
+def test_force_full_progress_callback_persists_swift_database_efficiency_pair_snapshot(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before=repo_info.last_indexed_commit,
+    )
+    prior_file = repo / "tests" / "root_tests" / "test_swift_plugin.py"
+    blocked_file = repo / "tests" / "root_tests" / "test_mcp_database_efficiency.py"
+
+    callback(
+        {
+            "stage": "lexical_walking",
+            "stage_family": "lexical",
+            "blocker_source": "lexical_mutation",
+            "lexical_stage": "walking",
+            "semantic_stage": "not_run",
+            "last_progress_path": str(prior_file),
+            "in_flight_path": str(blocked_file),
+            "summary_call_timed_out": False,
+            "summary_call_file_path": None,
+            "summary_call_chunk_ids": [],
+            "summary_call_timeout_seconds": None,
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "running"
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["last_progress_path"] == str(prior_file)
+    assert trace["in_flight_path"] == str(blocked_file)
+    assert ".codex/phase-loop" not in (trace.get("last_progress_path") or "")
+    assert "tests/root_tests/run_reranking_tests.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+    assert trace["trace_timestamp"]
+
+
 def test_force_full_progress_callback_preserves_last_progress_path_across_semantic_handoff(
     tmp_path,
 ):
@@ -4386,6 +4435,51 @@ def test_get_repository_status_preserves_comprehensive_query_pair_trace(tmp_path
     )
 
 
+def test_get_repository_status_preserves_swift_database_efficiency_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-30T02:14:12Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "tests" / "root_tests" / "test_swift_plugin.py"),
+                "in_flight_path": str(
+                    repo / "tests" / "root_tests" / "test_mcp_database_efficiency.py"
+                ),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "tests" / "root_tests" / "test_swift_plugin.py"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "tests" / "root_tests" / "test_mcp_database_efficiency.py"
+    )
+    assert ".codex/phase-loop" not in (status["force_full_exit_trace"]["last_progress_path"] or "")
+    assert "tests/root_tests/run_reranking_tests.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+
+
 def test_get_repository_status_preserves_centralization_pair_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
@@ -4487,6 +4581,71 @@ def test_force_full_sync_durable_trace_moves_past_comprehensive_query_pair(tmp_p
     )
 
 
+def test_force_full_sync_terminalizes_running_trace_when_swift_database_efficiency_pair_crashes(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+    repo_info.index_path.touch()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+
+    prior_file = repo / "tests" / "root_tests" / "test_swift_plugin.py"
+    blocked_file = repo / "tests" / "root_tests" / "test_mcp_database_efficiency.py"
+
+    def _crashing_full_index(repo_id, _ctx, progress_callback=None):
+        assert progress_callback is not None
+        progress_callback(
+            {
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "blocker_source": "lexical_mutation",
+                "lexical_stage": "walking",
+                "semantic_stage": "not_run",
+                "last_progress_path": str(prior_file),
+                "in_flight_path": str(blocked_file),
+                "summary_call_timed_out": False,
+                "summary_call_file_path": None,
+                "summary_call_chunk_ids": [],
+                "summary_call_timeout_seconds": None,
+            }
+        )
+        raise RuntimeError("synthetic crash after swift/database-efficiency pair")
+
+    manager._full_index = MagicMock(side_effect=_crashing_full_index)
+
+    with pytest.raises(
+        RuntimeError, match="synthetic crash after swift/database-efficiency pair"
+    ):
+        manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "interrupted"
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["last_progress_path"] == str(prior_file)
+    assert trace["in_flight_path"] == str(blocked_file)
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert ".codex/phase-loop" not in (trace.get("last_progress_path") or "")
+    assert "tests/root_tests/run_reranking_tests.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+    registry.update_indexed_commit.assert_not_called()
+
+
 def test_force_full_sync_durable_trace_moves_past_centralization_pair(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
@@ -4539,6 +4698,60 @@ def test_force_full_sync_durable_trace_moves_past_centralization_pair(tmp_path):
     assert trace["in_flight_path"] == str(later_file)
     assert str(prior_script) not in (trace.get("in_flight_path") or "")
     assert "tests/integration/__init__.py" not in (trace.get("last_progress_path") or "")
+
+
+def test_force_full_sync_durable_trace_moves_past_swift_database_efficiency_pair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    prior_file = repo / "tests" / "root_tests" / "test_swift_plugin.py"
+    blocked_file = repo / "tests" / "root_tests" / "test_mcp_database_efficiency.py"
+    later_file = repo / "docs" / "status" / "semantic_tail_14.md"
+    later_file.parent.mkdir(parents=True, exist_ok=True)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=3,
+            failed=1,
+            errors=["Lexical indexing timed out while processing docs/status/semantic_tail_14.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 4,
+                "lexical_files_completed": 3,
+                "last_progress_path": str(blocked_file),
+                "in_flight_path": str(later_file),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing docs/status/semantic_tail_14.md",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert trace["last_progress_path"] == str(blocked_file)
+    assert trace["in_flight_path"] == str(later_file)
+    assert str(prior_file) not in (trace.get("in_flight_path") or "")
+    assert ".codex/phase-loop" not in (trace.get("last_progress_path") or "")
 
 
 def test_get_repository_status_preserves_mixed_version_phase_plan_pair_trace(tmp_path):

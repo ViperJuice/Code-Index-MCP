@@ -3155,6 +3155,119 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "test_root_contract" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_swift_database_efficiency_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        tests_dir = repo / "tests" / "root_tests"
+        tests_dir.mkdir(parents=True)
+        swift_test = tests_dir / "test_swift_plugin.py"
+        db_efficiency_test = tests_dir / "test_mcp_database_efficiency.py"
+        helper_test = tests_dir / "test_control.py"
+        swift_test.write_text(
+            "def test_swift_plugin_basic():\n"
+            "    assert True\n\n"
+            "def test_swift_package_analysis():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        db_efficiency_test.write_text(
+            "class DatabaseEfficiencyTester:\n"
+            "    pass\n\n"
+            "def main():\n"
+            "    return DatabaseEfficiencyTester()\n",
+            encoding="utf-8",
+        )
+        helper_test.write_text(
+            "def test_control():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(swift_test.resolve()),
+            str(db_efficiency_test.resolve()),
+            str(helper_test.resolve()),
+        }
+        with store._get_connection() as conn:
+            swift_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_swift_plugin.py') ORDER BY id"
+                ).fetchall()
+            ]
+            db_efficiency_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_mcp_database_efficiency.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_control.py') ORDER BY id"
+                ).fetchall()
+            ]
+            swift_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_swift_plugin.py')"
+            ).fetchone()[0]
+            db_efficiency_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_mcp_database_efficiency.py')"
+            ).fetchone()[0]
+            swift_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'tests/root_tests/test_swift_plugin.py'"
+            ).fetchone()[0]
+            db_efficiency_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'tests/root_tests/test_mcp_database_efficiency.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'tests/root_tests/test_control.py'"
+            ).fetchone()[0]
+            swift_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_swift_plugin.py')"
+            ).fetchall()
+            db_efficiency_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/root_tests/test_mcp_database_efficiency.py')"
+            ).fetchall()
+        store.close()
+        assert swift_symbols == ["test_swift_plugin_basic", "test_swift_package_analysis"]
+        assert db_efficiency_symbols == ["DatabaseEfficiencyTester", "main"]
+        assert helper_symbols == ["test_control"]
+        assert swift_chunk_count == 0
+        assert db_efficiency_chunk_count == 0
+        assert "exact_test_swift_plugin_rebound" in swift_metadata
+        assert "exact_test_mcp_database_efficiency_rebound" in db_efficiency_metadata
+        assert "exact_test_swift_plugin_rebound" not in helper_metadata
+        assert "exact_test_mcp_database_efficiency_rebound" not in helper_metadata
+        assert len(swift_fts_rows) == 1
+        assert "test_swift_plugin_basic" in swift_fts_rows[0][0]
+        assert "test_swift_package_analysis" in swift_fts_rows[0][0]
+        assert len(db_efficiency_fts_rows) == 1
+        assert "DatabaseEfficiencyTester" in db_efficiency_fts_rows[0][0]
+        assert "main" in db_efficiency_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_integration_obs_smoke_pair(
         self, tmp_path, monkeypatch
     ):
