@@ -5013,6 +5013,71 @@ legacy `.codex/phase-loop` compatibility-runtime pair
 - IF-0-SEMCODEXLOOPHEARTBEATTAIL-1 — later legacy `.codex/phase-loop`
   heartbeat-pair lexical recovery and evidence contract.
 
+### Phase 86 — Legacy Codex Phase-Loop Relapse Rebound Tail Recovery (SEMCODEXLOOPRELAPSEREBOUNDTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the re-exposed legacy
+`.codex/phase-loop` compatibility-runtime pair exposed after
+SEMCODEXLOOPHEARTBEATTAIL:
+`.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the
+      post-SEMCODEXLOOPHEARTBEATTAIL head either advances durably beyond the
+      re-exposed
+      `.codex/phase-loop/.../terminal-summary.json ->
+      .codex/phase-loop/.../launch.json`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] Any repair chosen for the re-exposed legacy `.codex/phase-loop` relapse
+      seam stays narrow, tested, and does not reopen the cleared
+      `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+      .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMCODEXLOOPHEARTBEATTAIL rerun outcome and the final live verdict for
+      the re-exposed legacy `.codex/phase-loop` relapse pair.
+
+**Scope notes**
+
+This phase exists only if SEMCODEXLOOPHEARTBEATTAIL proves the later
+`.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
+.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`
+heartbeat pair is no longer the active blocker, but the refreshed live rerun
+still terminalizes later in lexical walking on the re-exposed legacy
+`.codex/phase-loop` compatibility-runtime pair
+`.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`.
+
+**Non-goals**
+
+- No reopening of the cleared `artpub-plan launch.json -> heartbeat.json`
+  seam once the live rerun has advanced beyond it.
+- No broad reopening of canonical `.phase-loop/` runtime behavior unless the
+  refreshed rerun proves the active blocker cannot be cleared with a narrower
+  legacy `.codex/phase-loop` compatibility-runtime repair.
+- No reopening of unrelated security, root-test, semantic-stage, or release
+  work unless the refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCODEXLOOPHEARTBEATTAIL
+
+**Produces**
+- IF-0-SEMCODEXLOOPRELAPSEREBOUNDTAIL-1 — re-exposed legacy
+  `.codex/phase-loop` relapse lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -5101,6 +5166,7 @@ SEMCONTRACT
   -> SEMSWIFTDBEFFTAIL
   -> SEMSECAUTHSANDBOXTAIL
   -> SEMCODEXLOOPHEARTBEATTAIL
+  -> SEMCODEXLOOPRELAPSEREBOUNDTAIL
 ```
 
 ## Execution Notes
@@ -5150,6 +5216,12 @@ SEMCONTRACT
   blocker such as
   `.codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json ->
   .codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json`.
+- SEMCODEXLOOPHEARTBEATTAIL should amend the roadmap immediately if the live
+  rerun proves the `artpub-plan launch.json -> heartbeat.json` seam is no
+  longer active but exposes a later exact legacy `.codex/phase-loop`
+  compatibility-runtime blocker such as
+  `.codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json ->
+  .codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json`.
 - SEMSCRIPTREBOUND should amend the roadmap immediately if the live rerun
   clears `scripts/quick_mcp_vs_native_validation.py` but exposes a later
   semantic closeout blocker such as `disk I/O error` during
