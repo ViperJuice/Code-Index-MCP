@@ -1,10 +1,15 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-30T04:22:02Z`.
-- Observed commit: `f32c2ac34f878a3bf7d60e87db7674ae0da3a76f`.
+- Evidence captured: `2026-04-30T04:41:42Z`.
+- Observed commit: `c4419ef3ddc58e74e4f39cc140665d1e42baf765`.
+- Prior SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL live-rerun anchor:
+  `2026-04-30T04:22:02Z` on observed commit
+  `f32c2ac34f878a3bf7d60e87db7674ae0da3a76f`.
 - Prior SEMCODEXLOOPCIFLOWEXECRELAPSETAIL live-rerun anchor:
   `2026-04-30T04:05:03Z` on observed commit
   `ee2e04c606a9e7737dc875b4c25e9af685a96220`.
+- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPCIFLOWEXECRELAPSETAIL.md`.
 - Prior SEMCODEXLOOPREBOUNDRELAPSETAIL live-rerun anchor:
   `2026-04-30T03:45:14Z` on observed commit
   `518e8a23e5914cf05a3ad3175459aa446bf8aaee`.
@@ -82,6 +87,17 @@
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMQUERYFULLREBOUNDTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMP24PLUGINGATINGTAIL` after
+  SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL proved the newer legacy
+  `.codex/phase-loop/runs/20260424T225641Z-01-garel-execute/heartbeat.json ->
+  .codex/phase-loop/runs/20260425T022006Z-01-garecut-plan/launch.json`
+  seam is no longer the active blocker, but the refreshed live rerun on the
+  new head still terminalized later in lexical walking on the test-pair seam
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py`.
+  Older downstream assumptions should be treated as stale after this roadmap
+  amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL` after
   SEMCODEXLOOPCIFLOWEXECRELAPSETAIL proved the newer legacy
@@ -3954,6 +3970,74 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the SEMCODEXLOOPCIFLOWEXECRELAPSETAIL-era
   `ciflow-execute terminal-summary.json -> launch.json` seam.
+
+## SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL Live Rerun Check
+
+SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL did not need a new dispatcher, durable
+trace, or operator-surface repair on the current head. The refreshed
+repo-local force-full rerun advanced durably beyond the planned legacy
+compatibility-runtime seam
+`.codex/phase-loop/runs/20260424T225641Z-01-garel-execute/heartbeat.json ->
+.codex/phase-loop/runs/20260425T022006Z-01-garecut-plan/launch.json`,
+but the same bounded watchdog still terminalized later in lexical walking on
+the newer test-pair seam
+`tests/test_p24_plugin_availability.py ->
+tests/test_dispatcher_extension_gating.py`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL live rerun advanced on
+  observed commit `c4419ef3ddc58e74e4f39cc140665d1e42baf765` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `135`.
+- At `2026-04-30T04:41:27Z`, `.mcp-index/force_full_exit_trace.json` still
+  showed a durable raw running snapshot with `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/test_p24_plugin_availability.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/test_dispatcher_extension_gating.py`,
+  proving the rerun had already advanced beyond the
+  `garel-execute heartbeat.json -> garecut-plan launch.json` pair before the
+  watchdog terminated the run.
+- At `2026-04-30T04:41:42Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving the same newer
+  lexical progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/test_p24_plugin_availability.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/test_dispatcher_extension_gating.py`.
+- `repository status` on the same head still advertises the bounded legacy
+  compatibility surface
+  `Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative`
+  while the durable trace has moved later.
+- The SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL target pair is no longer the
+  active blocker:
+  `.codex/phase-loop/runs/20260424T225641Z-01-garel-execute/heartbeat.json ->
+  .codex/phase-loop/runs/20260425T022006Z-01-garecut-plan/launch.json`.
+- The current authoritative blocker has moved later to the test-pair seam
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL acceptance is satisfied for its named
+  blocker: the live watchdog no longer terminalizes on the legacy
+  `garel-execute heartbeat.json -> garecut-plan launch.json` pair.
+- The final authoritative rerun for this phase moved later and now reaches
+  the exact test-pair seam
+  `tests/test_p24_plugin_availability.py ->
+  tests/test_dispatcher_extension_gating.py`.
+- The roadmap now adds downstream phase `SEMP24PLUGINGATINGTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCODEXLOOPGARELHEARTBEATREBOUNDTAIL-era
+  `garel-execute heartbeat.json -> garecut-plan launch.json` seam.
 
 ## Verification
 
