@@ -4473,6 +4473,157 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "verify_hybrid_search" in retrieval_fts_rows[0][0]
         assert "verify_index_availability" in retrieval_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_path_for_comprehensive_query_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        query_script = scripts_dir / "run_comprehensive_query_test.py"
+        semantic_script = scripts_dir / "index_all_repos_semantic_full.py"
+        helper_script = scripts_dir / "helper.py"
+        query_script.write_text(
+            "class ParallelQueryTester:\n"
+            "    async def test_bm25_query(self):\n"
+            "        return {}\n\n"
+            "    async def test_semantic_query(self):\n"
+            "        return {}\n\n"
+            "    async def test_queries_batch(self):\n"
+            "        return []\n\n"
+            "    async def test_repository(self):\n"
+            "        return {}\n\n"
+            "def run_all_repository_tests():\n"
+            "    return []\n\n"
+            "def aggregate_results():\n"
+            "    return {}\n\n"
+            "def main():\n"
+            "    return ParallelQueryTester()\n",
+            encoding="utf-8",
+        )
+        semantic_script.write_text(
+            "def get_all_code_files():\n"
+            "    return []\n\n"
+            "def create_embeddings_batch():\n"
+            "    return []\n\n"
+            "def process_repository():\n"
+            "    return {}\n\n"
+            "def find_test_repositories():\n"
+            "    return []\n\n"
+            "def main():\n"
+            "    return find_test_repositories()\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text("def helper():\n    return True\n", encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(query_script.resolve()),
+            str(semantic_script.resolve()),
+            str(helper_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            query_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/run_comprehensive_query_test.py') ORDER BY id"
+                ).fetchall()
+            ]
+            semantic_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_all_repos_semantic_full.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            query_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/run_comprehensive_query_test.py')"
+            ).fetchone()[0]
+            semantic_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_all_repos_semantic_full.py')"
+            ).fetchone()[0]
+            query_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/run_comprehensive_query_test.py'"
+            ).fetchone()[0]
+            semantic_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/index_all_repos_semantic_full.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            query_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/run_comprehensive_query_test.py')"
+            ).fetchall()
+            semantic_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/index_all_repos_semantic_full.py')"
+            ).fetchall()
+        store.close()
+        assert query_symbols == [
+            "ParallelQueryTester",
+            "test_bm25_query",
+            "test_semantic_query",
+            "test_queries_batch",
+            "test_repository",
+            "run_all_repository_tests",
+            "aggregate_results",
+            "main",
+        ]
+        assert semantic_symbols == [
+            "get_all_code_files",
+            "create_embeddings_batch",
+            "process_repository",
+            "find_test_repositories",
+            "main",
+        ]
+        assert helper_symbols == ["helper"]
+        assert query_chunk_count == 0
+        assert semantic_chunk_count == 0
+        assert "exact_run_comprehensive_query_test_rebound" in query_metadata
+        assert "exact_index_all_repos_semantic_full_rebound" in semantic_metadata
+        assert "exact_run_comprehensive_query_test_rebound" not in helper_metadata
+        assert "exact_index_all_repos_semantic_full_rebound" not in helper_metadata
+        assert len(query_fts_rows) == 1
+        assert "ParallelQueryTester" in query_fts_rows[0][0]
+        assert "run_all_repository_tests" in query_fts_rows[0][0]
+        assert len(semantic_fts_rows) == 1
+        assert "create_embeddings_batch" in semantic_fts_rows[0][0]
+        assert "find_test_repositories" in semantic_fts_rows[0][0]
+        assert calls == []
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):

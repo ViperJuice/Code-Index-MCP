@@ -4502,6 +4502,70 @@ scripts/index_all_repos_semantic_full.py`.
 - IF-0-SEMQUERYFULLTAIL-1 — exact later comprehensive-query/full-sync script
   recovery and evidence contract.
 
+### Phase 78 — Legacy Codex Phase-Loop Rebound Tail Recovery (SEMCODEXLOOPREBOUNDTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later re-exposed legacy
+`.codex/phase-loop` compatibility-runtime pair exposed after
+SEMQUERYFULLTAIL:
+`.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMQUERYFULLTAIL
+      head either advances durably beyond the re-exposed
+      `.codex/phase-loop/.../launch.json ->
+      .codex/phase-loop/.../terminal-summary.json`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the legacy `.codex/phase-loop` rebound seam stays
+      narrow, tested, and does not reopen the repaired
+      `scripts/run_comprehensive_query_test.py ->
+      scripts/index_all_repos_semantic_full.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMQUERYFULLTAIL rerun outcome and the final live verdict for the
+      re-exposed legacy `.codex/phase-loop` pair.
+
+**Scope notes**
+
+This phase exists only if SEMQUERYFULLTAIL proves the later
+comprehensive-query/full-sync script pair is cleared, but the refreshed live
+rerun still terminalizes later in lexical walking on a re-exposed legacy
+`.codex/phase-loop` compatibility-runtime pair such as
+`.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+
+**Non-goals**
+
+- No reopening of the repaired comprehensive-query/full-sync recovery once the
+  live rerun has advanced beyond
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`.
+- No broad reopening of canonical `.phase-loop/` runtime behavior unless the
+  refreshed rerun proves the active blocker cannot be cleared with a narrower
+  legacy `.codex/phase-loop` compatibility-runtime repair.
+- No reopening of unrelated semantic-stage, script-family, or release work
+  unless the refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMQUERYFULLTAIL
+
+**Produces**
+- IF-0-SEMCODEXLOOPREBOUNDTAIL-1 — re-exposed legacy `.codex/phase-loop`
+  lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4582,6 +4646,7 @@ SEMCONTRACT
   -> SEMEDITRETRIEVALTAIL
   -> SEMSCRIPTLANGSTAIL
   -> SEMQUERYFULLTAIL
+  -> SEMCODEXLOOPREBOUNDTAIL
 ```
 
 ## Execution Notes
@@ -5039,6 +5104,14 @@ SEMCONTRACT
   exposes a later exact lexical blocker such as
   `tests/docs/test_semincr_contract.py ->
   tests/docs/test_gabase_ga_readiness_contract.py`.
+- SEMQUERYFULLTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `scripts/run_comprehensive_query_test.py ->
+  scripts/index_all_repos_semantic_full.py`
+  but exposes a later re-exposed legacy `.codex/phase-loop`
+  compatibility-runtime blocker such as
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
 - SEMDOCCONTRACTTAIL should amend the roadmap immediately if the refreshed live
   rerun clears
   `tests/docs/test_semincr_contract.py ->
