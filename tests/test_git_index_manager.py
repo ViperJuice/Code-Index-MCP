@@ -4980,6 +4980,143 @@ def test_force_full_sync_durable_trace_moves_past_legacy_codex_phase_loop_heartb
     assert "test_route_auth_coverage.py" not in (trace.get("last_progress_path") or "")
 
 
+def test_get_repository_status_preserves_legacy_codex_phase_loop_garecut_heartbeat_pair_trace(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-30T03:26:35Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(
+                    repo
+                    / ".codex"
+                    / "phase-loop"
+                    / "runs"
+                    / "20260425T051448Z-01-garecut-execute"
+                    / "launch.json"
+                ),
+                "in_flight_path": str(
+                    repo
+                    / ".codex"
+                    / "phase-loop"
+                    / "runs"
+                    / "20260425T051448Z-01-garecut-execute"
+                    / "heartbeat.json"
+                ),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / ".codex" / "phase-loop" / "runs" / "20260425T051448Z-01-garecut-execute" / "launch.json"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260425T051448Z-01-garecut-execute"
+        / "heartbeat.json"
+    )
+    assert "20260427T071207Z-01-artpub-plan" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+    assert "20260427T081107Z-08-ciflow-plan" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
+
+
+def test_force_full_sync_durable_trace_moves_past_legacy_codex_phase_loop_garecut_heartbeat_pair(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    prior_launch = (
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260425T051448Z-01-garecut-execute"
+        / "launch.json"
+    )
+    blocked_heartbeat = (
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260425T051448Z-01-garecut-execute"
+        / "heartbeat.json"
+    )
+    later_file = repo / "docs" / "status" / "semantic_tail_16.md"
+    later_file.parent.mkdir(parents=True, exist_ok=True)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=3,
+            failed=1,
+            errors=["Lexical indexing timed out while processing docs/status/semantic_tail_16.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 4,
+                "lexical_files_completed": 3,
+                "last_progress_path": str(blocked_heartbeat),
+                "in_flight_path": str(later_file),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing docs/status/semantic_tail_16.md",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert trace["last_progress_path"] == str(blocked_heartbeat)
+    assert trace["in_flight_path"] == str(later_file)
+    assert str(prior_launch) not in (trace.get("in_flight_path") or "")
+    assert "20260427T071207Z-01-artpub-plan" not in (trace.get("last_progress_path") or "")
+    assert "20260427T081107Z-08-ciflow-plan" not in (trace.get("last_progress_path") or "")
+
+
 def test_get_repository_status_preserves_mixed_version_phase_plan_pair_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

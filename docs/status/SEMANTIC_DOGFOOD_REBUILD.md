@@ -60,6 +60,8 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
+- Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPGARECUTHEARTBEATTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSEREBOUNDTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPRELAPSEREBOUNDTAIL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPHEARTBEATTAIL.md`.
 - Phase plan: `plans/phase-plan-v7-SEMCODEXLOOPHEARTBEATTAIL.md`.
@@ -3710,6 +3712,74 @@ Steering outcome:
   blocker as the SEMCODEXLOOPRELAPSEREBOUNDTAIL-era
   `ciflow-plan terminal-summary.json -> launch.json` seam.
 
+## SEMCODEXLOOPGARECUTHEARTBEATTAIL Live Rerun Check
+
+SEMCODEXLOOPGARECUTHEARTBEATTAIL confirmed that the exact legacy heartbeat
+seam
+`.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json ->
+.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json`
+was not the final active blocker on the refreshed head. The same bounded
+repo-local force-full rerun regressed earlier in lexical walking and
+re-exposed the older legacy rebound pair
+`.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCODEXLOOPGARECUTHEARTBEATTAIL live rerun advanced on
+  observed commit `518e8a23e5914cf05a3ad3175459aa446bf8aaee` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-30T03:45:02Z`, `.mcp-index/force_full_exit_trace.json` still
+  showed a durable raw running snapshot with `status: running`,
+  `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`,
+  proving the rerun had already moved away from the SEMCODEXLOOPGARECUTHEARTBEATTAIL
+  target seam before the watchdog terminated the run.
+- At `2026-04-30T03:45:14Z`, a refreshed `repository status` terminalized the
+  same rerun to `Trace status: interrupted` while preserving the same
+  re-exposed earlier legacy rebound progress at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- `repository status` on the same head still advertises the bounded legacy
+  compatibility surface
+  `Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative`
+  while the durable trace has regressed earlier.
+- The SEMCODEXLOOPGARECUTHEARTBEATTAIL target pair is no longer the active
+  blocker:
+  `.codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json ->
+  .codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json`.
+- The current authoritative blocker has re-exposed the earlier legacy rebound
+  pair
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCODEXLOOPGARECUTHEARTBEATTAIL does not satisfy acceptance on its named
+  blocker: the live watchdog no longer reports the garecut seam, but it
+  regressed earlier to the re-exposed legacy rebound pair instead of
+  advancing durably beyond the current roadmap tail.
+- The final authoritative rerun for this phase moved away from the garecut
+  heartbeat seam and now reaches the re-exposed earlier legacy rebound pair
+  `.codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json ->
+  .codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json`.
+- The roadmap now adds downstream phase `SEMCODEXLOOPREBOUNDRELAPSETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCODEXLOOPGARECUTHEARTBEATTAIL-era
+  `garecut-execute launch.json -> heartbeat.json` seam.
+
 ## Verification
 
 Verification sequence for this SEMSECAUTHSANDBOXTAIL slice:
@@ -3767,6 +3837,9 @@ Verification sequence for this SEMCODEXLOOPRELAPSETAIL slice:
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "ciflow or legacy_codex_phase_loop or terminal_summary or launch or bounded or phase_loop"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "ciflow or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMQUERYFULLREBOUNDTAIL or SEMCODEXLOOPRELAPSETAIL or phase_loop"
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "garecut or heartbeat or legacy_codex_phase_loop or bounded or phase_loop"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "garecut or heartbeat or legacy_codex_phase_loop or interrupted or boundary or closeout_handoff or phase_loop"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov -k "SEMCODEXLOOPRELAPSEREBOUNDTAIL or SEMCODEXLOOPGARECUTHEARTBEATTAIL or garecut or phase_loop"
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sed -n '1,240p' .mcp-index/force_full_exit_trace.json
