@@ -5,8 +5,97 @@ from __future__ import annotations
 from mcp_server.cli.stdio_runner import _SERVER_INSTRUCTIONS, _build_tool_list
 
 
+EXPECTED_TOOL_ORDER = [
+    "symbol_lookup",
+    "search_code",
+    "get_status",
+    "list_plugins",
+    "reindex",
+    "write_summaries",
+    "summarize_sample",
+    "handshake",
+]
+
+EXPECTED_TITLES = {
+    "symbol_lookup": "Symbol Lookup",
+    "search_code": "Search Code",
+    "get_status": "Get Status",
+    "list_plugins": "List Plugins",
+    "reindex": "Reindex Repository",
+    "write_summaries": "Write Summaries",
+    "summarize_sample": "Summarize Sample",
+    "handshake": "Authenticate Session",
+}
+
+EXPECTED_ANNOTATIONS = {
+    "symbol_lookup": {
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    "search_code": {
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    "get_status": {
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    "list_plugins": {
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    "reindex": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    "write_summaries": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+    "summarize_sample": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+    "handshake": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+}
+
+
 def _tools_by_name():
     return {tool.name: tool for tool in _build_tool_list()}
+
+
+def test_public_tool_order_is_frozen():
+    assert [tool.name for tool in _build_tool_list()] == EXPECTED_TOOL_ORDER
+
+
+def test_every_public_tool_has_expected_title_annotations_and_output_schema():
+    tools = _tools_by_name()
+    for tool_name, expected_title in EXPECTED_TITLES.items():
+        tool = tools[tool_name]
+        assert tool.title == expected_title
+        assert tool.outputSchema is not None
+        assert tool.annotations is not None
+        for field_name, expected_value in EXPECTED_ANNOTATIONS[tool_name].items():
+            assert getattr(tool.annotations, field_name) is expected_value
 
 
 def test_server_instructions_are_readiness_gated():
@@ -76,3 +165,26 @@ def test_no_argument_tools_preserve_empty_object_contract():
         assert schema["type"] == "object"
         assert schema["properties"] == {}
         assert schema.get("required", []) == []
+        assert schema["additionalProperties"] is False
+
+
+def test_tool_input_schemas_are_explicit_about_additional_properties_and_defaults():
+    tools = _tools_by_name()
+    for tool_name, tool in tools.items():
+        schema = tool.inputSchema
+        assert schema["type"] == "object"
+        assert "properties" in schema
+        assert "required" in schema
+        assert schema["additionalProperties"] is False
+
+    search_schema = tools["search_code"].inputSchema["properties"]
+    assert search_schema["semantic"]["default"] is False
+    assert search_schema["fuzzy"]["default"] is False
+    assert search_schema["limit"]["default"] == 20
+
+    write_schema = tools["write_summaries"].inputSchema["properties"]
+    assert write_schema["limit"]["default"] == 500
+
+    summarize_schema = tools["summarize_sample"].inputSchema["properties"]
+    assert summarize_schema["n"]["default"] == 3
+    assert summarize_schema["persist"]["default"] is False

@@ -94,33 +94,243 @@ class _LocalRepoResolver:
         return _local_ctx
 
 
+_REPOSITORY_DESCRIPTION = "Repository ID, path, or git URL. Defaults to current repository."
+_PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"type": "string"},
+        "code": {"const": "path_outside_allowed_roots"},
+        "path": {"type": "string"},
+        "allowed_roots": {"type": "array", "items": {"type": "string"}},
+        "hint": {"type": "string"},
+    },
+    "required": ["error", "code", "path", "allowed_roots", "hint"],
+    "additionalProperties": True,
+}
+_HANDSHAKE_REQUIRED_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"type": "string"},
+        "code": {"const": "handshake_required"},
+    },
+    "required": ["error", "code"],
+    "additionalProperties": True,
+}
+_MISSING_PARAMETER_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"const": "Missing parameter"},
+        "details": {"type": "string"},
+    },
+    "required": ["error", "details"],
+    "additionalProperties": True,
+}
+_INDEX_UNAVAILABLE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"const": "Index unavailable"},
+        "code": {"const": "index_unavailable"},
+        "tool": {"type": "string"},
+        "safe_fallback": {"const": "native_search"},
+        "readiness": {"type": "object"},
+        "message": {"type": "string"},
+        "remediation": {"type": ["string", "array", "object", "null"]},
+        "query": {"type": "string"},
+        "symbol": {"type": "string"},
+    },
+    "required": ["error", "code", "tool", "safe_fallback", "readiness", "message"],
+    "additionalProperties": True,
+}
+_SECONDARY_READINESS_REFUSAL_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "results": {"type": "array"},
+        "code": {"type": "string"},
+        "tool": {"type": "string"},
+        "readiness": {"type": "object"},
+        "message": {"type": "string"},
+        "remediation": {"type": ["string", "array", "object", "null"]},
+        "mutation_performed": {"type": "boolean"},
+        "persisted": {"type": "boolean"},
+    },
+    "required": ["results", "code", "tool", "readiness", "message"],
+    "additionalProperties": True,
+}
+_SEMANTIC_REFUSAL_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "results": {"type": "array"},
+        "code": {"enum": ["semantic_not_ready", "semantic_search_failed"]},
+        "query": {"type": "string"},
+        "semantic_requested": {"const": True},
+        "semantic_source": {"const": "semantic"},
+        "semantic_profile_id": {"type": ["string", "null"]},
+        "semantic_collection_name": {"type": ["string", "null"]},
+        "semantic_fallback_status": {"type": "string"},
+        "semantic_readiness": {"type": ["object", "null"]},
+        "message": {"type": "string"},
+        "remediation": {"type": ["string", "array", "object", "null"]},
+        "details": {"type": "string"},
+    },
+    "required": [
+        "results",
+        "code",
+        "query",
+        "semantic_requested",
+        "semantic_source",
+        "semantic_fallback_status",
+        "message",
+    ],
+    "additionalProperties": True,
+}
+_CONFLICTING_SCOPE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"const": "Conflicting scope"},
+        "code": {"const": "conflicting_path_and_repository"},
+        "path": {"type": "string"},
+        "paths": {"type": "array", "items": {"type": "string"}},
+        "repository": {"type": "string"},
+        "hint": {"type": "string"},
+    },
+    "required": ["error", "code", "hint"],
+    "additionalProperties": True,
+}
+_SUMMARIZATION_UNAVAILABLE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"const": "Summarization not available"},
+        "details": {"type": "string"},
+    },
+    "required": ["error", "details"],
+    "additionalProperties": True,
+}
+_SQLITE_NOT_INITIALIZED_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "error": {"const": "sqlite_store not initialized"},
+    },
+    "required": ["error"],
+    "additionalProperties": True,
+}
+
+
+def _tool_annotations(
+    *,
+    read_only: bool,
+    destructive: bool,
+    idempotent: bool,
+    open_world: bool,
+) -> types.ToolAnnotations:
+    return types.ToolAnnotations(
+        readOnlyHint=read_only,
+        destructiveHint=destructive,
+        idempotentHint=idempotent,
+        openWorldHint=open_world,
+    )
+
+
+def _object_schema(
+    properties: dict[str, Any],
+    *,
+    required: Sequence[str] = (),
+    additional_properties: bool = False,
+) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": list(required),
+        "additionalProperties": additional_properties,
+    }
+
+
+def _tool(
+    *,
+    name: str,
+    title: str,
+    description: str,
+    input_schema: dict[str, Any],
+    annotations: types.ToolAnnotations,
+    output_schema: dict[str, Any],
+) -> types.Tool:
+    return types.Tool(
+        name=name,
+        title=title,
+        description=description,
+        inputSchema=input_schema,
+        annotations=annotations,
+        outputSchema=output_schema,
+    )
+
+
 def _build_tool_list() -> list[types.Tool]:
     return [
-        types.Tool(
+        _tool(
             name="symbol_lookup",
+            title="Symbol Lookup",
             description="Look up a class, function, method, or variable definition from the index when repository readiness is ready. If the tool returns index_unavailable with safe_fallback=native_search, use native search and follow the readiness remediation, such as reindex. Ready misses return not_found with readiness metadata. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
-            inputSchema={
-                "type": "object",
-                "properties": {
+            input_schema=_object_schema(
+                {
                     "symbol": {"type": "string", "description": "The symbol name to look up"},
                     "repository": {
                         "type": "string",
-                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                        "description": _REPOSITORY_DESCRIPTION,
                     },
                 },
-                "required": ["symbol"],
+                required=("symbol",),
+            ),
+            annotations=_tool_annotations(
+                read_only=True,
+                destructive=False,
+                idempotent=True,
+                open_world=False,
+            ),
+            output_schema={
+                "oneOf": [
+                    _MISSING_PARAMETER_SCHEMA,
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA,
+                    _INDEX_UNAVAILABLE_SCHEMA,
+                    _object_schema(
+                        {
+                            "symbol": {"type": "string"},
+                            "kind": {"type": ["string", "null"]},
+                            "language": {"type": ["string", "null"]},
+                            "signature": {"type": ["string", "null"]},
+                            "doc": {"type": ["string", "null"]},
+                            "defined_in": {"type": "string"},
+                            "line": {"type": ["integer", "null"]},
+                            "span": {"type": ["object", "array", "null"]},
+                            "_usage_hint": {"type": "string"},
+                        },
+                        required=("symbol", "defined_in"),
+                        additional_properties=True,
+                    ),
+                    _object_schema(
+                        {
+                            "result": {"const": "not_found"},
+                            "symbol": {"type": "string"},
+                            "message": {"type": "string"},
+                            "readiness": {"type": "object"},
+                            "index_issues": {"type": "array"},
+                            "suggestion": {"type": "string"},
+                        },
+                        required=("result", "symbol", "message"),
+                        additional_properties=True,
+                    ),
+                ]
             },
         ),
-        types.Tool(
+        _tool(
             name="search_code",
+            title="Search Code",
             description="Search indexed code by pattern, keyword, or natural language (semantic=true) when repository readiness is ready. If the tool returns index_unavailable with safe_fallback=native_search, use native search and follow the readiness remediation, such as reindex. Ready misses return results=[] with readiness metadata. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
-            inputSchema={
-                "type": "object",
-                "properties": {
+            input_schema=_object_schema(
+                {
                     "query": {"type": "string", "description": "The search query"},
                     "repository": {
                         "type": "string",
-                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                        "description": _REPOSITORY_DESCRIPTION,
                     },
                     "semantic": {
                         "type": "boolean",
@@ -138,56 +348,242 @@ def _build_tool_list() -> list[types.Tool]:
                         "default": 20,
                     },
                 },
-                "required": ["query"],
+                required=("query",),
+            ),
+            annotations=_tool_annotations(
+                read_only=True,
+                destructive=False,
+                idempotent=True,
+                open_world=False,
+            ),
+            output_schema={
+                "oneOf": [
+                    _MISSING_PARAMETER_SCHEMA,
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA,
+                    _INDEX_UNAVAILABLE_SCHEMA,
+                    _SEMANTIC_REFUSAL_SCHEMA,
+                    _object_schema(
+                        {
+                            "error": {"enum": ["Search timeout", "Search failed"]},
+                            "details": {"type": "string"},
+                            "query": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                        },
+                        required=("error", "details", "query"),
+                        additional_properties=True,
+                    ),
+                    {
+                        "type": "array",
+                        "items": _object_schema(
+                            {
+                                "file": {"type": "string"},
+                                "line": {"type": ["integer", "null"]},
+                                "line_end": {"type": ["integer", "null"]},
+                                "symbol": {"type": ["string", "null"]},
+                                "snippet": {"type": ["string", "null"]},
+                                "last_indexed": {"type": ["string", "null"]},
+                                "_usage_hint": {"type": "string"},
+                            },
+                            required=("file",),
+                            additional_properties=True,
+                        ),
+                    },
+                    _object_schema(
+                        {
+                            "results": {
+                                "type": "array",
+                                "items": _object_schema(
+                                    {
+                                        "file": {"type": "string"},
+                                        "line": {"type": ["integer", "null"]},
+                                        "line_end": {"type": ["integer", "null"]},
+                                        "symbol": {"type": ["string", "null"]},
+                                        "snippet": {"type": ["string", "null"]},
+                                        "last_indexed": {"type": ["string", "null"]},
+                                        "semantic_source": {"type": ["string", "null"]},
+                                        "semantic_profile_id": {"type": ["string", "null"]},
+                                        "semantic_collection_name": {
+                                            "type": ["string", "null"]
+                                        },
+                                        "_usage_hint": {"type": "string"},
+                                    },
+                                    required=("file",),
+                                    additional_properties=True,
+                                ),
+                            },
+                            "query": {"type": "string"},
+                            "message": {"type": "string"},
+                            "readiness": {"type": "object"},
+                            "indexing_in_progress": {"type": "boolean"},
+                            "note": {"type": "string"},
+                            "semantic_requested": {"type": "boolean"},
+                            "semantic_source": {"type": "string"},
+                            "semantic_profile_id": {"type": ["string", "null"]},
+                            "semantic_collection_name": {"type": ["string", "null"]},
+                            "semantic_fallback_status": {"type": "string"},
+                        },
+                        required=("results",),
+                        additional_properties=True,
+                    ),
+                ]
             },
         ),
-        types.Tool(
+        _tool(
             name="get_status",
+            title="Get Status",
             description="Get the status of the code index server. Shows index health, supported languages, and performance statistics.",
-            inputSchema={"type": "object", "properties": {}},
+            input_schema=_object_schema({}),
+            annotations=_tool_annotations(
+                read_only=True,
+                destructive=False,
+                idempotent=True,
+                open_world=False,
+            ),
+            output_schema={
+                "oneOf": [
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _object_schema(
+                        {
+                            "status": {"type": "string"},
+                            "version": {"type": "string"},
+                            "features": {"type": "object"},
+                            "plugins": {"type": "object"},
+                            "performance": {"type": "object"},
+                            "repositories": {"type": "array"},
+                            "client": {"type": ["object", "null"]},
+                        },
+                        required=("status", "version", "features", "plugins", "performance"),
+                        additional_properties=True,
+                    ),
+                ]
+            },
         ),
-        types.Tool(
+        _tool(
             name="list_plugins",
+            title="List Plugins",
             description=(
                 "List all loaded plugins and machine-readable plugin availability facts, "
                 "including enabled, unsupported, disabled, missing-extra, load-error, "
                 "specific-plugin versus registry-only coverage, and default activation posture."
             ),
-            inputSchema={"type": "object", "properties": {}},
+            input_schema=_object_schema({}),
+            annotations=_tool_annotations(
+                read_only=True,
+                destructive=False,
+                idempotent=True,
+                open_world=False,
+            ),
+            output_schema={
+                "oneOf": [
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _object_schema(
+                        {
+                            "plugin_manager_plugins": {"type": "array"},
+                            "supported_languages": {"type": "array"},
+                            "loaded_plugins": {"type": "array"},
+                            "plugin_availability": {"type": "array"},
+                            "availability_counts": {"type": "object"},
+                        },
+                        required=(
+                            "plugin_manager_plugins",
+                            "supported_languages",
+                            "loaded_plugins",
+                            "plugin_availability",
+                            "availability_counts",
+                        ),
+                        additional_properties=True,
+                    ),
+                ]
+            },
         ),
-        types.Tool(
+        _tool(
             name="reindex",
+            title="Reindex Repository",
             description=(
                 "Reindex files in the codebase only when repository readiness is ready. "
                 "Non-ready repositories return a structured readiness refusal without mutation. "
                 "Updates the index for changed files or specific paths. The path must be inside "
                 "MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots."
             ),
-            inputSchema={
-                "type": "object",
-                "properties": {
+            input_schema=_object_schema(
+                {
                     "path": {
                         "type": "string",
                         "description": "Optional path to reindex. If not provided, reindexes all files.",
                     },
                     "repository": {
                         "type": "string",
-                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                        "description": _REPOSITORY_DESCRIPTION,
                     },
                 },
+            ),
+            annotations=_tool_annotations(
+                read_only=False,
+                destructive=False,
+                idempotent=False,
+                open_world=False,
+            ),
+            output_schema={
+                "oneOf": [
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA,
+                    _SECONDARY_READINESS_REFUSAL_SCHEMA,
+                    _CONFLICTING_SCOPE_SCHEMA,
+                    _object_schema(
+                        {
+                            "error": {"const": "Path not found"},
+                            "path": {"type": "string"},
+                        },
+                        required=("error", "path"),
+                        additional_properties=True,
+                    ),
+                    {
+                        "type": "string",
+                    },
+                    _object_schema(
+                        {
+                            "path": {"type": "string"},
+                            "mode": {"const": "merge"},
+                            "indexed_files": {"type": ["integer", "null"]},
+                            "ignored_files": {"type": ["integer", "null"]},
+                            "failed_files": {"type": ["integer", "null"]},
+                            "total_files": {"type": ["integer", "null"]},
+                            "by_language": {"type": ["object", "null"]},
+                            "lexical_rows": {"type": ["integer", "null"]},
+                            "durable_files": {"type": ["integer", "null"]},
+                            "semantic_indexed": {"type": ["integer", "null"]},
+                            "semantic_failed": {"type": ["integer", "null"]},
+                            "semantic_skipped": {"type": ["integer", "null"]},
+                            "semantic_blocked": {"type": ["integer", "null"]},
+                            "semantic_stage": {"type": ["string", "null"]},
+                            "summaries_written": {"type": ["integer", "null"]},
+                            "summary_chunks_attempted": {"type": ["integer", "null"]},
+                            "summary_missing_chunks": {"type": ["integer", "null"]},
+                            "total_embedding_units": {"type": ["integer", "null"]},
+                            "semantic_error": {"type": ["string", "null"]},
+                            "semantic_blocker": {"type": ["string", "null"]},
+                            "semantic_paths_queued": {"type": ["integer", "null"]},
+                            "semantic_indexer_present": {"type": ["boolean", "null"]},
+                            "merge_note": {"type": "string"},
+                        },
+                        required=("path", "mode", "merge_note"),
+                        additional_properties=True,
+                    ),
+                ]
             },
         ),
-        types.Tool(
+        _tool(
             name="write_summaries",
+            title="Write Summaries",
             description=(
                 "Run the full LLM summarization pass over all un-summarized chunks in the index. "
                 "Runs only when repository readiness is ready; non-ready repositories return a "
                 "structured readiness refusal without persistence. Persists results. Use "
                 "summarize_sample first to validate quality."
             ),
-            inputSchema={
-                "type": "object",
-                "properties": {
+            input_schema=_object_schema(
+                {
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of chunks to summarize in this call.",
@@ -195,13 +591,49 @@ def _build_tool_list() -> list[types.Tool]:
                     },
                     "repository": {
                         "type": "string",
-                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                        "description": _REPOSITORY_DESCRIPTION,
                     },
                 },
+            ),
+            annotations=_tool_annotations(
+                read_only=False,
+                destructive=False,
+                idempotent=False,
+                open_world=True,
+            ),
+            output_schema={
+                "oneOf": [
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA,
+                    _SECONDARY_READINESS_REFUSAL_SCHEMA,
+                    _SUMMARIZATION_UNAVAILABLE_SCHEMA,
+                    _SQLITE_NOT_INITIALIZED_SCHEMA,
+                    _object_schema(
+                        {
+                            "chunks_summarized": {"type": "integer"},
+                            "limit": {"type": "integer"},
+                            "model_used": {"type": ["string", "null"]},
+                            "persisted": {"const": True},
+                            "semantic_vectors_written": {"type": "boolean"},
+                            "summary_chunks_attempted": {"type": "integer"},
+                            "summary_missing_chunks": {"type": "integer"},
+                        },
+                        required=(
+                            "chunks_summarized",
+                            "limit",
+                            "persisted",
+                            "semantic_vectors_written",
+                            "summary_chunks_attempted",
+                            "summary_missing_chunks",
+                        ),
+                        additional_properties=True,
+                    ),
+                ]
             },
         ),
-        types.Tool(
+        _tool(
             name="summarize_sample",
+            title="Summarize Sample",
             description=(
                 "Summarize a sample of indexed files using the LLM and return results "
                 "for quality evaluation only when repository readiness is ready; non-ready "
@@ -209,9 +641,8 @@ def _build_tool_list() -> list[types.Tool]:
                 "Does not persist results by default. "
                 "Each entry in paths is checked against the sandbox; mismatches return path_outside_allowed_roots."
             ),
-            inputSchema={
-                "type": "object",
-                "properties": {
+            input_schema=_object_schema(
+                {
                     "paths": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -229,18 +660,87 @@ def _build_tool_list() -> list[types.Tool]:
                     },
                     "repository": {
                         "type": "string",
-                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                        "description": _REPOSITORY_DESCRIPTION,
                     },
                 },
+            ),
+            annotations=_tool_annotations(
+                read_only=False,
+                destructive=False,
+                idempotent=False,
+                open_world=True,
+            ),
+            output_schema={
+                "oneOf": [
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                    _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA,
+                    _SECONDARY_READINESS_REFUSAL_SCHEMA,
+                    _CONFLICTING_SCOPE_SCHEMA,
+                    _SUMMARIZATION_UNAVAILABLE_SCHEMA,
+                    _SQLITE_NOT_INITIALIZED_SCHEMA,
+                    _object_schema(
+                        {
+                            "files_processed": {"type": "integer"},
+                            "total_chunks": {"type": "integer"},
+                            "model_used": {"type": ["string", "null"]},
+                            "persisted": {"type": "boolean"},
+                            "files": {
+                                "type": "array",
+                                "items": _object_schema(
+                                    {
+                                        "file_path": {"type": "string"},
+                                        "error": {"type": "string"},
+                                        "chunk_count": {"type": "integer"},
+                                        "summaries": {
+                                            "type": "array",
+                                            "items": _object_schema(
+                                                {
+                                                    "symbol": {"type": "string"},
+                                                    "lines": {"type": "string"},
+                                                    "summary": {"type": "string"},
+                                                },
+                                                required=("symbol", "lines", "summary"),
+                                                additional_properties=True,
+                                            ),
+                                        },
+                                    },
+                                    required=("file_path",),
+                                    additional_properties=True,
+                                ),
+                            },
+                        },
+                        required=("files_processed", "total_chunks", "persisted", "files"),
+                        additional_properties=True,
+                    ),
+                ]
             },
         ),
-        types.Tool(
+        _tool(
             name="handshake",
+            title="Authenticate Session",
             description="Authenticate with the server using the configured secret. Required before other tools when MCP_CLIENT_SECRET is set.",
-            inputSchema={
-                "type": "object",
-                "properties": {"secret": {"type": "string"}},
-                "required": ["secret"],
+            input_schema=_object_schema(
+                {"secret": {"type": "string"}},
+                required=("secret",),
+            ),
+            annotations=_tool_annotations(
+                read_only=False,
+                destructive=False,
+                idempotent=False,
+                open_world=False,
+            ),
+            output_schema={
+                "oneOf": [
+                    _MISSING_PARAMETER_SCHEMA,
+                    _object_schema(
+                        {
+                            "authenticated": {"const": True},
+                        },
+                        required=("authenticated",),
+                        additional_properties=True,
+                    ),
+                    _HANDSHAKE_REQUIRED_SCHEMA,
+                ]
             },
         ),
     ]

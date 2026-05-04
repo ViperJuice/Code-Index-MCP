@@ -418,6 +418,13 @@ ordinary no-match payloads (`results: []` for `search_code` or
 `result: "not_found"` for `symbol_lookup`) with readiness metadata; unavailable
 indexes return `index_unavailable` instead.
 
+The STDIO `tools/list` surface is deterministic and now advertises richer MCP
+metadata for every public tool: stable `title` values, explicit JSON Schema
+input contracts (`required`, defaults, and `additionalProperties` posture),
+annotations for read-only versus mutating behavior, and implementation-owned
+`outputSchema` drafts. This phase improves discoverability only; structured
+`call_tool` result payloads remain deferred to `MCPSTRUCT`.
+
 ### 🔧 Configuration
 
 Create a `.env` file for configuration:

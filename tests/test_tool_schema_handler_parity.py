@@ -32,6 +32,8 @@ TOOL_NAME_TO_HANDLER = {
     "list_plugins": handle_list_plugins,
 }
 
+ZERO_ARGUMENT_TOOLS = {"get_status", "list_plugins"}
+
 
 def _schema_advertises_repository(tool_schema: dict) -> bool:
     return "repository" in tool_schema.get("inputSchema", {}).get("properties", {})
@@ -80,3 +82,40 @@ def test_handler_accepts_repository_implies_schema_advertises_it():
                 )
 
     assert not failures, "\n".join(failures)
+
+
+def test_every_public_tool_has_output_schema_and_annotations():
+    tool_list = _build_tool_list()
+
+    for tool in tool_list:
+        assert tool.outputSchema is not None, f"{tool.name} must advertise outputSchema"
+        assert tool.annotations is not None, f"{tool.name} must advertise annotations"
+
+
+def test_zero_argument_tools_remain_zero_argument_after_metadata_refactor():
+    schema_map = {t.name: t.inputSchema for t in _build_tool_list()}
+
+    for tool_name in ZERO_ARGUMENT_TOOLS:
+        schema = schema_map[tool_name]
+        assert schema["properties"] == {}
+        assert schema.get("required", []) == []
+        assert schema["additionalProperties"] is False
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "expected_read_only"),
+    [
+        ("symbol_lookup", True),
+        ("search_code", True),
+        ("get_status", True),
+        ("list_plugins", True),
+        ("reindex", False),
+        ("write_summaries", False),
+        ("summarize_sample", False),
+        ("handshake", False),
+    ],
+)
+def test_annotations_match_read_only_posture(tool_name: str, expected_read_only: bool):
+    tools = {tool.name: tool for tool in _build_tool_list()}
+    assert tools[tool_name].annotations is not None
+    assert tools[tool_name].annotations.readOnlyHint is expected_read_only
