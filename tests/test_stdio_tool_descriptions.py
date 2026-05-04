@@ -67,3 +67,12 @@ def test_list_plugins_description_mentions_machine_readable_support_facts():
     description = _tools_by_name()["list_plugins"].description
     for expected in ("machine-readable", "specific-plugin", "registry-only", "activation"):
         assert expected in description
+
+
+def test_no_argument_tools_preserve_empty_object_contract():
+    tools = _tools_by_name()
+    for tool_name in ("get_status", "list_plugins"):
+        schema = tools[tool_name].inputSchema
+        assert schema["type"] == "object"
+        assert schema["properties"] == {}
+        assert schema.get("required", []) == []

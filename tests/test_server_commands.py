@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from mcp_server.cli.server_commands import serve
+from mcp_server.cli.server_commands import serve, stdio
 
 
 def test_serve_uses_explicit_host_port(monkeypatch):
@@ -51,3 +51,22 @@ def test_serve_preserves_explicit_storage_env(monkeypatch):
     assert result.exit_code == 0
     assert calls == [("mcp_server.gateway:app", "127.0.0.1", 8765, False)]
     assert __import__("os").environ["MCP_INDEX_STORAGE_PATH"] == "/tmp/custom-indexes"
+
+
+def test_serve_help_marks_fastapi_admin_gateway():
+    runner = CliRunner()
+
+    result = runner.invoke(serve, ["--help"])
+
+    assert result.exit_code == 0
+    assert "FastAPI admin/debug HTTP gateway" in result.output
+    assert "Streamable HTTP" not in result.output
+
+
+def test_stdio_help_marks_primary_mcp_surface():
+    runner = CliRunner()
+
+    result = runner.invoke(stdio, ["--help"])
+
+    assert result.exit_code == 0
+    assert "primary MCP STDIO server" in result.output

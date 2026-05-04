@@ -107,7 +107,7 @@ SL-1 ----/
   `initialize`, `tools/list`, and representative `tools/call` operations,
   while freezing the current stable tool names and no-argument runtime
   behavior.
-- **Owned files**: `tests/smoke/test_mcpbase_stdio_smoke.py`, `tests/test_stdio_tool_descriptions.py`
+- **Owned files**: `mcp_server/cli/stdio_runner.py`, `tests/smoke/test_mcpbase_stdio_smoke.py`, `tests/test_stdio_tool_descriptions.py`
 - **Interfaces provided**: IF-0-MCPBASE-1 STDIO baseline compatibility contract;
   IF-0-MCPBASE-2 no-argument compatibility contract;
   runtime evidence consumed by the SL-2 audit artifact

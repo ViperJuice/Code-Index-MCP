@@ -34,7 +34,7 @@ def _default_port() -> int:
     help="On schema mismatch, rebuild the index and retry the load.",
 )
 def serve(host: str, port: int, reload: bool, rebuild_on_schema_mismatch: bool) -> None:
-    """Start the MCP HTTP server with configurable host and port."""
+    """Start the FastAPI admin/debug HTTP gateway with configurable host and port."""
     from pathlib import Path
 
     import uvicorn
@@ -44,7 +44,7 @@ def serve(host: str, port: int, reload: bool, rebuild_on_schema_mismatch: bool) 
     if rebuild_on_schema_mismatch:
         os.environ["MCP_REBUILD_ON_SCHEMA_MISMATCH"] = "1"
 
-    click.echo(f"Starting MCP server on http://{host}:{port}")
+    click.echo(f"Starting FastAPI admin/debug gateway on http://{host}:{port}")
     uvicorn.run("mcp_server.gateway:app", host=host, port=port, reload=reload)
 
 
@@ -56,7 +56,7 @@ def serve(host: str, port: int, reload: bool, rebuild_on_schema_mismatch: bool) 
     help="On schema mismatch, rebuild the index and retry the load.",
 )
 def stdio(rebuild_on_schema_mismatch: bool) -> None:
-    """Start the MCP stdio server (JSON-RPC over stdin/stdout)."""
+    """Start the primary MCP STDIO server (JSON-RPC over stdin/stdout)."""
     from mcp_server.cli.stdio_runner import run
 
     if rebuild_on_schema_mismatch:

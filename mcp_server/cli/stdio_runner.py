@@ -939,7 +939,12 @@ async def _serve(registry_path=None) -> None:
 
     try:
         async with stdio_server() as (read_stream, write_stream):
-            await server.run(read_stream, write_stream, server.create_initialization_options())
+            await server.run(
+                read_stream,
+                write_stream,
+                server.create_initialization_options(),
+                raise_exceptions=True,
+            )
     finally:
         await _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
 
@@ -952,3 +957,7 @@ def run() -> None:
 async def main() -> None:
     """Async entry point — used by the shim for asyncio.run(main())."""
     await _serve()
+
+
+if __name__ == "__main__":
+    run()

@@ -377,7 +377,8 @@ mcp-index index status
 # Start the MCP STDIO runner (primary surface used by LLMs via .mcp.json)
 python -m mcp_server.cli.stdio_runner
 
-# Or start the FastAPI admin REST gateway (secondary, for diagnostics)
+# Or start the FastAPI admin REST gateway (secondary, for diagnostics only;
+# this is not the repo's MCP Streamable HTTP transport)
 mcp-index serve
 mcp-index serve --port 9123   # alternate port
 ```

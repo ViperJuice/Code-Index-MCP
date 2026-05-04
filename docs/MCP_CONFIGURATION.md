@@ -81,7 +81,7 @@ The setup script automatically detects your environment:
   "mcpServers": {
     "code-index-native": {
       "command": "mcp-index",
-      "args": ["serve"],
+      "args": ["stdio"],
       "cwd": "${workspace}",
       "env": {
         "PYTHONPATH": "${workspace}",
@@ -100,6 +100,10 @@ The setup script automatically detects your environment:
 - Development containers
 - Local development with Python installed
 - CI/CD environments
+
+This native template targets the primary MCP STDIO surface. Use
+`mcp-index serve` separately only when you need the secondary FastAPI
+admin/debug HTTP gateway; it is not the repo's Streamable HTTP transport.
 
 ### Docker Minimal Configuration
 

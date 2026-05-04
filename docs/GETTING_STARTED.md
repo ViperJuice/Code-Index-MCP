@@ -81,16 +81,19 @@ mcp-index index rebuild --force
 ### 2. Start the MCP Server
 
 ```bash
-# Start the server
-mcp-index serve
+# Start the primary MCP STDIO server used by LLM clients
+mcp-index stdio
 
-# Or pick a less crowded port
+# Or start the secondary FastAPI admin/debug gateway on a less crowded port
 mcp-index serve --port 9123
 ```
 
-The server exposes:
-- REST API at `http://127.0.0.1:8000`
-- MCP protocol for AI assistant integration
+The startup surfaces are:
+- MCP STDIO on stdin/stdout for LLM client integration
+- FastAPI admin/debug HTTP at `http://127.0.0.1:9123` when you start `mcp-index serve`
+
+`mcp-index serve` is an admin/debug gateway, not the repo's MCP Streamable HTTP
+transport.
 
 ### Same-Machine Multi-Repo Setup
 
