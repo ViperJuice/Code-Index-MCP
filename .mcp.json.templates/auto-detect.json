@@ -4,7 +4,7 @@
       "command": "sh",
       "args": [
         "-c", 
-        "if [ -f /.dockerenv ]; then python -m mcp_server.cli stdio; elif command -v docker >/dev/null 2>&1; then docker run -i --rm -v \"${workspace}:/workspace\" -e VOYAGE_API_KEY=\"${VOYAGE_API_KEY:-}\" ${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}; else python -m mcp_server.cli stdio; fi"
+        "if [ -f /.dockerenv ]; then mcp-index stdio; elif command -v docker >/dev/null 2>&1; then docker run -i --rm -v \"${workspace}:/workspace\" -e VOYAGE_API_KEY=\"${VOYAGE_API_KEY:-}\" ${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal} mcp-index stdio; else mcp-index stdio; fi"
       ],
       "env": {
         "PYTHONPATH": "${workspace}",

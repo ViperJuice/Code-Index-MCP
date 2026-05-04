@@ -72,6 +72,10 @@ The setup script automatically detects your environment:
 
 ## Configuration Templates
 
+All repo-shipped MCP client templates launch `mcp-index stdio`. Use
+`mcp-index serve` separately only for the secondary FastAPI admin/debug HTTP
+gateway, not as MCP client registration.
+
 ### Native Python Configuration
 
 **File:** `.mcp.json.templates/native.json`
@@ -123,7 +127,9 @@ admin/debug HTTP gateway; it is not the repo's Streamable HTTP transport.
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
         "-e", "MCP_ARTIFACT_SYNC=false",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}",
+        "mcp-index",
+        "stdio"
       ]
     }
   }
@@ -156,7 +162,9 @@ admin/debug HTTP gateway; it is not the repo's Streamable HTTP transport.
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}",
+        "mcp-index",
+        "stdio"
       ]
     }
   }
@@ -181,8 +189,8 @@ admin/debug HTTP gateway; it is not the repo's Streamable HTTP transport.
         "exec",
         "-i",
         "mcp-sidecar",
-        "python",
-        "/app/scripts/cli/mcp_server_cli.py"
+        "mcp-index",
+        "stdio"
       ],
       "env": {
         "MCP_WORKSPACE_ROOT": "/workspace",

@@ -133,8 +133,8 @@ First, register the server in your project's `.mcp.json`:
 {
   "mcpServers": {
     "code-index": {
-      "command": "python",
-      "args": ["-m", "mcp_server.cli.stdio_runner"],
+      "command": "mcp-index",
+      "args": ["stdio"],
       "cwd": "/path/to/your/project"
     }
   }

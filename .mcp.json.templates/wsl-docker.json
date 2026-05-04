@@ -9,7 +9,9 @@
         "-v", "${workspace}:/workspace",
         "-v", "${HOME}/.mcp-index:/app/.mcp-index",
         "-e", "VOYAGE_API_KEY=${VOYAGE_API_KEY:-}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}",
+        "mcp-index",
+        "stdio"
       ],
       "env": {
         "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}",
