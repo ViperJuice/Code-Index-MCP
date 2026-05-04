@@ -112,11 +112,13 @@ gateway, not as MCP client registration.
 
 This native template targets the primary MCP STDIO surface. Use
 `mcp-index serve` separately only when you need the secondary FastAPI
-admin/debug HTTP gateway; it is not the repo's Streamable HTTP transport.
+admin/debug HTTP gateway; it is not the repo's MCP Streamable HTTP transport.
 If you enable `MCP_CLIENT_SECRET`, clients must satisfy that local STDIO
 handshake guard through the `handshake` tool. It does not configure the
 gateway's admin/debug bearer token authentication, and no remote MCP
 authorization is implemented in this repo's current transport posture.
+For the current named-client and transport matrix, see
+`docs/status/MCP_COMPATIBILITY_EVALUATION.md`.
 
 ### Docker Minimal Configuration
 

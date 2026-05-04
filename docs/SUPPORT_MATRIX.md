@@ -21,6 +21,20 @@ Runtime facts are grounded in `mcp_server/plugins/language_registry.py`,
 and `mcp_server/cli/stdio_runner.py`. The canonical release-boundary and
 evidence checklist is `docs/validation/ga-readiness-checklist.md`.
 
+## Client and transport compatibility
+
+The client/transport compatibility reducer for the current MCP surface is
+`docs/status/MCP_COMPATIBILITY_EVALUATION.md`. The short version:
+
+- Official Python MCP SDK over STDIO is the direct phase-owned verified client.
+- Claude Code and other STDIO launchers are documented against the same STDIO
+  contract, but MCPEVAL does not add a separate vendor-harness smoke for each
+  editor.
+- FastAPI remains the admin/debug HTTP surface, not the repository's MCP
+  Streamable HTTP transport.
+- Remote Streamable HTTP MCP remains deferred until a later roadmap phase adds
+  a distinct endpoint, transport tests, and transport-specific auth.
+
 ## Claim tiers
 
 - **Stable prep**: `v1.2.0` is the prepared stable package and container

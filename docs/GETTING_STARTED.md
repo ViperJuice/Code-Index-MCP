@@ -129,6 +129,11 @@ The primary interface is the Model Context Protocol: your LLM (Claude Code,
 Cursor, etc.) calls `search_code` and `symbol_lookup` as MCP tools. A FastAPI
 admin surface is also available for manual debugging (see below).
 
+For the current named-client posture, see
+`docs/status/MCP_COMPATIBILITY_EVALUATION.md`. MCPEVAL's direct client proof is
+the official Python SDK smoke over STDIO; other STDIO launchers are expected to
+work only insofar as they honor that same MCP contract.
+
 **Via MCP Protocol (primary):**
 
 First, register the server in your project's `.mcp.json`:

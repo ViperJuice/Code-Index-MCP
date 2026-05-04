@@ -449,6 +449,12 @@ terminal payload retrieval, and best-effort cancellation. Readiness refusals,
 path sandbox failures, conflicting scope errors, and
 summarizer-unavailable preflights still fail synchronously before any task is created.
 
+Current verified MCP client posture is summarized in the
+[MCP compatibility matrix](docs/status/MCP_COMPATIBILITY_EVALUATION.md). The
+phase-owned direct smoke is the official Python SDK over STDIO; Claude Code and
+other STDIO launchers are documented against that same server contract, while
+remote Streamable HTTP MCP remains deferred.
+
 ### 🔧 Configuration
 
 Create a `.env` file for configuration:
@@ -1254,7 +1260,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress
 **Current Status**: 1.2.0 stable surface prepared; downstream GADISP dispatch still pending
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
-- ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients
+- ✅ **MCP Protocol**: Verified official Python SDK compatibility over STDIO; see `docs/status/MCP_COMPATIBILITY_EVALUATION.md` for named client posture
 - ✅ **Performance**: Sub-100ms queries with BM25 optimization
 - 🔄 **Index Sync**: Beta support via GitHub Artifacts
 - 🔄 **Semantic Search**: Optional feature requiring Voyage AI API
