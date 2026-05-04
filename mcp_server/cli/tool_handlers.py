@@ -17,6 +17,8 @@ from typing import Any, Optional, Sequence
 import mcp.types as types
 
 from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, validate_index
+from mcp_server.cli.task_reindex import run_reindex_task
+from mcp_server.cli.task_write_summaries import run_write_summaries_task
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.dispatcher_enhanced import SemanticSearchFailure
@@ -822,7 +824,9 @@ async def handle_reindex(
     dispatcher: DispatcherProtocol,
     repo_resolver: RepoResolver,
     sqlite_store: Any = None,
-) -> Sequence[types.TextContent]:
+    request_experimental: Any = None,
+    task_registry: Any = None,
+) -> Sequence[types.TextContent] | types.CreateTaskResult:
     path = (arguments or {}).get("path")
     repository = (arguments or {}).get("repository")
 
@@ -897,6 +901,19 @@ async def handle_reindex(
         )
 
     if path and target_path.is_file():
+        if request_experimental is not None and request_experimental.is_task:
+            return await request_experimental.run_task(
+                lambda task: run_reindex_task(
+                    task=task,
+                    registry=task_registry,
+                    dispatcher=dispatcher,
+                    ctx=ctx,
+                    active_store=active_store,
+                    target_path=target_path,
+                    requested_path=path,
+                ),
+                model_immediate_response="Reindex task created; poll tasks/get or tasks/result for progress.",
+            )
         try:
             if ctx is not None:
                 dispatcher.index_file(ctx, target_path)  # type: ignore[call-arg]
@@ -946,6 +963,19 @@ async def handle_reindex(
                 }
             )
     else:
+        if request_experimental is not None and request_experimental.is_task:
+            return await request_experimental.run_task(
+                lambda task: run_reindex_task(
+                    task=task,
+                    registry=task_registry,
+                    dispatcher=dispatcher,
+                    ctx=ctx,
+                    active_store=active_store,
+                    target_path=target_path,
+                    requested_path=path,
+                ),
+                model_immediate_response="Reindex task created; poll tasks/get or tasks/result for progress.",
+            )
         try:
             if ctx is not None:
                 stats = dispatcher.index_directory(ctx, target_path, recursive=True)  # type: ignore[call-arg]
@@ -1002,7 +1032,9 @@ async def handle_write_summaries(
     lazy_summarizer: Any = None,
     current_session: Any = None,
     client_name: Optional[str] = None,
-) -> Sequence[types.TextContent]:
+    request_experimental: Any = None,
+    task_registry: Any = None,
+) -> Sequence[types.TextContent] | types.CreateTaskResult:
     from mcp_server.config.settings import Settings
     from mcp_server.indexing.summarization import ComprehensiveChunkWriter
 
@@ -1061,6 +1093,22 @@ async def handle_write_summaries(
     db_path = active_store.db_path
     limit_arg = int((arguments or {}).get("limit", 500))
     model_used = lazy_summarizer._get_model_name()
+
+    if request_experimental is not None and request_experimental.is_task:
+        return await request_experimental.run_task(
+            lambda task: run_write_summaries_task(
+                task=task,
+                registry=task_registry,
+                active_store=active_store,
+                current_session=current_session,
+                client_name=client_name,
+                limit_arg=limit_arg,
+                model_used=model_used,
+            ),
+            model_immediate_response=(
+                "Summary task created; use tasks/get and tasks/result to observe bounded progress."
+            ),
+        )
 
     _settings = Settings.from_environment()
     writer = ComprehensiveChunkWriter(

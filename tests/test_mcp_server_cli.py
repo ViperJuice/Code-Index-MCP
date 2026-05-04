@@ -9,6 +9,7 @@ import json
 import os
 import threading
 from contextlib import ExitStack
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -519,3 +520,31 @@ class TestFreshRepoEndToEnd:
             "Expected BM25 results after indexing real files, got empty results. "
             f"Full response: {structured}"
         )
+
+
+@pytest.mark.asyncio
+async def test_call_tool_preserves_create_task_result_branch():
+    cli = _load_cli_module()
+    _reset_globals(cli)
+    cli.dispatcher = _FakeEnhancedDispatcher()
+    cli.sqlite_store = MagicMock()
+
+    created = types.CreateTaskResult(
+        task=types.Task(
+            taskId="task-1",
+            status="working",
+            statusMessage="queued",
+            createdAt=datetime.now(timezone.utc),
+            lastUpdatedAt=datetime.now(timezone.utc),
+            ttl=None,
+            pollInterval=500,
+        )
+    )
+
+    async def _fake_reindex(**kwargs):
+        return created
+
+    with patch.object(cli.tool_handlers, "handle_reindex", side_effect=_fake_reindex):
+        result = await cli.call_tool("reindex", {"path": "/tmp/example"})
+
+    assert result is created

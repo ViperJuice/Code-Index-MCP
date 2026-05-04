@@ -20,6 +20,7 @@ from typing import Any, Optional, Sequence
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
+from mcp.shared.exceptions import McpError
 
 from mcp_server.cli import tool_handlers
 from mcp_server.cli.bootstrap import initialize_stateless_services, timeout, validate_index
@@ -29,6 +30,7 @@ from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.metrics.prometheus_exporter import PrometheusExporter, record_tool_call
 from mcp_server.plugin_system import PluginManager
+from mcp_server.storage.mcp_task_registry import MCPTaskRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.index_discovery import IndexDiscovery
 from mcp_server.watcher import FileWatcher
@@ -78,6 +80,7 @@ _indexing_started_at: Optional[float] = None
 _repo_resolver: Any = None
 _store_registry: Any = None
 _local_ctx: Any = None  # RepoContext for the local repo, built by initialize_services()
+_task_registry: MCPTaskRegistry | None = None
 
 
 class _LocalRepoResolver:
@@ -261,6 +264,11 @@ def _tool(
         inputSchema=input_schema,
         annotations=annotations,
         outputSchema=output_schema,
+        execution=(
+            types.ToolExecution(taskSupport="optional")
+            if name in {"reindex", "write_summaries"}
+            else None
+        ),
     )
 
 
@@ -1186,16 +1194,18 @@ _init_lock: Optional[asyncio.Lock] = None
 
 async def call_tool(
     name: str, arguments: dict | None
-) -> types.CallToolResult:
+) -> types.CallToolResult | types.CreateTaskResult:
     global _lazy_summarizer, _init_lock, _gate
 
     _current_session = None
     _client_name = None
+    _request_experimental = None
     try:
         from mcp.server.lowlevel.server import request_ctx
 
         _ctx = request_ctx.get()
         _current_session = _ctx.session
+        _request_experimental = _ctx.experimental
         _params = getattr(_current_session, "client_params", None)
         _client_name = getattr(getattr(_params, "clientInfo", None), "name", None)
     except Exception as _e:
@@ -1273,6 +1283,9 @@ async def call_tool(
 
     _tool_status = "success"
     try:
+        tool_def = next((tool for tool in _build_tool_list() if tool.name == name), None)
+        if _request_experimental is not None and tool_def is not None:
+            _request_experimental.validate_for_tool(tool_def)
         if name == "handshake":
             _secret = (arguments or {}).get("secret", "")
             if _gate.verify(_secret):
@@ -1328,6 +1341,8 @@ async def call_tool(
             response = await tool_handlers.handle_reindex(
                 **common_kwargs,
                 sqlite_store=sqlite_store,
+                request_experimental=_request_experimental,
+                task_registry=_task_registry,
             )
         elif name == "write_summaries":
             response = await tool_handlers.handle_write_summaries(
@@ -1336,6 +1351,8 @@ async def call_tool(
                 lazy_summarizer=_lazy_summarizer,
                 current_session=_current_session,
                 client_name=_client_name,
+                request_experimental=_request_experimental,
+                task_registry=_task_registry,
             )
         elif name == "summarize_sample":
             response = await tool_handlers.handle_summarize_sample(
@@ -1369,6 +1386,8 @@ async def call_tool(
             ]
     except Exception as e:
         _tool_status = "error"
+        if isinstance(e, McpError):
+            raise
         logger.error(f"Error in tool {name}: {e}", exc_info=True)
         response = [
             types.TextContent(
@@ -1387,6 +1406,9 @@ async def call_tool(
 
     elapsed = time.time() - start_time
     logger.info(f"=== MCP Tool Response: {name} ({elapsed:.2f}s) ===")
+
+    if isinstance(response, types.CreateTaskResult):
+        return response
 
     if not response:
         response = [
@@ -1412,7 +1434,7 @@ async def call_tool(
 
 async def _serve(registry_path=None) -> None:
     """Set up and run the MCP stdio server."""
-    global _shutdown_called, _gate, _repo_resolver, _store_registry
+    global _shutdown_called, _gate, _repo_resolver, _store_registry, _task_registry
 
     _shutdown_called = False
 
@@ -1499,6 +1521,18 @@ async def _serve(registry_path=None) -> None:
 
     server = Server(_SERVER_NAME)
     server.instructions = _SERVER_INSTRUCTIONS
+    _task_registry = MCPTaskRegistry()
+    server.experimental.enable_tasks(store=_task_registry)
+
+    @server.experimental.cancel_task()
+    async def _cancel_task(req: types.CancelTaskRequest) -> types.CancelTaskResult:
+        if _task_registry is None:
+            raise RuntimeError("Task registry not initialized")
+        task = await _task_registry.request_cancellation(
+            req.params.taskId,
+            status_message="Cancellation requested; waiting for a safe stop point.",
+        )
+        return types.CancelTaskResult(**task.model_dump())
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:

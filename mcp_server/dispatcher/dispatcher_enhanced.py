@@ -2488,6 +2488,7 @@ class EnhancedDispatcher:
         ctx: RepoContext,
         paths: List[Path],
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Run the summary-first strict semantic pipeline for selected files."""
         stats = {
@@ -2577,6 +2578,13 @@ class EnhancedDispatcher:
             )
 
         while remaining_missing > 0:
+            if cancel_check is not None and cancel_check():
+                stats["summary_missing_chunks"] = remaining_missing
+                stats["semantic_stage"] = "cancelled"
+                stats["semantic_blocked"] = len(normalized_paths)
+                stats["cancelled"] = True
+                emit_progress("cancelled", "semantic_closeout", "summary_call_shutdown")
+                return stats
             missing_before_pass = remaining_missing
             try:
                 summary_result = _run_coro_blocking(
@@ -2585,6 +2593,7 @@ class EnhancedDispatcher:
                             limit=summary_limit,
                             target_paths=normalized_paths,
                             max_batches=1,
+                            cancel_check=cancel_check,
                         ),
                         timeout=semantic_stage_timeout_seconds,
                     )
@@ -2656,6 +2665,15 @@ class EnhancedDispatcher:
                     "semantic_closeout",
                     "summary_call_shutdown",
                 )
+                return stats
+            if getattr(summary_result, "cancelled", False):
+                stats["summary_missing_chunks"] = self._count_missing_summaries_for_paths(
+                    ctx, normalized_paths
+                )
+                stats["semantic_stage"] = "cancelled"
+                stats["semantic_blocked"] = len(normalized_paths)
+                stats["cancelled"] = True
+                emit_progress("cancelled", "semantic_closeout", "summary_call_shutdown")
                 return stats
             stats["summary_passes"] += 1
             stats["summaries_written"] += summary_result.summaries_written
@@ -2763,6 +2781,12 @@ class EnhancedDispatcher:
                 "semantic_closeout",
                 "semantic_closeout",
             )
+            return stats
+        if cancel_check is not None and cancel_check():
+            stats["semantic_stage"] = "cancelled"
+            stats["semantic_blocked"] = len(normalized_paths)
+            stats["cancelled"] = True
+            emit_progress("cancelled", "semantic_closeout", "semantic_closeout")
             return stats
 
         try:
@@ -3025,6 +3049,7 @@ class EnhancedDispatcher:
         directory: Path,
         recursive: bool = True,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Index all files in a directory, respecting ignore patterns."""
         logger.info(f"Indexing directory: {directory} (recursive={recursive})")
@@ -3107,6 +3132,12 @@ class EnhancedDispatcher:
         semantically_indexed_paths: List[Path] = []
 
         for path in iter_files():
+            if cancel_check is not None and cancel_check():
+                stats["lexical_stage"] = "cancelled"
+                stats["in_flight_path"] = None
+                stats["cancelled"] = True
+                emit_progress("cancelled", "lexical", "lexical_mutation")
+                break
             if not path.is_file():
                 continue
 
@@ -3259,25 +3290,35 @@ class EnhancedDispatcher:
                 break
 
         if stats["low_level_blocker"] is None:
-            stats["lexical_stage"] = "completed"
-            stats["in_flight_path"] = None
-            emit_progress(
-                "force_full_closeout_handoff",
-                "final_closeout",
-                "final_closeout",
-            )
+            if stats.get("cancelled"):
+                stats["lexical_stage"] = "cancelled"
+                stats["in_flight_path"] = None
+            else:
+                stats["lexical_stage"] = "completed"
+                stats["in_flight_path"] = None
+                emit_progress(
+                    "force_full_closeout_handoff",
+                    "final_closeout",
+                    "final_closeout",
+                )
 
         # Batch semantic embedding — O(n/1000) API calls instead of O(n)
         _sem = self._get_semantic_indexer(ctx)
         stats["semantic_paths_queued"] = len(semantically_indexed_paths)
         stats["semantic_indexer_present"] = _sem is not None
-        if stats["low_level_blocker"] is None and _sem and semantically_indexed_paths:
+        if (
+            stats["low_level_blocker"] is None
+            and not stats.get("cancelled")
+            and _sem
+            and semantically_indexed_paths
+        ):
             try:
                 stats.update(
                     self.rebuild_semantic_for_paths(
                         ctx,
                         semantically_indexed_paths,
                         progress_callback=progress_callback,
+                        cancel_check=cancel_check,
                     )
                 )
             except Exception as e:

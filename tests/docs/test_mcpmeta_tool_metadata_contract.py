@@ -62,10 +62,13 @@ def test_annotations_are_explicit_for_every_public_tool():
         ) == expected
 
 
-def test_output_schema_drafts_exist_without_execution_metadata():
+def test_output_schema_drafts_exist_with_only_planned_task_execution_metadata():
     for tool in _build_tool_list():
         assert tool.outputSchema is not None
         assert "oneOf" in tool.outputSchema
         dumped = tool.model_dump(mode="json", by_alias=True, exclude_none=True)
         assert "structuredContent" not in dumped
-        assert "execution" not in dumped
+        if tool.name in {"reindex", "write_summaries"}:
+            assert dumped["execution"]["taskSupport"] == "optional"
+        else:
+            assert "execution" not in dumped

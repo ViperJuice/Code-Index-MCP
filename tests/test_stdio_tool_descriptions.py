@@ -103,6 +103,23 @@ def test_every_public_tool_has_expected_title_annotations_and_output_schema():
             assert getattr(tool.annotations, field_name) is expected_value
 
 
+def test_only_long_running_mutations_advertise_optional_task_support():
+    tools = _tools_by_name()
+    assert tools["reindex"].execution is not None
+    assert tools["reindex"].execution.taskSupport == "optional"
+    assert tools["write_summaries"].execution is not None
+    assert tools["write_summaries"].execution.taskSupport == "optional"
+    for tool_name in (
+        "symbol_lookup",
+        "search_code",
+        "get_status",
+        "list_plugins",
+        "summarize_sample",
+        "handshake",
+    ):
+        assert tools[tool_name].execution is None
+
+
 def test_server_instructions_are_readiness_gated():
     text = _SERVER_INSTRUCTIONS
     for expected in ("readiness", "ready", "index_unavailable", "native_search", "reindex"):

@@ -430,6 +430,15 @@ hits are wrapped under `structuredContent.results`, while readiness failures
 still carry `index_unavailable` with `safe_fallback: "native_search"` where
 that contract already applied.
 
+`reindex` and `write_summaries` also support task-augmented execution through
+the SDK-native MCP tasks surface. Both tools advertise
+`execution.taskSupport = "optional"`, so clients can either keep the current
+synchronous path or include a `task` object in `tools/call` and then use
+`tasks/get`, `tasks/list`, `tasks/result`, and `tasks/cancel` for progress,
+terminal payload retrieval, and best-effort cancellation. Readiness refusals,
+path sandbox failures, conflicting scope errors, and
+summarizer-unavailable preflights still fail synchronously before any task is created.
+
 ### 🔧 Configuration
 
 Create a `.env` file for configuration:

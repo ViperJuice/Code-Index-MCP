@@ -57,6 +57,16 @@ class FakeResolver:
         return self.ctx
 
 
+class FakeTaskExperimental:
+    def __init__(self) -> None:
+        self.is_task = True
+        self.run_task_called = False
+
+    async def run_task(self, *args, **kwargs):
+        self.run_task_called = True
+        raise AssertionError("run_task should not be reached when preflight fails")
+
+
 NON_READY_STATES = [
     RepositoryReadinessState.UNREGISTERED_REPOSITORY,
     RepositoryReadinessState.MISSING_INDEX,
@@ -301,6 +311,29 @@ def test_reindex_path_sandbox_error_precedes_readiness_gate(tmp_path, monkeypatc
     assert resolver.resolve_called is False
 
 
+def test_reindex_non_ready_refuses_before_task_creation(tmp_path, monkeypatch):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    experimental = FakeTaskExperimental()
+    resolver = FakeResolver(_readiness(RepositoryReadinessState.MISSING_INDEX, repo))
+
+    result = _run(
+        handle_reindex(
+            arguments={"repository": str(repo)},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+            request_experimental=experimental,
+            task_registry=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == RepositoryReadinessState.MISSING_INDEX.value
+    assert experimental.run_task_called is False
+
+
 def test_summarize_sample_path_sandbox_error_precedes_readiness_gate(tmp_path, monkeypatch):
     allowed = tmp_path / "allowed"
     outside = tmp_path / "outside"
@@ -324,6 +357,30 @@ def test_summarize_sample_path_sandbox_error_precedes_readiness_gate(tmp_path, m
     assert data["code"] == "path_outside_allowed_roots"
     lazy_summarizer.can_summarize.assert_not_called()
     assert resolver.resolve_called is False
+
+
+def test_write_summaries_non_ready_refuses_before_task_creation(tmp_path, monkeypatch):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    experimental = FakeTaskExperimental()
+    resolver = FakeResolver(_readiness(RepositoryReadinessState.MISSING_INDEX, repo))
+
+    result = _run(
+        handle_write_summaries(
+            arguments={"repository": str(repo)},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+            lazy_summarizer=MagicMock(),
+            request_experimental=experimental,
+            task_registry=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == RepositoryReadinessState.MISSING_INDEX.value
+    assert experimental.run_task_called is False
 
 
 def test_reindex_conflicting_path_and_repository_precedes_readiness(tmp_path, monkeypatch):
