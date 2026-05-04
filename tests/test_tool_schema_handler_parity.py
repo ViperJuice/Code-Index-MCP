@@ -92,6 +92,23 @@ def test_every_public_tool_has_output_schema_and_annotations():
         assert tool.annotations is not None, f"{tool.name} must advertise annotations"
 
 
+def test_mcpstruct_output_schemas_stay_object_shaped_for_structured_results():
+    schema_map = {t.name: t.outputSchema for t in _build_tool_list()}
+    search_branch_types = [
+        branch.get("type")
+        for branch in schema_map["search_code"]["oneOf"]
+        if isinstance(branch, dict)
+    ]
+    reindex_branch_types = [
+        branch.get("type")
+        for branch in schema_map["reindex"]["oneOf"]
+        if isinstance(branch, dict)
+    ]
+
+    assert "array" not in search_branch_types
+    assert "string" not in reindex_branch_types
+
+
 def test_zero_argument_tools_remain_zero_argument_after_metadata_refactor():
     schema_map = {t.name: t.inputSchema for t in _build_tool_list()}
 

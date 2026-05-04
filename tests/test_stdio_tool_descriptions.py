@@ -83,6 +83,11 @@ def _tools_by_name():
     return {tool.name: tool for tool in _build_tool_list()}
 
 
+def _branch_types(tool_name: str) -> list[str | None]:
+    schema = _tools_by_name()[tool_name].outputSchema
+    return [branch.get("type") for branch in schema.get("oneOf", []) if isinstance(branch, dict)]
+
+
 def test_public_tool_order_is_frozen():
     assert [tool.name for tool in _build_tool_list()] == EXPECTED_TOOL_ORDER
 
@@ -188,3 +193,8 @@ def test_tool_input_schemas_are_explicit_about_additional_properties_and_default
     summarize_schema = tools["summarize_sample"].inputSchema["properties"]
     assert summarize_schema["n"]["default"] == 3
     assert summarize_schema["persist"]["default"] is False
+
+
+def test_structured_result_schemas_do_not_advertise_top_level_array_or_string_payloads():
+    assert "array" not in _branch_types("search_code")
+    assert "string" not in _branch_types("reindex")

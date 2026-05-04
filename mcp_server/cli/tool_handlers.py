@@ -69,6 +69,10 @@ def _ensure_response(data: Any) -> str:
         )
 
 
+def _json_text_response(data: Any) -> list[types.TextContent]:
+    return [types.TextContent(type="text", text=_ensure_response(data))]
+
+
 def _translate_path(path: str) -> str:
     """Translate legacy Docker paths to current environment paths."""
     if not path:
@@ -129,19 +133,14 @@ def _classify_ctx(
 
 
 def _unsupported_worktree_response(readiness: RepositoryReadiness) -> list[types.TextContent]:
-    return [
-        types.TextContent(
-            type="text",
-            text=_ensure_response(
-                {
-                    "results": [],
-                    "code": readiness.code,
-                    "readiness": readiness.to_dict(),
-                    "message": "Repository path is an unsupported sibling worktree.",
-                }
-            ),
-        )
-    ]
+    return _json_text_response(
+        {
+            "results": [],
+            "code": readiness.code,
+            "readiness": readiness.to_dict(),
+            "message": "Repository path is an unsupported sibling worktree.",
+        }
+    )
 
 
 def _index_unavailable_response(
@@ -164,7 +163,7 @@ def _index_unavailable_response(
         response["query"] = query
     if symbol is not None:
         response["symbol"] = symbol
-    return [types.TextContent(type="text", text=_ensure_response(response))]
+    return _json_text_response(response)
 
 
 def _secondary_readiness_refusal_response(
@@ -183,7 +182,7 @@ def _secondary_readiness_refusal_response(
         response["mutation_performed"] = False
     else:
         response["persisted"] = False
-    return [types.TextContent(type="text", text=_ensure_response(response))]
+    return _json_text_response(response)
 
 
 def _semantic_not_ready_response(
@@ -204,7 +203,7 @@ def _semantic_not_ready_response(
         "message": "Semantic search requested, but enriched semantic vectors are not ready.",
         "remediation": semantic_readiness.remediation,
     }
-    return [types.TextContent(type="text", text=_ensure_response(response))]
+    return _json_text_response(response)
 
 
 def _semantic_failure_response(
@@ -232,7 +231,7 @@ def _semantic_failure_response(
         "message": "Semantic search failed at runtime; lexical fallback was not used.",
         "details": str(error),
     }
-    return [types.TextContent(type="text", text=_ensure_response(response))]
+    return _json_text_response(response)
 
 
 def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path: Path) -> int:
@@ -292,20 +291,15 @@ async def handle_symbol_lookup(
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [
-                types.TextContent(
-                    type="text",
-                    text=_ensure_response(
-                        {
-                            "error": "Path outside allowed roots",
-                            "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
-                            "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
-                        }
-                    ),
-                )
-            ]
+            return _json_text_response(
+                {
+                    "error": "Path outside allowed roots",
+                    "code": "path_outside_allowed_roots",
+                    "path": str(Path(repository).resolve()),
+                    "allowed_roots": [str(r) for r in allowed],
+                    "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+                }
+            )
 
     readiness = _classify_ctx(repo_resolver, repository)
     if readiness is not None and not readiness.ready:
@@ -860,20 +854,15 @@ async def handle_reindex(
             and ctx_from_repo is not None
             and ctx_from_path.repo_id != ctx_from_repo.repo_id
         ):
-            return [
-                types.TextContent(
-                    type="text",
-                    text=_ensure_response(
-                        {
-                            "error": "Conflicting scope",
-                            "code": "conflicting_path_and_repository",
-                            "path": str(path),
-                            "repository": repository,
-                            "hint": "Provide only one, or ensure both resolve to the same repo.",
-                        }
-                    ),
-                )
-            ]
+            return _json_text_response(
+                {
+                    "error": "Conflicting scope",
+                    "code": "conflicting_path_and_repository",
+                    "path": str(path),
+                    "repository": repository,
+                    "hint": "Provide only one, or ensure both resolve to the same repo.",
+                }
+            )
 
     scope_arg = repository or (str(path) if path else None)
     readiness = _classify_ctx(repo_resolver, scope_arg)
@@ -894,27 +883,18 @@ async def handle_reindex(
         target_path = allowed[0]
 
     if not target_path.exists():
-        return [
-            types.TextContent(
-                type="text",
-                text=_ensure_response({"error": "Path not found", "path": str(target_path)}),
-            )
-        ]
+        return _json_text_response({"error": "Path not found", "path": str(target_path)})
 
     if not _path_within_allowed(target_path, allowed):
-        return [
-            types.TextContent(
-                type="text",
-                text=_ensure_response(
-                    {
-                        "error": "Path outside allowed roots",
-                        "path": str(target_path.resolve()),
-                        "allowed_roots": [str(r) for r in allowed],
-                        "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
-                    }
-                ),
-            )
-        ]
+        return _json_text_response(
+            {
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(target_path.resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+            }
+        )
 
     if path and target_path.is_file():
         try:
@@ -922,16 +902,49 @@ async def handle_reindex(
                 dispatcher.index_file(ctx, target_path)  # type: ignore[call-arg]
             else:
                 dispatcher.index_file(target_path)  # type: ignore[call-arg]
-            if ctx is not None and active_store is not None:
+            durable_files = (
                 _record_reindexed_files(active_store, ctx.workspace_root, target_path)
-            return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
+                if ctx is not None and active_store is not None
+                else 0
+            )
+            return _json_text_response(
+                {
+                    "path": str(target_path),
+                    "mode": "file",
+                    "indexed_files": 1,
+                    "durable_files": durable_files,
+                    "mutation_performed": True,
+                    "message": f"Reindexed file: {path}",
+                }
+            )
         except TypeError:
             dispatcher.index_file(target_path)  # type: ignore[call-arg]
-            if ctx is not None and active_store is not None:
+            durable_files = (
                 _record_reindexed_files(active_store, ctx.workspace_root, target_path)
-            return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
+                if ctx is not None and active_store is not None
+                else 0
+            )
+            return _json_text_response(
+                {
+                    "path": str(target_path),
+                    "mode": "file",
+                    "indexed_files": 1,
+                    "durable_files": durable_files,
+                    "mutation_performed": True,
+                    "message": f"Reindexed file: {path}",
+                }
+            )
         except Exception as e:
-            return [types.TextContent(type="text", text=f"Error reindexing {path}: {str(e)}")]
+            return _json_text_response(
+                {
+                    "error": "Reindex failed",
+                    "code": "reindex_failed",
+                    "path": str(target_path),
+                    "message": f"Error reindexing {path}",
+                    "details": str(e),
+                    "mutation_performed": False,
+                }
+            )
     else:
         try:
             if ctx is not None:
@@ -951,6 +964,7 @@ async def handle_reindex(
         response_data = {
             "path": str(target_path),
             "mode": "merge",
+            "mutation_performed": True,
             "indexed_files": stats.get("indexed_files"),
             "ignored_files": stats.get("ignored_files"),
             "failed_files": stats.get("failed_files"),
@@ -976,7 +990,7 @@ async def handle_reindex(
                 "FileWatcher handles those on next change, or reindex again after deletions."
             ),
         }
-        return [types.TextContent(type="text", text=_ensure_response(response_data))]
+        return _json_text_response(response_data)
 
 
 async def handle_write_summaries(

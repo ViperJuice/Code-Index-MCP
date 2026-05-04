@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -455,11 +456,9 @@ class TestReindexUnchanged:
             )
         )
         data = _parsed(result)
-        # reindex uses "Path outside allowed roots" — slightly different wording, that's OK
+        assert data["code"] == "path_outside_allowed_roots"
         dumped = json.dumps(data).lower()
-        assert (
-            "outside" in dumped or "allowed" in dumped
-        ), f"Expected outside-allowed indication in reindex response; got: {data}"
+        assert "outside" in dumped or "allowed" in dumped
 
 
 # ---------------------------------------------------------------------------
@@ -486,7 +485,13 @@ class TestWriteSummariesUnguarded:
         sqlite_store.db_path = str(db_file)
 
         mock_writer = MagicMock()
-        mock_writer.process_all = AsyncMock(return_value=0)
+        mock_writer.process_scope = AsyncMock(
+            return_value=SimpleNamespace(
+                summaries_written=0,
+                chunks_attempted=0,
+                missing_chunk_ids=[],
+            )
+        )
 
         with (
             patch("mcp_server.cli.tool_handlers.handle_write_summaries.__module__"),

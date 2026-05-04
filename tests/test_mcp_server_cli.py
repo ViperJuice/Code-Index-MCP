@@ -12,6 +12,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import mcp.types as types
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -110,6 +111,14 @@ def _apply_patches(patches, extra=None):
     for p in (patches or []) + (extra or []):
         stack.enter_context(p)
     return stack
+
+
+def _structured_and_text_payload(result: types.CallToolResult) -> tuple[dict, object]:
+    assert isinstance(result, types.CallToolResult)
+    assert result.content
+    assert isinstance(result.content[0], types.TextContent)
+    assert result.structuredContent is not None
+    return result.structuredContent, json.loads(result.content[0].text)
 
 
 # ---------------------------------------------------------------------------
@@ -367,8 +376,8 @@ class TestIndexingInProgressFlag:
         cli.call_tool is the decorated async function we can call directly.
         """
         result = await cli.call_tool("search_code", {"query": query})
-        assert result, "Tool returned empty response"
-        return json.loads(result[0].text)
+        structured, text_payload = _structured_and_text_payload(result)
+        return structured, text_payload
 
     def _make_cli_with_dispatcher(self, search_results):
         """Return a fresh cli module with dispatcher pre-set to avoid MagicMock attrs
@@ -390,8 +399,9 @@ class TestIndexingInProgressFlag:
         cli = self._make_cli_with_dispatcher([])
         cli._indexing_thread = self._alive_thread()
 
-        data = await self._call_search(cli)
-        assert data.get("indexing_in_progress") is True
+        structured, text_payload = await self._call_search(cli)
+        assert structured.get("indexing_in_progress") is True
+        assert text_payload["indexing_in_progress"] is True
 
     @pytest.mark.asyncio
     async def test_empty_results_no_flag_when_thread_done(self):
@@ -399,8 +409,9 @@ class TestIndexingInProgressFlag:
         cli = self._make_cli_with_dispatcher([])
         cli._indexing_thread = self._dead_thread()
 
-        data = await self._call_search(cli)
-        assert "indexing_in_progress" not in data
+        structured, text_payload = await self._call_search(cli)
+        assert "indexing_in_progress" not in structured
+        assert "indexing_in_progress" not in text_payload
 
     @pytest.mark.asyncio
     async def test_empty_results_informative_message_during_indexing(self):
@@ -408,8 +419,9 @@ class TestIndexingInProgressFlag:
         cli = self._make_cli_with_dispatcher([])
         cli._indexing_thread = self._alive_thread()
 
-        data = await self._call_search(cli)
-        assert "building" in data.get("message", "").lower()
+        structured, text_payload = await self._call_search(cli)
+        assert "building" in structured.get("message", "").lower()
+        assert "building" in text_payload.get("message", "").lower()
 
     @pytest.mark.asyncio
     async def test_non_empty_results_include_flag_when_thread_alive(self):
@@ -419,9 +431,10 @@ class TestIndexingInProgressFlag:
         )
         cli._indexing_thread = self._alive_thread()
 
-        data = await self._call_search(cli, query="foo")
-        assert data.get("indexing_in_progress") is True
-        assert "results" in data
+        structured, text_payload = await self._call_search(cli, query="foo")
+        assert structured.get("indexing_in_progress") is True
+        assert "results" in structured
+        assert text_payload["results"]
 
     @pytest.mark.asyncio
     async def test_non_empty_results_no_flag_when_no_thread(self):
@@ -431,12 +444,10 @@ class TestIndexingInProgressFlag:
         )
         cli._indexing_thread = None
 
-        data = await self._call_search(cli, query="foo")
-        # Should be a list (no wrapper dict) or dict without the flag
-        if isinstance(data, dict):
-            assert "indexing_in_progress" not in data
-        else:
-            assert isinstance(data, list)
+        structured, text_payload = await self._call_search(cli, query="foo")
+        assert "indexing_in_progress" not in structured
+        assert isinstance(structured["results"], list)
+        assert isinstance(text_payload, list)
 
 
 # ---------------------------------------------------------------------------
@@ -500,11 +511,11 @@ class TestFreshRepoEndToEnd:
 
         # Search for a symbol that exists in greet.py
         result = await cli.call_tool("search_code", {"query": "greet_world"})
-        assert result, "call_tool returned empty"
-        data = json.loads(result[0].text)
+        structured, text_payload = _structured_and_text_payload(result)
 
-        results = data if isinstance(data, list) else data.get("results", [])
+        results = structured.get("results", [])
+        assert isinstance(text_payload, list)
         assert results, (
             "Expected BM25 results after indexing real files, got empty results. "
-            f"Full response: {data}"
+            f"Full response: {structured}"
         )

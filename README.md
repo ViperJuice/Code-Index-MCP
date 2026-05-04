@@ -422,8 +422,13 @@ The STDIO `tools/list` surface is deterministic and now advertises richer MCP
 metadata for every public tool: stable `title` values, explicit JSON Schema
 input contracts (`required`, defaults, and `additionalProperties` posture),
 annotations for read-only versus mutating behavior, and implementation-owned
-`outputSchema` drafts. This phase improves discoverability only; structured
-`call_tool` result payloads remain deferred to `MCPSTRUCT`.
+`outputSchema` drafts. The STDIO `tools/call` surface now returns SDK-native
+`CallToolResult` objects with object-shaped `structuredContent`, preserved JSON
+text fallback content in `content` for older clients, and `isError` on refusal
+and error branches. Legacy array-like payloads such as plain lexical search
+hits are wrapped under `structuredContent.results`, while readiness failures
+still carry `index_unavailable` with `safe_fallback: "native_search"` where
+that contract already applied.
 
 ### 🔧 Configuration
 

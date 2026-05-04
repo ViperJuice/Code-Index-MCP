@@ -591,6 +591,85 @@ def test_reindex_reports_additive_semantic_stage_metadata(tmp_path, monkeypatch)
     assert data["semantic_stage"] == "blocked_missing_summaries"
 
 
+def test_reindex_single_file_success_returns_object_payload(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_reindex
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    source_file = worktree / "demo.py"
+    source_file.write_text("def demo():\n    return 1\n", encoding="utf-8")
+
+    dispatcher = MagicMock()
+    ctx = MagicMock()
+    ctx.workspace_root = worktree
+    ctx.sqlite_store = MagicMock()
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(source_file)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["path"] == str(source_file)
+    assert data["mode"] == "file"
+    assert data["indexed_files"] == 1
+    assert data["mutation_performed"] is True
+    assert "Reindexed file:" in data["message"]
+
+
+def test_reindex_single_file_failure_returns_structured_error(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_reindex
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    source_file = worktree / "broken.py"
+    source_file.write_text("def broken():\n    return 1\n", encoding="utf-8")
+
+    dispatcher = MagicMock()
+    dispatcher.index_file.side_effect = RuntimeError("boom")
+    ctx = MagicMock()
+    ctx.workspace_root = worktree
+    ctx.sqlite_store = MagicMock()
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(source_file)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["error"] == "Reindex failed"
+    assert data["code"] == "reindex_failed"
+    assert data["path"] == str(source_file)
+    assert data["mutation_performed"] is False
+    assert data["details"] == "boom"
+
+
 def test_write_summaries_remains_summary_only(tmp_path, monkeypatch):
     from mcp_server.cli.tool_handlers import handle_write_summaries
 

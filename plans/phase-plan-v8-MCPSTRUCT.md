@@ -184,7 +184,7 @@ SL-0 -----> SL-1 ----\
 - **Scope**: Update the narrow README surface that documents `tools/call` so
   users can see that structured results now exist and that JSON text fallback
   is preserved for compatibility.
-- **Owned files**: `README.md`, `tests/docs/test_mcpstruct_readme_alignment.py`
+- **Owned files**: `README.md`, `tests/docs/test_mcpmeta_readme_alignment.py`, `tests/docs/test_mcpstruct_readme_alignment.py`
 - **Interfaces provided**: IF-0-MCPSTRUCT-5 public contract docs gate;
   closeout proof that MCPSTRUCT changed result shape but not task, transport,
   or auth posture

@@ -8,6 +8,7 @@ scripts/cli/mcp_server_cli.py.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -263,6 +264,52 @@ def _tool(
     )
 
 
+def _structured_payload_from_legacy_text(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(payload, list):
+        return {"results": payload}
+    return {"message": str(payload)}
+
+
+def _payload_is_error(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if "error" in payload:
+        return True
+    code = payload.get("code")
+    if code in {
+        "handshake_required",
+        "index_unavailable",
+        "path_outside_allowed_roots",
+        "conflicting_path_and_repository",
+        "semantic_not_ready",
+        "semantic_search_failed",
+        "reindex_failed",
+    }:
+        return True
+    readiness = payload.get("readiness")
+    return isinstance(readiness, dict) and readiness.get("ready") is False and bool(code)
+
+
+def _to_call_tool_result(
+    response: Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource],
+) -> types.CallToolResult:
+    structured_payload: dict[str, Any] | None = None
+    if response and isinstance(response[0], types.TextContent):
+        try:
+            parsed_payload = json.loads(response[0].text)
+        except json.JSONDecodeError:
+            parsed_payload = {"message": response[0].text}
+        structured_payload = _structured_payload_from_legacy_text(parsed_payload)
+
+    return types.CallToolResult(
+        content=list(response),
+        structuredContent=structured_payload,
+        isError=_payload_is_error(structured_payload),
+    )
+
+
 def _build_tool_list() -> list[types.Tool]:
     return [
         _tool(
@@ -373,22 +420,6 @@ def _build_tool_list() -> list[types.Tool]:
                         required=("error", "details", "query"),
                         additional_properties=True,
                     ),
-                    {
-                        "type": "array",
-                        "items": _object_schema(
-                            {
-                                "file": {"type": "string"},
-                                "line": {"type": ["integer", "null"]},
-                                "line_end": {"type": ["integer", "null"]},
-                                "symbol": {"type": ["string", "null"]},
-                                "snippet": {"type": ["string", "null"]},
-                                "last_indexed": {"type": ["string", "null"]},
-                                "_usage_hint": {"type": "string"},
-                            },
-                            required=("file",),
-                            additional_properties=True,
-                        ),
-                    },
                     _object_schema(
                         {
                             "results": {
@@ -538,13 +569,48 @@ def _build_tool_list() -> list[types.Tool]:
                         required=("error", "path"),
                         additional_properties=True,
                     ),
-                    {
-                        "type": "string",
-                    },
+                    _object_schema(
+                        {
+                            "path": {"type": "string"},
+                            "mode": {"const": "file"},
+                            "indexed_files": {"const": 1},
+                            "durable_files": {"type": ["integer", "null"]},
+                            "mutation_performed": {"const": True},
+                            "message": {"type": "string"},
+                        },
+                        required=(
+                            "path",
+                            "mode",
+                            "indexed_files",
+                            "mutation_performed",
+                            "message",
+                        ),
+                        additional_properties=True,
+                    ),
+                    _object_schema(
+                        {
+                            "error": {"const": "Reindex failed"},
+                            "code": {"const": "reindex_failed"},
+                            "path": {"type": "string"},
+                            "message": {"type": "string"},
+                            "details": {"type": "string"},
+                            "mutation_performed": {"const": False},
+                        },
+                        required=(
+                            "error",
+                            "code",
+                            "path",
+                            "message",
+                            "details",
+                            "mutation_performed",
+                        ),
+                        additional_properties=True,
+                    ),
                     _object_schema(
                         {
                             "path": {"type": "string"},
                             "mode": {"const": "merge"},
+                            "mutation_performed": {"const": True},
                             "indexed_files": {"type": ["integer", "null"]},
                             "ignored_files": {"type": ["integer", "null"]},
                             "failed_files": {"type": ["integer", "null"]},
@@ -567,7 +633,7 @@ def _build_tool_list() -> list[types.Tool]:
                             "semantic_indexer_present": {"type": ["boolean", "null"]},
                             "merge_note": {"type": "string"},
                         },
-                        required=("path", "mode", "merge_note"),
+                        required=("path", "mode", "mutation_performed", "merge_note"),
                         additional_properties=True,
                     ),
                 ]
@@ -1120,7 +1186,7 @@ _init_lock: Optional[asyncio.Lock] = None
 
 async def call_tool(
     name: str, arguments: dict | None
-) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+) -> types.CallToolResult:
     global _lazy_summarizer, _init_lock, _gate
 
     _current_session = None
@@ -1144,21 +1210,23 @@ async def call_tool(
                 await initialize_services()
 
     if initialization_error:
-        return [
-            types.TextContent(
-                type="text",
-                text=tool_handlers._ensure_response(
-                    {
-                        "error": "MCP server initialization failed",
-                        "details": initialization_error,
-                        "suggestion": (
-                            "No index found. Run 'mcp-index index' or "
-                            "'python scripts/reindex_current_repo.py' in your repository root."
-                        ),
-                    }
-                ),
-            )
-        ]
+        return _to_call_tool_result(
+            [
+                types.TextContent(
+                    type="text",
+                    text=tool_handlers._ensure_response(
+                        {
+                            "error": "MCP server initialization failed",
+                            "details": initialization_error,
+                            "suggestion": (
+                                "No index found. Run 'mcp-index index' or "
+                                "'python scripts/reindex_current_repo.py' in your repository root."
+                            ),
+                        }
+                    ),
+                )
+            ]
+        )
 
     if _lazy_summarizer is None and sqlite_store is not None:
         from mcp_server.config.settings import Settings
@@ -1185,7 +1253,9 @@ async def call_tool(
             logger.warning("running unauthenticated \u2014 MCP_CLIENT_SECRET not set")
     _gate_err = _gate.check(name, arguments or {})
     if _gate_err is not None:
-        return [types.TextContent(type="text", text=tool_handlers._ensure_response(_gate_err))]
+        return _to_call_tool_result(
+            [types.TextContent(type="text", text=tool_handlers._ensure_response(_gate_err))]
+        )
 
     logger.info(f"=== MCP Tool Call: {name} args={arguments} ===")
     start_time = time.time()
@@ -1332,7 +1402,7 @@ async def call_tool(
             )
         ]
 
-    return response
+    return _to_call_tool_result(response)
 
 
 # ---------------------------------------------------------------------------
