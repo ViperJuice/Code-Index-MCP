@@ -46,6 +46,11 @@ The Model Context Protocol (MCP) uses JSON-RPC over standard input/output (stdio
 - Secure by default (no network exposure)
 - Works in all environments (containers, WSL, native)
 
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
+
 ## Environment Detection
 
 The setup script automatically detects your environment:
@@ -108,6 +113,10 @@ gateway, not as MCP client registration.
 This native template targets the primary MCP STDIO surface. Use
 `mcp-index serve` separately only when you need the secondary FastAPI
 admin/debug HTTP gateway; it is not the repo's Streamable HTTP transport.
+If you enable `MCP_CLIENT_SECRET`, clients must satisfy that local STDIO
+handshake guard through the `handshake` tool. It does not configure the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented in this repo's current transport posture.
 
 ### Docker Minimal Configuration
 

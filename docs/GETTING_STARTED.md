@@ -94,6 +94,10 @@ The startup surfaces are:
 
 `mcp-index serve` is an admin/debug gateway, not the repo's MCP Streamable HTTP
 transport.
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
 
 ### Same-Machine Multi-Repo Setup
 
@@ -169,6 +173,12 @@ Example JSON for an exact-name symbol lookup:
 Both tools accept an optional `repository` argument (a registered repo name or
 an absolute path inside `MCP_ALLOWED_ROOTS`) to scope the query in a multi-repo
 setup. See the multi-repo section above for registration.
+
+If you set `MCP_CLIENT_SECRET`, clients must call the `handshake` tool first on
+the local STDIO session. That local STDIO handshake guard does not replace the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented while `mcp-index serve` remains a non-MCP admin
+surface.
 
 **Via REST API (admin/debug):**
 

@@ -792,7 +792,11 @@ def _build_tool_list() -> list[types.Tool]:
         _tool(
             name="handshake",
             title="Authenticate Session",
-            description="Authenticate with the server using the configured secret. Required before other tools when MCP_CLIENT_SECRET is set.",
+            description=(
+                "Authenticate the local STDIO session with the configured "
+                "MCP_CLIENT_SECRET guard. Required before other tools when "
+                "that local STDIO guard is enabled."
+            ),
             input_schema=_object_schema(
                 {"secret": {"type": "string"}},
                 required=("secret",),
@@ -1267,7 +1271,11 @@ async def call_tool(
             [types.TextContent(type="text", text=tool_handlers._ensure_response(_gate_err))]
         )
 
-    logger.info(f"=== MCP Tool Call: {name} args={arguments} ===")
+    log_arguments = arguments
+    if name == "handshake" and arguments is not None:
+        log_arguments = {"secret": "[REDACTED]"}
+
+    logger.info("=== MCP Tool Call: %s args=%s ===", name, log_arguments)
     start_time = time.time()
 
     _effective_resolver = (

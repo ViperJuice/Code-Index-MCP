@@ -120,6 +120,14 @@ def test_only_long_running_mutations_advertise_optional_task_support():
         assert tools[tool_name].execution is None
 
 
+def test_handshake_description_stays_local_stdio_only():
+    description = _tools_by_name()["handshake"].description
+    assert "local STDIO session" in description
+    assert "MCP_CLIENT_SECRET" in description
+    assert "remote" not in description.lower()
+    assert "bearer" not in description.lower()
+
+
 def test_server_instructions_are_readiness_gated():
     text = _SERVER_INSTRUCTIONS
     for expected in ("readiness", "ready", "index_unavailable", "native_search", "reindex"):

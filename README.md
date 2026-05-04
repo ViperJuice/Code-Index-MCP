@@ -21,6 +21,11 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
 **Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
+
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
 ## 🎯 Key Features
@@ -87,6 +92,11 @@ Code-Index-MCP implements defense-in-depth security hardening (Phase 15):
 - **Path Traversal Guard**: Search results are validated to prevent escaping configured repository roots. See [docs/security/path-guard.md](docs/security/path-guard.md).
 - **Token Validation**: GitHub tokens are validated for required scopes at startup (`contents:read`, `metadata:read`, `actions:read`, `actions:write`, `attestations:write`). See [docs/security/token-scopes.md](docs/security/token-scopes.md).
 - **Metrics Authentication**: The `/metrics` endpoint requires bearer token authentication.
+
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard only. It is not the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented while the repository continues to defer remote
+MCP transport.
 
 For a comprehensive operator runbook, see [docs/operations/user-action-runbook.md](docs/operations/user-action-runbook.md).
 

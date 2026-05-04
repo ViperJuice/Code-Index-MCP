@@ -40,6 +40,14 @@ def _make_app_with_redaction():
             media_type="application/json",
         )
 
+    @app.get("/mcp-client-secret-leak")
+    async def mcp_client_secret():
+        return Response(
+            content='{"msg": "MCP_CLIENT_SECRET=stdiosecret was used"}',
+            status_code=401,
+            media_type="application/json",
+        )
+
     return app
 
 
@@ -71,6 +79,16 @@ def test_4xx_github_token_redacted():
     body = resp.text
     assert "ghp_abc12345" not in body
     assert "GITHUB_TOKEN=[REDACTED]" in body
+
+
+def test_4xx_mcp_client_secret_redacted():
+    """MCP_CLIENT_SECRET value in 4xx responses must be redacted."""
+    client = TestClient(_make_app_with_redaction(), raise_server_exceptions=False)
+    resp = client.get("/mcp-client-secret-leak")
+    assert resp.status_code == 401
+    body = resp.text
+    assert "stdiosecret" not in body
+    assert "MCP_CLIENT_SECRET=[REDACTED]" in body
 
 
 def test_2xx_body_untouched():
