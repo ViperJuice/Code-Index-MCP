@@ -180,3 +180,4 @@ coverage.xml
 .worktrees/
 .claude/worktrees/
 .claude/execute-phase-state.json
+/.dev-skills/
