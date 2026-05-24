@@ -27,7 +27,7 @@ dependencies = [
     "mcp>=1.0.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
-    "treesitter-chunker==2.2.21",
+    "treesitter-chunker>=2.2.21,<3",
     # Legacy tree-sitter deps (for backward compatibility during migration)
     "tree-sitter>=0.20.0",
     "tree-sitter-language-pack>=0.13.0",
