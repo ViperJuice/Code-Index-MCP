@@ -47,6 +47,13 @@ def _make_dispatcher(store: SQLiteStore):
     dispatcher._router = None
     dispatcher._semantic_registry = None
     dispatcher._semantic_indexer_fallback = None
+    # Attributes the registered-indexer lazy-build path (added in the roadmap-v8
+    # dispatcher refactor) reads via _get_or_build_registered_semantic_indexer().
+    # _make_ctx() sets a real registry_entry.path, so _is_registered_context() is
+    # True and move_file()/remove_file() reach this path; without these the lookup
+    # raises AttributeError before any rename logic runs.
+    dispatcher._registered_semantic_indexers = {}
+    dispatcher._registered_semantic_indexer_lock = __import__("threading").RLock()
     dispatcher._plugin_set_registry = Mock()
     dispatcher._plugin_set_registry.plugins_for.return_value = []
     dispatcher._file_cache = {}
@@ -128,15 +135,18 @@ class TestRenameRollbackOnSemanticFailure:
         ctx = _make_ctx(store, workspace_root=repo_root)
         dispatcher = _make_dispatcher(store)
 
-        # Inject a failing plugin._indexer via _match_plugin
-        failing_indexer = Mock()
-        failing_indexer.move_file = Mock(side_effect=RuntimeError("semantic failure"))
-        plugin_with_indexer = Mock()
-        plugin_with_indexer._indexer = failing_indexer
+        # move_file wraps the SQLite path-update (primary) and the semantic re-embed
+        # (shadow) in two_phase_commit; a shadow failure must roll the SQLite move
+        # back. Drive that by failing the semantic indexer's shadow op.
+        failing_sem = Mock()
+        failing_sem.semantic_profile.profile_id = "oss-high"
+        failing_sem.cleanup_stale_semantic_artifacts = Mock(
+            side_effect=RuntimeError("semantic failure")
+        )
 
         bar_abs = repo_root / "bar.py"
 
-        with patch.object(dispatcher, "_match_plugin", return_value=plugin_with_indexer):
+        with patch.object(dispatcher, "_get_semantic_indexer", return_value=failing_sem):
             with pytest.raises(Exception):
                 dispatcher.move_file(ctx, foo_abs, bar_abs, content_hash="abc123")
 
@@ -190,10 +200,12 @@ class TestRenameRollbackOnSemanticFailure:
         ctx = _make_ctx(store, workspace_root=repo_root)
         dispatcher = _make_dispatcher(store)
 
-        failing_indexer = Mock()
-        failing_indexer.move_file = Mock(side_effect=RuntimeError("boom"))
-        plugin_with_indexer = Mock()
-        plugin_with_indexer._indexer = failing_indexer
+        # A shadow-op (semantic) failure inside two_phase_commit surfaces as a
+        # TwoPhaseCommitError, which move_file wraps in IndexingError and reports
+        # via record_handled_error before re-raising.
+        failing_sem = Mock()
+        failing_sem.semantic_profile.profile_id = "oss-high"
+        failing_sem.cleanup_stale_semantic_artifacts = Mock(side_effect=RuntimeError("boom"))
 
         bar_abs = repo_root / "bar.py"
 
@@ -207,7 +219,7 @@ class TestRenameRollbackOnSemanticFailure:
                 "mcp_server.dispatcher.dispatcher_enhanced.record_handled_error",
                 side_effect=fake_record_handled_error,
             ),
-            patch.object(dispatcher, "_match_plugin", return_value=plugin_with_indexer),
+            patch.object(dispatcher, "_get_semantic_indexer", return_value=failing_sem),
         ):
             with pytest.raises(Exception):
                 dispatcher.move_file(ctx, foo_abs, bar_abs, content_hash="abc123")
