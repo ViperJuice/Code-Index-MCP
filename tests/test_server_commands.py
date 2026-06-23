@@ -1,6 +1,10 @@
 from click.testing import CliRunner
 
-from mcp_server.cli.server_commands import serve
+from mcp_server.cli.server_commands import serve, stdio
+
+
+def _compact(text: str) -> str:
+    return " ".join(text.split())
 
 
 def test_serve_uses_explicit_host_port(monkeypatch):
@@ -17,6 +21,7 @@ def test_serve_uses_explicit_host_port(monkeypatch):
     assert result.exit_code == 0
     assert calls == [("mcp_server.gateway:app", "127.0.0.1", 9123, False)]
     assert "MCP_INDEX_STORAGE_PATH" in __import__("os").environ
+    assert "not the MCP Streamable HTTP transport" in result.output
 
 
 def test_serve_uses_env_defaults(monkeypatch):
@@ -51,3 +56,23 @@ def test_serve_preserves_explicit_storage_env(monkeypatch):
     assert result.exit_code == 0
     assert calls == [("mcp_server.gateway:app", "127.0.0.1", 8765, False)]
     assert __import__("os").environ["MCP_INDEX_STORAGE_PATH"] == "/tmp/custom-indexes"
+
+
+def test_serve_help_marks_fastapi_admin_gateway():
+    runner = CliRunner()
+
+    result = runner.invoke(serve, ["--help"])
+
+    assert result.exit_code == 0
+    compact = _compact(result.output)
+    assert "FastAPI admin/debug HTTP gateway" in compact
+    assert "not the MCP Streamable HTTP transport" in compact
+
+
+def test_stdio_help_marks_primary_mcp_surface():
+    runner = CliRunner()
+
+    result = runner.invoke(stdio, ["--help"])
+
+    assert result.exit_code == 0
+    assert "primary MCP client transport over STDIO" in result.output

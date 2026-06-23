@@ -8,7 +8,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import mcp.types as types
 
@@ -71,6 +71,7 @@ class SummaryGenerationResult:
     blocked_call_file_path: Optional[str] = None
     blocked_call_chunk_ids: List[str] = field(default_factory=list)
     blocked_call_timeout_seconds: Optional[float] = None
+    cancelled: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -87,6 +88,7 @@ class SummaryGenerationResult:
             "blocked_call_file_path": self.blocked_call_file_path,
             "blocked_call_chunk_ids": list(self.blocked_call_chunk_ids),
             "blocked_call_timeout_seconds": self.blocked_call_timeout_seconds,
+            "cancelled": self.cancelled,
         }
 
 
@@ -1103,6 +1105,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
         limit: int = 500,
         target_paths: Optional[Sequence[Path]] = None,
         max_batches: Optional[int] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
     ) -> SummaryGenerationResult:
         """Generate summaries for unsummarized chunks within an optional file scope."""
         if not self.can_summarize():
@@ -1124,6 +1127,20 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
         repo_scope = len(target_paths or []) > 1
         call_timeout_seconds = self._repo_scope_call_timeout_seconds() if repo_scope else None
         while True:
+            if cancel_check is not None and cancel_check():
+                remaining_chunks = self._count_unsummarized_rows(target_paths=target_paths)
+                return SummaryGenerationResult(
+                    chunks_attempted=total_attempted,
+                    summaries_written=total_summaries_written,
+                    authoritative_chunks=total_authoritative_chunks,
+                    missing_chunk_ids=missing_chunk_ids,
+                    files_attempted=total_files_attempted,
+                    files_summarized=total_files_summarized,
+                    batches_processed=batches_processed,
+                    remaining_chunks=remaining_chunks,
+                    scope_drained=False,
+                    cancelled=True,
+                )
             rows = self._fetch_unsummarized_rows(limit=limit, target_paths=target_paths)
             if not rows:
                 if total_attempted == 0:
@@ -1191,6 +1208,20 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             pass_summaries_written = 0
 
             for file_id, (file_path, _) in file_meta.items():
+                if cancel_check is not None and cancel_check():
+                    remaining_chunks = self._count_unsummarized_rows(target_paths=target_paths)
+                    return SummaryGenerationResult(
+                        chunks_attempted=total_attempted,
+                        summaries_written=total_summaries_written,
+                        authoritative_chunks=total_authoritative_chunks,
+                        missing_chunk_ids=missing_chunk_ids,
+                        files_attempted=total_files_attempted,
+                        files_summarized=total_files_summarized,
+                        batches_processed=batches_processed,
+                        remaining_chunks=remaining_chunks,
+                        scope_drained=False,
+                        cancelled=True,
+                    )
                 file_language = (file_meta[file_id][1] or "unknown") if file_id in file_meta else "unknown"
                 file_chunk_window = self._file_chunk_window_for_language(
                     file_language,

@@ -21,6 +21,11 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
 **Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
+
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
 ## 🎯 Key Features
@@ -87,6 +92,11 @@ Code-Index-MCP implements defense-in-depth security hardening (Phase 15):
 - **Path Traversal Guard**: Search results are validated to prevent escaping configured repository roots. See [docs/security/path-guard.md](docs/security/path-guard.md).
 - **Token Validation**: GitHub tokens are validated for required scopes at startup (`contents:read`, `metadata:read`, `actions:read`, `actions:write`, `attestations:write`). See [docs/security/token-scopes.md](docs/security/token-scopes.md).
 - **Metrics Authentication**: The `/metrics` endpoint requires bearer token authentication.
+
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard only. It is not the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented while the repository continues to defer remote
+MCP transport.
 
 For a comprehensive operator runbook, see [docs/operations/user-action-runbook.md](docs/operations/user-action-runbook.md).
 
@@ -257,10 +267,10 @@ Index many unrelated repositories from a single running server instance.
 export MCP_ALLOWED_ROOTS=/abs/a:/abs/b
 ```
 
-**Start the server** (with secrets via `op run` or plain `python`):
+**Start the server** (with secrets via `op run` or plain `mcp-index stdio`):
 
 ```bash
-op run --env-file=.mcp.env -- python -m mcp_server.cli.server_commands
+op run --env-file=.mcp.env -- mcp-index stdio
 ```
 
 **Register each repo** — register one worktree per git common directory. The
@@ -375,9 +385,10 @@ mcp-index artifact sync
 mcp-index index status
 
 # Start the MCP STDIO runner (primary surface used by LLMs via .mcp.json)
-python -m mcp_server.cli.stdio_runner
+mcp-index stdio
 
-# Or start the FastAPI admin REST gateway (secondary, for diagnostics)
+# Or start the FastAPI admin REST gateway (secondary, for diagnostics only;
+# this is not the repo's MCP Streamable HTTP transport)
 mcp-index serve
 mcp-index serve --port 9123   # alternate port
 ```
@@ -416,6 +427,33 @@ an absolute path inside `MCP_ALLOWED_ROOTS`) for multi-repo scoping. See the
 ordinary no-match payloads (`results: []` for `search_code` or
 `result: "not_found"` for `symbol_lookup`) with readiness metadata; unavailable
 indexes return `index_unavailable` instead.
+
+The STDIO `tools/list` surface is deterministic and now advertises richer MCP
+metadata for every public tool: stable `title` values, explicit JSON Schema
+input contracts (`required`, defaults, and `additionalProperties` posture),
+annotations for read-only versus mutating behavior, and implementation-owned
+`outputSchema` drafts. The STDIO `tools/call` surface now returns SDK-native
+`CallToolResult` objects with object-shaped `structuredContent`, preserved JSON
+text fallback content in `content` for older clients, and `isError` on refusal
+and error branches. Legacy array-like payloads such as plain lexical search
+hits are wrapped under `structuredContent.results`, while readiness failures
+still carry `index_unavailable` with `safe_fallback: "native_search"` where
+that contract already applied.
+
+`reindex` and `write_summaries` also support task-augmented execution through
+the SDK-native MCP tasks surface. Both tools advertise
+`execution.taskSupport = "optional"`, so clients can either keep the current
+synchronous path or include a `task` object in `tools/call` and then use
+`tasks/get`, `tasks/list`, `tasks/result`, and `tasks/cancel` for progress,
+terminal payload retrieval, and best-effort cancellation. Readiness refusals,
+path sandbox failures, conflicting scope errors, and
+summarizer-unavailable preflights still fail synchronously before any task is created.
+
+Current verified MCP client posture is summarized in the
+[MCP compatibility matrix](docs/status/MCP_COMPATIBILITY_EVALUATION.md). The
+phase-owned direct smoke is the official Python SDK over STDIO; Claude Code and
+other STDIO launchers are documented against that same server contract, while
+remote Streamable HTTP MCP remains deferred.
 
 ### 🔧 Configuration
 
@@ -749,8 +787,8 @@ Create or edit `.mcp.json` in your project root:
 {
   "mcpServers": {
     "code-index-mcp": {
-      "command": "uvicorn",
-      "args": ["mcp_server.gateway:app", "--host", "0.0.0.0", "--port", "8000"],
+      "command": "mcp-index",
+      "args": ["stdio"],
       "env": {
         "VOYAGE_API_KEY": "your-voyage-ai-api-key-here",
         "SEMANTIC_SEARCH_ENABLED": "true"
@@ -763,7 +801,7 @@ Create or edit `.mcp.json` in your project root:
 **Method 2: Claude Code CLI**
 
 ```bash
-claude mcp add code-index-mcp -e VOYAGE_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app
+claude mcp add code-index-mcp -e VOYAGE_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- mcp-index stdio
 ```
 
 **Method 3: Environment Variables**
@@ -1222,7 +1260,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress
 **Current Status**: 1.2.0 stable surface prepared; downstream GADISP dispatch still pending
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
-- ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients
+- ✅ **MCP Protocol**: Verified official Python SDK compatibility over STDIO; see `docs/status/MCP_COMPATIBILITY_EVALUATION.md` for named client posture
 - ✅ **Performance**: Sub-100ms queries with BM25 optimization
 - 🔄 **Index Sync**: Beta support via GitHub Artifacts
 - 🔄 **Semantic Search**: Optional feature requiring Voyage AI API

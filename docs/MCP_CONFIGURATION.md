@@ -46,6 +46,11 @@ The Model Context Protocol (MCP) uses JSON-RPC over standard input/output (stdio
 - Secure by default (no network exposure)
 - Works in all environments (containers, WSL, native)
 
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
+
 ## Environment Detection
 
 The setup script automatically detects your environment:
@@ -72,6 +77,10 @@ The setup script automatically detects your environment:
 
 ## Configuration Templates
 
+All repo-shipped MCP client templates launch `mcp-index stdio`. Use
+`mcp-index serve` separately only for the secondary FastAPI admin/debug HTTP
+gateway, not as MCP client registration.
+
 ### Native Python Configuration
 
 **File:** `.mcp.json.templates/native.json`
@@ -81,7 +90,7 @@ The setup script automatically detects your environment:
   "mcpServers": {
     "code-index-native": {
       "command": "mcp-index",
-      "args": ["serve"],
+      "args": ["stdio"],
       "cwd": "${workspace}",
       "env": {
         "PYTHONPATH": "${workspace}",
@@ -101,6 +110,16 @@ The setup script automatically detects your environment:
 - Local development with Python installed
 - CI/CD environments
 
+This native template targets the primary MCP STDIO surface. Use
+`mcp-index serve` separately only when you need the secondary FastAPI
+admin/debug HTTP gateway; it is not the repo's MCP Streamable HTTP transport.
+If you enable `MCP_CLIENT_SECRET`, clients must satisfy that local STDIO
+handshake guard through the `handshake` tool. It does not configure the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented in this repo's current transport posture.
+For the current named-client and transport matrix, see
+`docs/status/MCP_COMPATIBILITY_EVALUATION.md`.
+
 ### Docker Minimal Configuration
 
 **File:** `.mcp.json.templates/docker-minimal.json`
@@ -119,7 +138,9 @@ The setup script automatically detects your environment:
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
         "-e", "MCP_ARTIFACT_SYNC=false",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}",
+        "mcp-index",
+        "stdio"
       ]
     }
   }
@@ -152,7 +173,9 @@ The setup script automatically detects your environment:
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0}",
+        "mcp-index",
+        "stdio"
       ]
     }
   }
@@ -177,8 +200,8 @@ The setup script automatically detects your environment:
         "exec",
         "-i",
         "mcp-sidecar",
-        "python",
-        "/app/scripts/cli/mcp_server_cli.py"
+        "mcp-index",
+        "stdio"
       ],
       "env": {
         "MCP_WORKSPACE_ROOT": "/workspace",

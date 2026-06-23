@@ -87,6 +87,21 @@ class TestP7SchemaAlignment:
                 "repository" not in required
             ), f"Tool {tool_name} must not have repository in required array"
 
+    def test_repository_accepting_tools_disallow_undeclared_input_properties(self):
+        """Assert path-accepting tools keep explicit additionalProperties=false schemas."""
+        path_tools = [
+            "search_code",
+            "symbol_lookup",
+            "reindex",
+            "write_summaries",
+            "summarize_sample",
+        ]
+        for tool_name in path_tools:
+            input_schema = self.tools[tool_name].inputSchema
+            assert (
+                input_schema.get("additionalProperties") is False
+            ), f"Tool {tool_name} must set additionalProperties=false"
+
     def test_repository_absent_from_non_path_tools(self):
         """Assert repository property absent from handshake, get_status, list_plugins."""
         non_path_tools = ["handshake", "get_status", "list_plugins"]
@@ -97,3 +112,6 @@ class TestP7SchemaAlignment:
             assert (
                 "repository" not in properties
             ), f"Tool {tool_name} must not have repository property"
+            assert (
+                input_schema.get("additionalProperties") is False
+            ), f"Tool {tool_name} must set additionalProperties=false"
