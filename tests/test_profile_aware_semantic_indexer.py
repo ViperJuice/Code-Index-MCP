@@ -43,9 +43,7 @@ class _FakeQdrantClient:
         size, distance = self.collections[collection_name]
         return SimpleNamespace(
             config=SimpleNamespace(
-                params=SimpleNamespace(
-                    vectors=SimpleNamespace(size=size, distance=distance)
-                )
+                params=SimpleNamespace(vectors=SimpleNamespace(size=size, distance=distance))
             )
         )
 
@@ -89,9 +87,7 @@ def _patch_indexer_runtime(monkeypatch, tmp_path) -> None:
     # tmp_path so relative paths (and the chunk ids derived from them) are stable.
     from mcp_server.core.path_resolver import PathResolver
 
-    monkeypatch.setattr(
-        PathResolver, "_detect_repository_root", lambda self: Path(tmp_path)
-    )
+    monkeypatch.setattr(PathResolver, "_detect_repository_root", lambda self: Path(tmp_path))
 
     def _fake_init_qdrant(self, qdrant_path):
         self._qdrant_available = True
