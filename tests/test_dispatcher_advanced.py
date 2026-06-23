@@ -670,8 +670,7 @@ class TestRemoveFileSemanticCleanup:
         d._router = None
         return d
 
-    def _make_ctx(self):
-        from pathlib import Path
+    def _make_ctx(self, workspace_root):
         from unittest.mock import MagicMock
 
         from mcp_server.core.repo_context import RepoContext
@@ -682,7 +681,7 @@ class TestRemoveFileSemanticCleanup:
         return RepoContext(
             repo_id="test-repo",
             sqlite_store=MagicMock(),
-            workspace_root=Path("/tmp/test"),
+            workspace_root=Path(workspace_root),
             tracked_branch="main",
             registry_entry=registry_entry,
         )
@@ -693,18 +692,18 @@ class TestRemoveFileSemanticCleanup:
 
         mock_semantic = MagicMock()
         dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=mock_semantic)
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(tmp_path)
 
         target = tmp_path / "foo.py"
         target.write_text("x = 1")
         dispatcher.remove_file(ctx, target)
 
-        mock_semantic.remove_file.assert_called_once()
+        mock_semantic.cleanup_stale_semantic_artifacts.assert_called_once()
 
     def test_remove_file_no_semantic_indexer_does_not_raise(self, tmp_path):
         """remove_file() must not raise when _semantic_indexer is None."""
         dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=None)
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(tmp_path)
 
         target = tmp_path / "bar.py"
         target.write_text("y = 2")
@@ -715,12 +714,14 @@ class TestRemoveFileSemanticCleanup:
         from unittest.mock import MagicMock
 
         mock_semantic = MagicMock()
-        mock_semantic.remove_file.side_effect = RuntimeError("qdrant unavailable")
+        mock_semantic.cleanup_stale_semantic_artifacts.side_effect = RuntimeError(
+            "qdrant unavailable"
+        )
         dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=mock_semantic)
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(tmp_path)
 
         target = tmp_path / "baz.py"
         target.write_text("z = 3")
         dispatcher.remove_file(ctx, target)  # must not raise despite indexer error
 
-        mock_semantic.remove_file.assert_called_once()
+        mock_semantic.cleanup_stale_semantic_artifacts.assert_called_once()

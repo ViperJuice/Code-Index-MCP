@@ -83,6 +83,16 @@ def _sample_profiles() -> dict[str, dict[str, object]]:
 def _patch_indexer_runtime(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
 
+    # The default PathResolver auto-detects the repository root by walking up to
+    # the nearest .git, which under pytest's tmp_path lands on /tmp and prefixes
+    # every repo-relative chunk id with the pytest tmp directory. Pin detection to
+    # tmp_path so relative paths (and the chunk ids derived from them) are stable.
+    from mcp_server.core.path_resolver import PathResolver
+
+    monkeypatch.setattr(
+        PathResolver, "_detect_repository_root", lambda self: Path(tmp_path)
+    )
+
     def _fake_init_qdrant(self, qdrant_path):
         self._qdrant_available = True
         self._connection_mode = "memory"
