@@ -8,6 +8,25 @@ Code-Index-MCP is a fast, **local-first** search index for your code. It plugs i
 >
 > **Status:** v1.2.0 — MCP tools (`search_code`, `symbol_lookup`) are the primary interface; a FastAPI admin gateway is available for diagnostics.
 
+> **Stable-surface prep status**: This guide targets `1.2.0` and reflects the
+> repo-owned stable install surface prepared by GAREL. MCP STDIO remains the
+> primary LLM surface, FastAPI remains a secondary admin surface, and final
+> release publication plus GA release evidence remain downstream-only in
+> `GADISP`.
+
+## Project Status
+**Version**: 1.2.0 (stable surface prepared; dispatch pending)
+**Python distribution**: `index-it-mcp`
+**Container image**: `ghcr.io/viperjuice/code-index-mcp`
+**Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
+**Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
+**Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
+**Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
+**Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
+**GA decision**: see [docs/validation/ga-final-decision.md](docs/validation/ga-final-decision.md); the current decision is `ship GA`, but stable release mutation and release evidence remain downstream-only in `GADISP`.
+**GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
+**Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
+
 ## Why it exists
 
 When an AI assistant works in a large codebase, it often reads big chunks of files just to find what it needs. That's slow, and every file it reads costs tokens (money). Code-Index-MCP builds a local index so the assistant can jump straight to the right function, class, or line — **cutting token cost and making answers faster and more accurate**.
