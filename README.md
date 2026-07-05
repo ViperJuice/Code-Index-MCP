@@ -1,6 +1,12 @@
-# Code-Index-MCP (Local-first Code Indexer)
+# Code-Index-MCP
 
-Modular, extensible local-first code indexer designed to enhance Claude Code and other LLMs with deep code understanding capabilities. Built on the Model Context Protocol (MCP) for seamless integration with AI assistants.
+**Give your AI coding assistant instant, precise search across your whole codebase — so it finds the exact code it needs in milliseconds instead of burning time and tokens reading whole files.**
+
+Code-Index-MCP is a fast, **local-first** search index for your code. It plugs into Claude Code and other AI assistants (through the Model Context Protocol, "MCP") and lets them look up any symbol or search any text in your repository almost instantly — without your code ever leaving your machine.
+
+> **New to Code-Index-MCP?** Start with the [Getting Started Guide](docs/GETTING_STARTED.md).
+>
+> **Status:** v1.2.0 — MCP tools (`search_code`, `symbol_lookup`) are the primary interface; a FastAPI admin gateway is available for diagnostics.
 
 > **Stable-surface prep status**: This guide targets `1.2.0` and reflects the
 > repo-owned stable install surface prepared by GAREL. MCP STDIO remains the
@@ -21,7 +27,34 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
 **Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
-> **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
+## Why it exists
+
+When an AI assistant works in a large codebase, it often reads big chunks of files just to find what it needs. That's slow, and every file it reads costs tokens (money). Code-Index-MCP builds a local index so the assistant can jump straight to the right function, class, or line — **cutting token cost and making answers faster and more accurate**.
+
+## Who it's for
+
+Developers and teams using AI coding assistants on real, sizable codebases who want **faster, cheaper, more accurate** results — and who want their code to stay **private, on their own machine**.
+
+## What you get
+
+- **⚡ Instant lookups** — sub-100ms symbol lookup, sub-500ms search on indexed repos.
+- **🔒 Local-first & private** — indexing runs on your machine; your code isn't shipped to a cloud.
+- **💸 Lower token cost** — the assistant *searches* instead of reading whole files (see the charts below).
+- **🧠 Semantic search (optional)** — natural-language code search via embeddings.
+- **🌐 Many languages, many repos** — one server can index multiple repositories with mixed languages.
+- **🔌 Plugin-based & extensible** — add language support without touching the core.
+
+## See it in action
+
+Benchmarks in this repository show large token/cost reductions when an assistant searches with Code-Index-MCP instead of reading files directly:
+
+![Token and cost savings — summary](reports/performance_charts/summary_infographic.png)
+
+![Cost savings](reports/performance_charts/cost_savings.png)
+
+![Token reduction by language](reports/performance_charts/token_reduction_by_language.png)
+
+*(Charts generated from the benchmarks in `reports/`; numbers vary by repo size and language mix.)*
 
 ## 🎯 Key Features
 
