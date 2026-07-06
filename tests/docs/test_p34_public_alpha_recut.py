@@ -6,8 +6,8 @@ from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
 
-PREPARED_STABLE_VERSION = "1.2.0"
-PREPARED_STABLE_TAG = "v1.2.0"
+PREPARED_STABLE_VERSION = "1.3.0"
+PREPARED_STABLE_TAG = "v1.3.0"
 PUBLIC_ALPHA_VERSION = "1.2.0-rc8"
 PUBLIC_ALPHA_TAG = "v1.2.0-rc8"
 CURRENT_RECUT_VERSION = "1.2.0-rc8"

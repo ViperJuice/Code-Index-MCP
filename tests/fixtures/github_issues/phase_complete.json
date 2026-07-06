@@ -1,0 +1,14 @@
+{
+  "number": 11,
+  "title": "Phase complete: friction metadata shipped",
+  "labels": [
+    {"name": "phase-complete"},
+    {"name": "xg"}
+  ],
+  "state": "CLOSED",
+  "createdAt": "2026-07-01T10:00:00Z",
+  "updatedAt": "2026-07-02T10:00:00Z",
+  "closedAt": "2026-07-03T10:00:00Z",
+  "url": "https://github.com/owner/repo/issues/11",
+  "body": "Learnings:\n- Keep metadata generic\n- Preserve legacy shape\n"
+}

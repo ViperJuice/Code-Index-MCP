@@ -2,11 +2,14 @@
 
 This guide walks you through installing and using Code-Index-MCP to index and search your codebase.
 
-> **Stable-surface prep status**: This guide targets `1.2.0`. MCP STDIO is the
+> **Stable-surface prep status**: This guide targets `1.3.0`. MCP STDIO is the
 > primary LLM surface; FastAPI is a secondary admin surface. Language behavior is
 > documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md), and the pre-GA release
 > boundary is frozen in
 > [ga-readiness-checklist.md](validation/ga-readiness-checklist.md).
+> The July 6, 2026 PyPI check recorded live `index-it-mcp` at `2.14.9`, so
+> this guide keeps public install instructions on source and local-wheel proof
+> instead of claiming live `1.3.0` package parity.
 > Install-surface and language/runtime support tiers are defined in
 > [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md); do not treat every install path or
 > language row as equivalent support.
@@ -26,17 +29,7 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 
 ## Installation
 
-### Option 1: Install via pip (Recommended)
-
-```bash
-# Install the prepared stable package surface
-pip install index-it-mcp==1.2.0
-
-# Verify installation
-mcp-index --version
-```
-
-### Option 2: Install from Source
+### Option 1: Install from source (Recommended)
 
 ```bash
 # Clone the repository
@@ -46,9 +39,24 @@ cd Code-Index-MCP
 # Install locked project dependencies
 uv sync --locked
 
-# Verify the console script
+# Verify the canonical CLI entrypoint
 uv run mcp-index --version
 ```
+
+### Option 2: Build and install the local wheel
+
+```bash
+# From the repo root
+uv run --extra dev python -m build --wheel
+python -m pip install dist/index_it_mcp-1.3.0-py3-none-any.whl
+index-it-mcp --version
+```
+
+If a Windows checkout still hits path-length limits after you use the cleaned
+source tree, note that tracked repo paths are capped by the 160-character tracked-path
+limit and the release audit also checks wheel member depth. Use
+`git config --global core.longpaths true` only as a fallback for unusually deep
+clone locations or third-party tooling.
 
 ## Quick Start
 
@@ -81,16 +89,23 @@ mcp-index index rebuild --force
 ### 2. Start the MCP Server
 
 ```bash
-# Start the server
-mcp-index serve
+# Start the primary MCP STDIO server used by LLM clients
+mcp-index stdio
 
-# Or pick a less crowded port
+# Or start the secondary FastAPI admin/debug gateway on a less crowded port
 mcp-index serve --port 9123
 ```
 
-The server exposes:
-- REST API at `http://127.0.0.1:8000`
-- MCP protocol for AI assistant integration
+The startup surfaces are:
+- MCP STDIO on stdin/stdout for LLM client integration
+- FastAPI admin/debug HTTP at `http://127.0.0.1:9123` when you start `mcp-index serve`
+
+`mcp-index serve` is an admin/debug gateway, not the repo's MCP Streamable HTTP
+transport.
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
 
 ### Same-Machine Multi-Repo Setup
 
@@ -122,6 +137,11 @@ The primary interface is the Model Context Protocol: your LLM (Claude Code,
 Cursor, etc.) calls `search_code` and `symbol_lookup` as MCP tools. A FastAPI
 admin surface is also available for manual debugging (see below).
 
+For the current named-client posture, see
+`docs/status/MCP_COMPATIBILITY_EVALUATION.md`. MCPEVAL's direct client proof is
+the official Python SDK smoke over STDIO; other STDIO launchers are expected to
+work only insofar as they honor that same MCP contract.
+
 **Via MCP Protocol (primary):**
 
 First, register the server in your project's `.mcp.json`:
@@ -130,8 +150,8 @@ First, register the server in your project's `.mcp.json`:
 {
   "mcpServers": {
     "code-index": {
-      "command": "python",
-      "args": ["-m", "mcp_server.cli.stdio_runner"],
+      "command": "mcp-index",
+      "args": ["stdio"],
       "cwd": "/path/to/your/project"
     }
   }
@@ -166,6 +186,12 @@ Example JSON for an exact-name symbol lookup:
 Both tools accept an optional `repository` argument (a registered repo name or
 an absolute path inside `MCP_ALLOWED_ROOTS`) to scope the query in a multi-repo
 setup. See the multi-repo section above for registration.
+
+If you set `MCP_CLIENT_SECRET`, clients must call the `handshake` tool first on
+the local STDIO session. That local STDIO handshake guard does not replace the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented while `mcp-index serve` remains a non-MCP admin
+surface.
 
 **Via REST API (admin/debug):**
 

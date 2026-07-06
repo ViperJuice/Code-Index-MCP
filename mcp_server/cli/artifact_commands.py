@@ -29,6 +29,7 @@ from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
 from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.utils.subprocess_env import get_full_env
 
 
 def _canonical_index_location(repo_info: RepositoryInfo | None = None) -> Path:
@@ -119,6 +120,7 @@ def _get_git_ref_info() -> dict[str, str | None]:
             capture_output=True,
             text=True,
             check=True,
+            env=get_full_env(),
         )
         info["head"] = head.stdout.strip()
     except Exception:
@@ -130,6 +132,7 @@ def _get_git_ref_info() -> dict[str, str | None]:
             capture_output=True,
             text=True,
             check=True,
+            env=get_full_env(),
         )
         info["branch"] = branch.stdout.strip()
     except Exception:
@@ -297,6 +300,7 @@ def push(validate: bool, compress_only: bool, no_secure: bool, skip_if_current: 
                         ["git", "rev-parse", "HEAD"],
                         capture_output=True,
                         text=True,
+                        env=get_full_env(),
                     ).stdout.strip()
                     if meta.get("git_commit") == head:
                         click.echo("Index is current. Skipping upload.")

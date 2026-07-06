@@ -2,14 +2,23 @@
 
 # Version information
 # Historical GARC soak target: 1.2.0-rc6.
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # Public API exports
 __all__ = [
     "__version__",
+    "ClientSearchOptions",
+    "ClientSearchResult",
+    "ClientStatusResult",
+    "ClientSymbolResult",
+    "ClientReindexResult",
+    "IndexItClient",
+    "IndexUnavailable",
+    "SourceType",
     "SQLiteStore",
     "EnhancedDispatcher",
     "PluginFactory",
+    "open_client",
 ]
 
 
@@ -20,6 +29,38 @@ __all__ = [
 #   from mcp_server import EnhancedDispatcher, PluginFactory
 def __getattr__(name):
     """Lazy import public API components to avoid circular import issues."""
+    if name in {
+        "ClientSearchOptions",
+        "ClientSearchResult",
+        "ClientStatusResult",
+        "ClientSymbolResult",
+        "ClientReindexResult",
+        "IndexUnavailable",
+        "SourceType",
+    }:
+        from .client_types import (
+            ClientReindexResult,
+            ClientSearchOptions,
+            ClientSearchResult,
+            ClientStatusResult,
+            ClientSymbolResult,
+            IndexUnavailable,
+            SourceType,
+        )
+
+        return {
+            "ClientSearchOptions": ClientSearchOptions,
+            "ClientSearchResult": ClientSearchResult,
+            "ClientStatusResult": ClientStatusResult,
+            "ClientSymbolResult": ClientSymbolResult,
+            "ClientReindexResult": ClientReindexResult,
+            "IndexUnavailable": IndexUnavailable,
+            "SourceType": SourceType,
+        }[name]
+    if name in {"IndexItClient", "open_client"}:
+        from .client import IndexItClient, open_client
+
+        return {"IndexItClient": IndexItClient, "open_client": open_client}[name]
     if name == "SQLiteStore":
         from .storage.sqlite_store import SQLiteStore
 

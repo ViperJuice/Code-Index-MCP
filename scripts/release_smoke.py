@@ -19,6 +19,8 @@ from urllib.request import urlopen
 
 REPO = Path(__file__).resolve().parents[1]
 IMAGE = "ghcr.io/viperjuice/code-index-mcp:local-smoke"
+CANONICAL_ENTRYPOINTS = ("mcp-index", "index-it-mcp")
+REMOVED_ENTRYPOINTS = ("code-index-mcp",)
 
 
 def _run(cmd: list[str], *, cwd: Path = REPO, env: dict[str, str] | None = None) -> None:
@@ -55,12 +57,19 @@ def smoke_wheel() -> None:
 
         venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
         python = _venv_bin(venv_dir, "python")
-        mcp_index = _venv_bin(venv_dir, "mcp-index")
         _run(
             [str(python), "-m", "pip", "install", str(wheels[-1])],
             env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"},
         )
-        _run([str(mcp_index), "--help"])
+        for entrypoint in CANONICAL_ENTRYPOINTS:
+            script = _venv_bin(venv_dir, entrypoint)
+            if not script.exists():
+                raise RuntimeError(f"Missing expected wheel entrypoint: {entrypoint}")
+            _run([str(script), "--help"])
+        for entrypoint in REMOVED_ENTRYPOINTS:
+            script = _venv_bin(venv_dir, entrypoint)
+            if script.exists():
+                raise RuntimeError(f"Unexpected legacy wheel entrypoint present: {entrypoint}")
 
 
 def smoke_stdio() -> None:

@@ -76,7 +76,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
         except ImportError as exc:
             raise RuntimeError(
                 "OpenAI-compatible embeddings require the openai package. "
-                "Install dependencies with requirements-semantic.txt or pip install openai."
+                "Run uv sync --locked to install the default client dependencies."
             ) from exc
 
         resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY") or "vllm-local"

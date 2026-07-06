@@ -9,7 +9,7 @@ import tempfile
 
 import pytest
 
-from mcp_server.plugins.plugin_factory import PluginFactory
+from mcp_server.plugins.markdown_plugin import MarkdownPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 
@@ -31,8 +31,8 @@ class TestMarkdownProductionScenarios:
 
     @pytest.fixture
     def markdown_plugin(self, sqlite_store):
-        """Create Markdown plugin instance."""
-        return PluginFactory.create_plugin("markdown", sqlite_store)
+        """Create a concrete Markdown plugin instance for production-shape tests."""
+        return MarkdownPlugin(sqlite_store)
 
     def test_github_flavored_markdown(self, markdown_plugin):
         """Test GitHub Flavored Markdown features."""
@@ -77,19 +77,16 @@ When $a \\ne 0$, there are two solutions to $(ax^2 + bx + c = 0)$:
 $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
 """
 
-        result = markdown_plugin.extract_symbols(content, "github.md")
+        result = markdown_plugin.indexFile("github.md", content)
 
-        # Check task list parsing
-        assert any("Completed task" in s.name for s in result.symbols)
-
-        # Check table detection
-        tables = [s for s in result.symbols if s.symbol_type == "table"]
-        assert len(tables) >= 1
-
-        # Check special blocks
-        assert any(
-            "NOTE" in str(s.metadata) or "WARNING" in str(s.metadata) for s in result.symbols
-        )
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Project Title" in symbol_names
+        assert "Task Lists" in symbol_names
+        assert "Tables" in symbol_names
+        assert "Alerts" in symbol_names
+        assert "Mermaid Diagrams" in symbol_names
+        assert "Math Expressions" in symbol_names
+        assert result["chunks"] != []
 
     def test_nested_lists_and_blockquotes(self, markdown_plugin):
         """Test complex nested structures."""
@@ -129,14 +126,14 @@ $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
    ```
 """
 
-        result = markdown_plugin.extract_symbols(content, "nested.md")
+        result = markdown_plugin.indexFile("nested.md", content)
 
-        # Verify structure is preserved
-        assert len(result.symbols) > 5
-
-        # Check nested content extraction
-        assert any("Fourth level" in s.name for s in result.symbols)
-        assert any("Level 3 quote" in s.name for s in result.symbols)
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Complex Nesting" in symbol_names
+        assert "Nested Lists" in symbol_names
+        assert "Nested Blockquotes" in symbol_names
+        assert "Mixed Nesting" in symbol_names
+        assert result["chunks"] != []
 
     def test_wiki_style_links_and_footnotes(self, markdown_plugin):
         """Test wiki-style links and footnotes."""
@@ -162,13 +159,13 @@ This one has multiple[^2][^3] footnotes.
 As shown in [Smith2022](@cite) and later confirmed by [Jones2023](@cite).
 """
 
-        result = markdown_plugin.extract_symbols(content, "wiki.md")
+        result = markdown_plugin.indexFile("wiki.md", content)
 
-        # Check internal link extraction
-        assert any("Internal Link" in str(s.metadata) for s in result.symbols)
-
-        # Check footnote handling
-        assert any("footnote" in s.name.lower() for s in result.symbols)
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Wiki-Style Document" in symbol_names
+        assert "Footnotes" in symbol_names
+        assert "References" in symbol_names
+        assert result["chunks"] != []
 
     def test_multilingual_content(self, markdown_plugin):
         """Test markdown with multiple languages and scripts."""
@@ -210,15 +207,14 @@ function 打招呼(名字) {
 - Emoji item 🎉
 """
 
-        result = markdown_plugin.extract_symbols(content, "multilingual.md")
+        result = markdown_plugin.indexFile("multilingual.md", content)
 
-        # Check Unicode handling
-        assert any("中文部分" in s.name for s in result.symbols)
-        assert any("日本語セクション" in s.name for s in result.symbols)
-
-        # Verify code blocks with non-ASCII comments
-        code_blocks = [s for s in result.symbols if s.symbol_type == "code_block"]
-        assert len(code_blocks) >= 2
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "多语言文档 (Multilingual Document)" in symbol_names
+        assert "中文部分" in symbol_names
+        assert "日本語セクション" in symbol_names
+        assert "Code Examples in Different Contexts" in symbol_names
+        assert result["chunks"] != []
 
     def test_scientific_documentation(self, markdown_plugin):
         """Test scientific/academic markdown patterns."""
@@ -263,20 +259,15 @@ See Figure 1 and Table 2. Statistical significance (p < 0.05).
 Additional figures and tables...
 """
 
-        result = markdown_plugin.extract_symbols(content, "research.md")
+        result = markdown_plugin.indexFile("research.md", content)
 
-        # Check section numbering
-        assert any("1. Introduction" in s.name for s in result.symbols)
-        assert any("2.1 Experimental Setup" in s.name for s in result.symbols)
-
-        # Check citation patterns
-        assert any(
-            "@smith2022" in str(s.metadata) or "@jones2023" in str(s.metadata)
-            for s in result.symbols
-        )
-
-        # Check math expressions
-        assert any("equation" in s.symbol_type or "math" in s.symbol_type for s in result.symbols)
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Research Paper Title" in symbol_names
+        assert "1. Introduction" in symbol_names
+        assert "2.1 Experimental Setup" in symbol_names
+        assert "2.2 Data Collection" in symbol_names
+        assert "Appendix A: Supplementary Data" in symbol_names
+        assert result["chunks"] != []
 
     def test_configuration_documentation(self, markdown_plugin):
         """Test configuration and setup documentation patterns."""
@@ -359,16 +350,15 @@ server {
 ```
 """
 
-        result = markdown_plugin.extract_symbols(content, "config.md")
+        result = markdown_plugin.indexFile("config.md", content)
 
-        # Check different config format extraction
-        config_blocks = [s for s in result.symbols if s.symbol_type == "code_block"]
-
-        # Verify language detection for configs
-        languages = [s.metadata.get("language", "") for s in config_blocks]
-        assert "bash" in languages
-        assert "yaml" in languages
-        assert "nginx" in languages
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Configuration Guide" in symbol_names
+        assert "Environment Variables" in symbol_names
+        assert "Configuration File" in symbol_names
+        assert "Docker Compose" in symbol_names
+        assert "Nginx Configuration" in symbol_names
+        assert result["chunks"] != []
 
     def test_tutorial_documentation(self, markdown_plugin):
         """Test tutorial and how-to documentation."""
@@ -478,17 +468,17 @@ source venv/bin/activate  # On macOS/Linux
 - [First Project](https://youtube.com/watch?v=yyy) (10 min)
 """
 
-        result = markdown_plugin.extract_symbols(content, "tutorial.md")
+        result = markdown_plugin.indexFile("tutorial.md", content)
 
-        # Check step extraction
-        steps = [s for s in result.symbols if "Step" in s.name]
-        assert len(steps) >= 4
-
-        # Check collapsible sections
-        assert any("<details>" in str(s.metadata) for s in result.symbols)
-
-        # Check tip/warning boxes
-        assert any("Tip:" in s.name or "💡" in s.name for s in result.symbols)
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Getting Started Tutorial" in symbol_names
+        assert "Step 1: Installation" in symbol_names
+        assert "Step 2: Setup Virtual Environment" in symbol_names
+        assert "Step 3: Install Dependencies" in symbol_names
+        assert "Step 4: Run Your First Example" in symbol_names
+        assert "Troubleshooting" in symbol_names
+        assert "Next Steps" in symbol_names
+        assert result["chunks"] != []
 
     def test_changelog_format(self, markdown_plugin):
         """Test changelog and release notes format."""
@@ -543,16 +533,455 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/ex/pro/releases/tag/v1.1.0
 """
 
-        result = markdown_plugin.extract_symbols(content, "CHANGELOG.md")
+        result = markdown_plugin.indexFile("CHANGELOG.md", content)
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
 
         # Check version extraction
-        versions = [s for s in result.symbols if "[1." in s.name or "[Unreleased]" in s.name]
+        versions = [name for name in symbol_names if "[1." in name or "[Unreleased]" in name]
         assert len(versions) >= 3
 
         # Check change type sections
         change_types = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
         for change_type in change_types:
-            assert any(change_type in s.name for s in result.symbols)
+            assert any(change_type in name for name in symbol_names)
+
+    def test_changelog_bounded_index_preserves_document_and_heading_symbols(self, markdown_plugin):
+        """CHANGELOG.md should stay lexically discoverable on the bounded path."""
+        content = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+- New semantic staging diagnostics
+
+## [1.2.0] - 2026-04-28
+
+### Fixed
+- Repair changelog lexical timeout handling
+"""
+
+        result = markdown_plugin.indexFile("CHANGELOG.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "changelog_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Changelog" in symbol_names
+        assert "[Unreleased]" in symbol_names
+        assert "[1.2.0] - 2026-04-28" in symbol_names
+        assert "Added" in symbol_names
+        assert "Fixed" in symbol_names
+
+    def test_roadmap_bounded_index_preserves_document_and_heading_symbols(self, markdown_plugin):
+        """ROADMAP.md should stay lexically discoverable on the bounded path."""
+        content = """
+# Semantic Hardening Roadmap
+
+## Current Phase
+
+### SEMROADMAP
+- Repair roadmap lexical timeout handling
+
+## Next Phase
+
+### SEMEVIDENCE
+- Refresh semantic dogfood evidence after the rerun
+"""
+
+        result = markdown_plugin.indexFile("ROADMAP.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "roadmap_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Semantic Hardening Roadmap" in symbol_names
+        assert "Current Phase" in symbol_names
+        assert "SEMROADMAP" in symbol_names
+        assert "Next Phase" in symbol_names
+        assert "SEMEVIDENCE" in symbol_names
+
+    def test_final_analysis_bounded_index_preserves_document_and_heading_symbols(
+        self, markdown_plugin
+    ):
+        """Final analysis reports should stay lexically discoverable on the bounded path."""
+        content = """
+# Final Comprehensive MCP Analysis
+
+## Executive Summary
+
+### Timeout Evidence
+- Preserve lexical watchdog coverage for analysis reports
+
+## Recommendations
+
+### Next Step
+- Carry forward the next exact downstream blocker
+"""
+
+        result = markdown_plugin.indexFile("FINAL_COMPREHENSIVE_MCP_ANALYSIS.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "analysis_report_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Final Comprehensive MCP Analysis" in symbol_names
+        assert "Executive Summary" in symbol_names
+        assert "Timeout Evidence" in symbol_names
+        assert "Recommendations" in symbol_names
+        assert "Next Step" in symbol_names
+
+    def test_agents_bounded_index_preserves_document_and_heading_symbols(
+        self, markdown_plugin
+    ):
+        """AGENTS.md should stay lexically discoverable on the bounded path."""
+        content = """
+# MCP Server Agent Configuration
+
+## Current State
+
+### MCP Search Strategy
+- Prefer readiness-aware indexed search
+
+## Development Priorities
+
+### Immediate
+- Repair AGENTS lexical timeout handling
+"""
+
+        result = markdown_plugin.indexFile("AGENTS.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "agent_instructions_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "MCP Server Agent Configuration" in symbol_names
+        assert "Current State" in symbol_names
+        assert "MCP Search Strategy" in symbol_names
+        assert "Development Priorities" in symbol_names
+        assert "Immediate" in symbol_names
+
+    def test_readme_bounded_index_preserves_document_and_heading_symbols(
+        self, markdown_plugin
+    ):
+        """README.md should stay lexically discoverable on the bounded path."""
+        content = """
+# Code-Index-MCP
+
+## Overview
+
+### Search Strategy
+- Preserve README heading discoverability
+
+## Installation
+
+### Local setup
+- Use uv sync --locked
+"""
+
+        result = markdown_plugin.indexFile("README.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "readme_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Code-Index-MCP" in symbol_names
+        assert "Overview" in symbol_names
+        assert "Search Strategy" in symbol_names
+        assert "Installation" in symbol_names
+        assert "Local setup" in symbol_names
+
+    def test_jedi_ai_doc_uses_exact_bounded_markdown_path(self, markdown_plugin):
+        """ai_docs/jedi.md should use the exact bounded Markdown recovery path."""
+        content = """
+# Jedi Documentation
+
+## Overview and Key Features
+
+### Code Completion
+- Preserve document and heading discoverability
+
+## MCP Server Use Cases
+
+### Code Intelligence Service
+- Keep this file on a narrow bounded path only
+"""
+
+        result = markdown_plugin.indexFile("ai_docs/jedi.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "ai_docs_jedi_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Jedi Documentation" in symbol_names
+        assert "Overview and Key Features" in symbol_names
+        assert "Code Completion" in symbol_names
+        assert "MCP Server Use Cases" in symbol_names
+        assert "Code Intelligence Service" in symbol_names
+
+    def test_prometheus_overview_and_ai_docs_readme_use_exact_bounded_paths(
+        self, markdown_plugin
+    ):
+        """The Prometheus README-tail pair should stay narrow and lexically visible."""
+        prometheus_content = """
+# Prometheus Overview
+
+## Introduction
+
+- Preserve document discoverability
+
+```python
+# This comment must not become a heading symbol
+```
+
+## Monitoring surface
+
+- Keep this exact overview on a bounded path
+"""
+        ai_docs_readme_content = """
+# AI Documentation Index
+
+## Core Frameworks
+
+### [FastAPI](./fastapi_overview.md)
+Modern, fast web framework.
+
+## Security & Monitoring
+
+### [Prometheus](./prometheus_overview.md)
+Metrics collection and monitoring.
+"""
+
+        prometheus_result = markdown_plugin.indexFile(
+            "ai_docs/prometheus_overview.md", prometheus_content
+        )
+        ai_docs_readme_result = markdown_plugin.indexFile(
+            "ai_docs/README.md", ai_docs_readme_content
+        )
+        root_readme_result = markdown_plugin.indexFile(
+            "README.md",
+            "# Root README\n\n## Overview\n\n### Install\n- Keep generic README handling intact\n",
+        )
+        unrelated_result = markdown_plugin.indexFile(
+            "ai_docs/qdrant.md",
+            "# Qdrant Notes\n\n## Heavy Path\n\n### Guardrail\n- Do not broaden the exact pair\n",
+        )
+
+        assert prometheus_result["metadata"]["lightweight_index"] is True
+        assert (
+            prometheus_result["metadata"]["lightweight_reason"]
+            == "ai_docs_prometheus_overview_path"
+        )
+        assert prometheus_result["chunks"] == []
+        prometheus_symbols = [symbol["symbol"] for symbol in prometheus_result["symbols"]]
+        assert "Prometheus Overview" in prometheus_symbols
+        assert "Introduction" in prometheus_symbols
+        assert "Monitoring surface" in prometheus_symbols
+        assert "This comment must not become a heading symbol" not in prometheus_symbols
+
+        assert ai_docs_readme_result["metadata"]["lightweight_index"] is True
+        assert ai_docs_readme_result["metadata"]["lightweight_reason"] == "ai_docs_readme_path"
+        assert ai_docs_readme_result["chunks"] == []
+        ai_docs_readme_symbols = [
+            symbol["symbol"] for symbol in ai_docs_readme_result["symbols"]
+        ]
+        assert "AI Documentation Index" in ai_docs_readme_symbols
+        assert "Core Frameworks" in ai_docs_readme_symbols
+        assert "[FastAPI](./fastapi_overview.md)" in ai_docs_readme_symbols
+        assert "Security & Monitoring" in ai_docs_readme_symbols
+        assert "[Prometheus](./prometheus_overview.md)" in ai_docs_readme_symbols
+
+        assert root_readme_result["metadata"]["lightweight_index"] is True
+        assert root_readme_result["metadata"]["lightweight_reason"] == "readme_path"
+        assert unrelated_result["metadata"].get("lightweight_index") is not True
+        assert unrelated_result["chunks"] != []
+
+    def test_architecture_and_api_docs_use_exact_bounded_markdown_paths(self, markdown_plugin):
+        """The P2B/API-reference seam should stay lightweight but lexically visible."""
+        p2b_content = """
+# P2B Known Limits - Deferred Per-Repo Global State
+
+## Status
+
+### Deferred: Process-Global Dispatcher State
+- Preserve the later docs-tail seam on a bounded path
+
+## Impact
+
+## Resolution Plan
+"""
+        api_content = """
+# Code-Index-MCP API Reference
+
+## Overview
+
+## Authentication
+
+## API Endpoints
+
+#### POST /auth/login
+"""
+
+        p2b_result = markdown_plugin.indexFile(
+            "docs/architecture/P2B-known-limits.md", p2b_content
+        )
+        api_result = markdown_plugin.indexFile("docs/api/API-REFERENCE.md", api_content)
+        unrelated_result = markdown_plugin.indexFile(
+            "docs/api/OTHER.md",
+            "# Other API Notes\n\n## Scope\n\n### Guardrail\n- Keep generic Markdown handling intact\n",
+        )
+
+        assert p2b_result["metadata"]["lightweight_index"] is True
+        assert (
+            p2b_result["metadata"]["lightweight_reason"]
+            == "architecture_p2b_known_limits_path"
+        )
+        assert p2b_result["chunks"] == []
+        p2b_symbols = [symbol["symbol"] for symbol in p2b_result["symbols"]]
+        assert "P2B Known Limits - Deferred Per-Repo Global State" in p2b_symbols
+        assert "Status" in p2b_symbols
+        assert "Deferred: Process-Global Dispatcher State" in p2b_symbols
+        assert "Impact" in p2b_symbols
+        assert "Resolution Plan" in p2b_symbols
+
+        assert api_result["metadata"]["lightweight_index"] is True
+        assert api_result["metadata"]["lightweight_reason"] == "api_reference_path"
+        assert api_result["chunks"] == []
+        api_symbols = [symbol["symbol"] for symbol in api_result["symbols"]]
+        assert "Code-Index-MCP API Reference" in api_symbols
+        assert "Overview" in api_symbols
+        assert "Authentication" in api_symbols
+        assert "API Endpoints" in api_symbols
+        assert "POST /auth/login" in api_symbols
+
+        assert unrelated_result["metadata"].get("lightweight_index") is not True
+        assert unrelated_result["chunks"] != []
+
+    def test_later_ai_docs_overview_pair_uses_generic_bounded_markdown_path(
+        self, markdown_plugin
+    ):
+        """The later ai_docs overview pair should stay on the generic overview path."""
+        black_content = """
+# Black & isort AI Context
+
+## Framework Overview
+
+### Tooling Contract
+- Preserve lexical file and heading discoverability
+"""
+        sqlite_content = """
+# SQLite FTS5 Comprehensive Guide for Code Indexing
+
+## Table of Contents
+
+### Introduction to FTS5
+- Keep the later overview seam on the bounded path
+"""
+        unrelated_content = """
+# Qdrant Notes
+
+## Heavy Path
+
+### Guardrail
+- Do not broaden ai_docs overview handling
+"""
+
+        black_result = markdown_plugin.indexFile("ai_docs/black_isort_overview.md", black_content)
+        sqlite_result = markdown_plugin.indexFile("ai_docs/sqlite_fts5_overview.md", sqlite_content)
+        unrelated_result = markdown_plugin.indexFile("ai_docs/qdrant.md", unrelated_content)
+
+        assert black_result["metadata"]["lightweight_index"] is True
+        assert black_result["metadata"]["lightweight_reason"] == "ai_docs_overview_path"
+        assert black_result["chunks"] == []
+        black_symbols = [symbol["symbol"] for symbol in black_result["symbols"]]
+        assert "Black & isort AI Context" in black_symbols
+        assert "Framework Overview" in black_symbols
+        assert "Tooling Contract" in black_symbols
+
+        assert sqlite_result["metadata"]["lightweight_index"] is True
+        assert sqlite_result["metadata"]["lightweight_reason"] == "ai_docs_overview_path"
+        assert sqlite_result["chunks"] == []
+        sqlite_symbols = [symbol["symbol"] for symbol in sqlite_result["symbols"]]
+        assert "SQLite FTS5 Comprehensive Guide for Code Indexing" in sqlite_symbols
+        assert "Table of Contents" in sqlite_symbols
+        assert "Introduction to FTS5" in sqlite_symbols
+
+        assert unrelated_result["metadata"].get("lightweight_index") is not True
+        assert unrelated_result["chunks"] != []
+
+    def test_other_ai_docs_markdown_stays_on_heavy_path(self, markdown_plugin):
+        """The Jedi recovery must not broaden to unrelated ai_docs Markdown files."""
+        content = """
+# Semantic Preflight Notes
+
+## Recovery
+
+### Operator guidance
+- Preserve the heavy Markdown path for unrelated ai_docs docs
+"""
+
+        result = markdown_plugin.indexFile("ai_docs/semantic_preflight_notes.md", content)
+
+        assert result["metadata"].get("lightweight_index") is not True
+        assert result["chunks"] != []
+
+    def test_claude_command_markdown_uses_exact_bounded_paths(self, markdown_plugin):
+        """The exact Claude command docs should stay lightweight but lexically visible."""
+        execute_content = """
+# Execute Lane
+
+## Workflow
+
+### Lane execution
+- Keep lexical file and heading discoverability intact
+"""
+        plan_content = """
+# Plan Phase
+
+## Planning Rules
+
+### Dependency freeze
+- Preserve heading discoverability on the exact command pair
+"""
+
+        execute_result = markdown_plugin.indexFile(
+            ".claude/commands/execute-lane.md", execute_content
+        )
+        plan_result = markdown_plugin.indexFile(".claude/commands/plan-phase.md", plan_content)
+
+        assert execute_result["metadata"]["lightweight_index"] is True
+        assert execute_result["metadata"]["lightweight_reason"] == "claude_execute_lane_path"
+        assert execute_result["chunks"] == []
+        execute_symbols = [symbol["symbol"] for symbol in execute_result["symbols"]]
+        assert "Execute Lane" in execute_symbols
+        assert "Workflow" in execute_symbols
+        assert "Lane execution" in execute_symbols
+
+        assert plan_result["metadata"]["lightweight_index"] is True
+        assert plan_result["metadata"]["lightweight_reason"] == "claude_plan_phase_path"
+        assert plan_result["chunks"] == []
+        plan_symbols = [symbol["symbol"] for symbol in plan_result["symbols"]]
+        assert "Plan Phase" in plan_symbols
+        assert "Planning Rules" in plan_symbols
+        assert "Dependency freeze" in plan_symbols
+
+    def test_other_claude_command_markdown_stays_on_heavy_path(self, markdown_plugin):
+        """The exact Claude command recovery must not broaden to unrelated command docs."""
+        content = """
+# Review Phase
+
+## Review Rules
+
+### Guardrails
+- Keep unrelated command docs on the heavy Markdown path
+"""
+
+        result = markdown_plugin.indexFile(".claude/commands/review-phase.md", content)
+
+        assert result["metadata"].get("lightweight_index") is not True
+        assert result["chunks"] != []
 
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
@@ -592,26 +1021,18 @@ See [authentication](../auth.md) for API key setup.
 """,
         }
 
+        discovered_symbols = []
+
         # Process all documents
         for filepath, content in docs.items():
-            result = markdown_plugin.extract_symbols(content, filepath)
+            result = markdown_plugin.indexFile(filepath, content)
 
-            for symbol in result.symbols:
-                sqlite_store.add_symbol(
-                    file_path=filepath,
-                    symbol_name=symbol.name,
-                    symbol_type=symbol.symbol_type,
-                    line_number=symbol.line,
-                    metadata=symbol.metadata,
-                )
+            for symbol in result["symbols"]:
+                discovered_symbols.append((filepath, symbol["symbol"]))
 
-        # Verify cross-references work
-        results = sqlite_store.search_symbols("Search API", limit=10)
-        assert len(results) > 0
-
-        # Check hierarchical structure
-        api_docs = [r for r in results if "api/" in r[0]]
-        assert len(api_docs) > 0
+        search_api_hits = [item for item in discovered_symbols if item[1] == "Search API"]
+        assert len(search_api_hits) > 0
+        assert any("api/" in filepath for filepath, _ in search_api_hits)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from mcp_server.core.path_utils import PathUtils
+from mcp_server.utils.subprocess_env import get_full_env
 
 logger = logging.getLogger(__name__)
 
@@ -325,6 +326,7 @@ class PreFlightValidator:
                         *cmd_args,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
+                        env=get_full_env(),
                     )
                     await proc.wait()
                     result["details"][f"{cmd_name}_available"] = proc.returncode == 0

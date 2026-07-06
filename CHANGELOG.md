@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: # placeholder for post-rc5 work
 
+## [1.3.0] — 2026-07-06
+
+### Added
+- Added the public `mcp_server.client` Python API with typed local search,
+  symbol lookup, reindex, and status operations for programmatic use without
+  starting MCP STDIO or FastAPI.
+- Added source metadata filters for ordinary code, friction signals, and
+  historical GitHub issue context across the direct client, MCP tool handlers,
+  and FastAPI `/search`.
+
+### Changed
+- Advanced the repo-owned package, runtime, release automation, installer, and
+  active public documentation surface from `1.2.0` / `v1.2.0` to `1.3.0` /
+  `v1.3.0`.
+- Preserved `index-it-mcp` as the canonical Python distribution while keeping
+  `code-index-mcp` limited to repository, client-local server, and container
+  naming surfaces.
+
 ## [1.2.0] — 2026-04-25
 
 ### Changed (GAREL — stable surface preparation)

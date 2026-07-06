@@ -60,7 +60,7 @@ profiles:
     serving:
       default_backend: vllm
       vllm:
-        base_url: "${VLLM_EMBEDDING_BASE_URL:http://ai:8001/v1}"
+        base_url: "${SEMANTIC_EMBEDDING_BASE_URL:http://ai:8001/v1}"
         embeddings_path: "/v1/embeddings"
         model_id: "Qwen/Qwen3-Embedding-8B"
         tensor_parallel_size: 1
@@ -88,11 +88,14 @@ profiles:
       chunk_schema_version: 1
       embed_schema_version: 1
 
+    auth:
+      api_key_env: OPENAI_API_KEY
+
     summarization:
       enabled: true
       mode: lazy
       provider: openai_compatible
-      model_name: Qwen/Qwen2.5-Coder-14B-Instruct-AWQ
-      base_url: "${VLLM_SUMMARIZATION_BASE_URL:http://win:8002/v1}"
+      model_name: "${SEMANTIC_ENRICHMENT_MODEL:chat}"
+      base_url: "${SEMANTIC_ENRICHMENT_BASE_URL:http://ai:8002/v1}"
       api_key_env: OPENAI_API_KEY
       prompt_template: "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code."

@@ -6,9 +6,7 @@
         "exec", 
         "-i", 
         "mcp-sidecar",
-        "python",
-        "-m",
-        "mcp_server.cli",
+        "mcp-index",
         "stdio"
       ],
       "env": {

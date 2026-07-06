@@ -23,6 +23,7 @@ from .dispatcher.dispatcher_enhanced import EnhancedDispatcher, IndexResult, Ind
 from .indexing.lock_registry import lock_registry
 from .storage.git_index_manager import GitAwareIndexManager, should_reindex_for_branch
 from .storage.repository_registry import RepositoryRegistry
+from .utils.subprocess_env import get_full_env
 from .watcher import _Handler
 from .watcher.sweeper import WatcherSweeper
 
@@ -103,6 +104,7 @@ class GitMonitor:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=get_full_env(),
             )
             return result.stdout.strip()
         except Exception:
@@ -134,6 +136,7 @@ class MultiRepositoryHandler(FileSystemEventHandler):
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=get_full_env(),
             )
             if result.returncode == 0:
                 return result.stdout.strip()

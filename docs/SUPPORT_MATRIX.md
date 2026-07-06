@@ -1,7 +1,7 @@
 # Code-Index-MCP Support Matrix
 
 This matrix is the canonical GASUPPORT support statement for the prepared
-stable surface `1.2.0`. MCP STDIO is the primary LLM surface, FastAPI is a
+stable surface `1.3.0`. MCP STDIO is the primary LLM surface, FastAPI is a
 secondary admin surface, and the GA-hardening roadmap remains responsible for
 separating stable release prep from the downstream `GADISP` dispatch evidence.
 
@@ -11,7 +11,9 @@ registered worktree per git common directory. Only the tracked/default branch is
 indexed automatically. Same-repo sibling worktrees and non-default branch
 queries return `index_unavailable` with `safe_fallback: "native_search"` until
 readiness remediation completes; indexed MCP results are authoritative only when
-readiness is `ready`.
+readiness is `ready`. Lexical repository readiness does not imply semantic
+readiness: `semantic: true` queries additionally require summaries, vector
+linkage, and profile-compatible semantic metadata.
 
 Runtime facts are grounded in `mcp_server/plugins/language_registry.py`,
 `mcp_server/plugins/plugin_factory.py`, `mcp_server/plugins/plugin_set_registry.py`,
@@ -19,9 +21,23 @@ Runtime facts are grounded in `mcp_server/plugins/language_registry.py`,
 and `mcp_server/cli/stdio_runner.py`. The canonical release-boundary and
 evidence checklist is `docs/validation/ga-readiness-checklist.md`.
 
+## Client and transport compatibility
+
+The client/transport compatibility reducer for the current MCP surface is
+`docs/status/MCP_COMPATIBILITY_EVALUATION.md`. The short version:
+
+- Official Python MCP SDK over STDIO is the direct phase-owned verified client.
+- Claude Code and other STDIO launchers are documented against the same STDIO
+  contract, but MCPEVAL does not add a separate vendor-harness smoke for each
+  editor.
+- FastAPI remains the admin/debug HTTP surface, not the repository's MCP
+  Streamable HTTP transport.
+- Remote Streamable HTTP MCP remains deferred until a later roadmap phase adds
+  a distinct endpoint, transport tests, and transport-specific auth.
+
 ## Claim tiers
 
-- **Stable prep**: `v1.2.0` is the prepared stable package and container
+- **Stable prep**: `v1.3.0` is the prepared stable package and container
   contract. It is the repo-owned surface that downstream `GADISP` dispatches
   and verifies.
 - **Beta**: Multi-repo support, STDIO, and secondary tool readiness remain beta
@@ -111,13 +127,14 @@ topology, or install-surface support expansion.
 
 | Surface | Support tier | Default posture | Evidence basis | Notes |
 | --- | --- | --- | --- | --- |
-| STDIO query tools (`search_code`, `symbol_lookup`, `get_status`, `list_plugins`) | beta | Primary LLM surface | `stdio_runner._build_tool_list()`, readiness-gated tool descriptions, `plugin_availability` facts | Indexed query results are authoritative only when readiness is `ready` |
+| STDIO query tools (`search_code`, `symbol_lookup`, `get_status`, `list_plugins`) | beta | Primary LLM surface | `stdio_runner._build_tool_list()`, readiness-gated tool descriptions, `plugin_availability` facts | Indexed query results are authoritative only when readiness is `ready`; `search_code` also supports additive `source_type="friction"` / `source_type="history"` filters, `friction_categories`, `history_labels`, `history_repos`, and `include_source_metadata` |
 | STDIO mutation and summarization tools (`reindex`, `write_summaries`, `summarize_sample`) | beta | Secondary tool surfaces behind readiness gates | `tool_handlers.py`, TOOLRDY evidence, readiness-refusal tests | Non-ready repos fail closed; the artifact is readiness evidence, not support expansion |
+| Python client (`mcp_server.client`, `IndexItClient`) | beta | Supported local programmatic API | `mcp_server/client.py`, `mcp_server/client_types.py`, PYCLIENT tests/docs | Local-only API for `search_code`, `symbol_lookup`, `reindex`, and `get_status`; it shares readiness-aware search behavior with MCP `search_code` and returns typed `index_unavailable` results instead of dispatching stale indexes |
 | FastAPI admin and diagnostics surface | beta | Secondary/admin surface | `README.md`, `docs/GETTING_STARTED.md`, `docs/MCP_CONFIGURATION.md` | Do not treat FastAPI as the primary LLM interface |
 | Native source install via `uv sync --locked` | beta | Canonical local development and operator path | `pyproject.toml`, `uv.lock`, install docs | This is the preferred local install path while the release remains pre-GA |
-| Package install (`index-it-mcp==1.2.0`) | beta | Prepared stable artifact path | package naming and install docs | Stable surface prep does not by itself prove downstream release publication |
-| Docker image `ghcr.io/viperjuice/code-index-mcp:v1.2.0` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
-| Semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental | Optional extra and provider-dependent | extras docs, config env vars, support-fact notes | Requires provider credentials or a compatible local endpoint; not unconditional support |
+| Python distribution name on PyPI (`index-it-mcp`) | beta | Canonical distribution name; live install parity currently deferred to the identity note | package naming note, install docs, `docs/status/public-package-identity.md` | Use source install or a locally built wheel until live PyPI parity is re-proven for the prepared `1.3.0` surface |
+| Docker image `ghcr.io/viperjuice/code-index-mcp:v1.3.0` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
+| Semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental | Optional extra and provider-dependent | extras docs, config env vars, support-fact notes | Requires semantic readiness `ready` for the active profile; ready `semantic: true` responses expose semantic source/profile/collection metadata, while `summaries_missing`, `vectors_missing`, `profile_mismatch`, or `semantic_stale` return explicit semantic refusal or failure instead of lexical fallback |
 | Reranking (`uv sync --locked --extra rerank` plus provider/model config) | experimental | Optional extra and provider-dependent | extras docs and support-fact notes | Treat as opt-in ranking improvement, not baseline query behavior |
 | Default sandboxed plugin execution | beta | Default security posture | `sandbox_supported`, `activation_mode`, sandbox docs | Coverage varies by language and is authoritative through `plugin_availability` |
 | Unsandboxed or sandbox-disabled plugin path | disabled-by-default | Explicit operator opt-in only | `activation_mode=disabled_by_default`, sandbox docs | Enabling unsandboxed fallback does not widen documented default support |
@@ -127,7 +144,8 @@ topology, or install-surface support expansion.
 
 - Optional semantic and reranking behavior depends on extras, provider
   configuration, and API keys or local model endpoints. It should not be
-  treated as unconditional support.
+  treated as unconditional support. Lexical readiness alone is not enough for
+  semantic query support.
 - `list_plugins` is the canonical detailed capability surface. Each
   `plugin_availability` row includes `language`, `state`, `sandbox_supported`,
   `specific_plugin`, `plugin_module`, `availability_basis`,

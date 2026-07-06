@@ -21,7 +21,10 @@ wheels/
 *.egg
 MANIFEST
 .pytest_cache/
-.coverage
+.coverage*
+coverage.xml
+coverage.json
+htmlcov/
 .tox/
 .mypy_cache/
 .dmypy.json
@@ -89,6 +92,51 @@ logs/
 *.temp
 .cache/
 
+# Repo-clean generated outputs
+/.metadata/
+/INDEXING_STATUS.json
+/artifact-metadata.json
+/complete_indexing_results.json
+/full_indexing_log.txt
+/indexing_progress_summary.json
+/mcp_direct_test_results.json
+/mcp_indexing_status.json
+/mcp_indexing_summary.json
+/mcp_path_fix_test_results.json
+/mcp_search_code_test_results.json
+/mcp_validation_results.json
+/mcp_verification_results.json
+/missing_repos_to_index.json
+/multi_repo_search_test_results.json
+/proper_repo_mapping.json
+/real_quick_results.json
+/repo_db_mapping.json
+/semantic_indexing_progress.json
+/test_queries.json
+/test_queries_small.json
+/*_REPORT.md
+/*_SUMMARY.md
+/*_STATUS.md
+/*_ANALYSIS.md
+/analysis_archive/
+/comprehensive_real_results/
+/comprehensive_semantic_results/
+/fast_test_results/
+/final_optimized_report_final_report_1750958096/
+/mcp_test_results/
+/performance_reports/
+/quick_test_results/
+/real_cost_analysis/
+/real_edit_analysis/
+/real_session_analysis/
+/reports/
+/sample_transcripts/
+/strategic_recommendations/
+/test_indexes/
+/test_results/
+/.phase-loop/
+/.codex/phase-loop/
+
 # =============================================================================
 # AI AGENT GUIDANCE AND DEVELOPER TOOLS - SHARED WITH TEAM
 # =============================================================================
@@ -149,7 +197,7 @@ rapid_test_report.json
 # Local data directories (DO IGNORE)
 data/
 backup/
-cache/
+/cache/
 
 # Test repositories (git submodules)
 tests/fixtures/repos/
@@ -173,10 +221,10 @@ private-alpha-evidence/
 # 1Password op run env-file for MCP server (references only, but machine-local)
 .mcp.env
 index-archive.tar.gz
-coverage.xml
 .metadata/coverage.xml
 
 # execute-phase artifacts
 .worktrees/
 .claude/worktrees/
 .claude/execute-phase-state.json
+/.dev-skills/

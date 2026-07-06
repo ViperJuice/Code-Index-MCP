@@ -1,0 +1,101 @@
+# Public Package Identity
+
+Check date: 2026-07-06 UTC
+
+## Scope
+
+This note freezes the repo-owned public identity contract for PUBNAME.
+It is metadata-only evidence for the prepared `1.3.0` surface. It does not
+claim a new package or container publication.
+
+## Metadata Probes
+
+PyPI JSON probe used on 2026-07-06 UTC:
+
+```bash
+python - <<'PY'
+import json, urllib.request
+for name in ("index-it-mcp", "code-index-mcp"):
+    url = f"https://pypi.org/pypi/{name}/json"
+    with urllib.request.urlopen(url, timeout=20) as response:
+        payload = json.load(response)
+    info = payload["info"]
+    print(json.dumps({
+        "name": name,
+        "url": url,
+        "normalized_name": info.get("name"),
+        "version": info.get("version"),
+        "project_urls": info.get("project_urls"),
+    }, sort_keys=True))
+PY
+```
+
+Observed source URLs:
+
+- `https://pypi.org/pypi/index-it-mcp/json`
+- `https://pypi.org/project/index-it-mcp/`
+- `https://pypi.org/pypi/code-index-mcp/json`
+- `https://pypi.org/project/code-index-mcp/`
+
+Observed live facts:
+
+| Package | Normalized name | Latest visible version on 2026-07-06 | Project/source URLs | Decision input |
+| --- | --- | --- | --- | --- |
+| `index-it-mcp` | `index-it-mcp` | `2.14.9` | `Homepage`, `Repository`, and `Documentation` point to `https://github.com/ViperJuice/Code-Index-MCP` | The canonical distribution name matches this repo, but live PyPI parity for the repo-owned `1.3.0` surface is not proven. |
+| `code-index-mcp` | `code-index-mcp` | `2.17.0` | `Homepage` points to `https://github.com/johnhuang316/code-index-mcp` | Treat as an external or colliding package name, not this repo's install target. |
+
+## Proof Status
+
+- Owner/source URL proof for `index-it-mcp`: partial. The live project URLs
+  point at this repository and the author metadata is `Jenner Torrence`, but
+  the latest visible live version is `2.14.9` rather than this repo's prepared
+  `1.3.0` surface.
+- Version parity proof for `index-it-mcp`: not proven. PUBNAME therefore keeps
+  public install docs on source and local-wheel proof.
+- Owner/source proof for `code-index-mcp`: negative for this repo. The live
+  homepage points to a different repository, so PUBNAME treats the name as
+  external and avoids it in user-facing install instructions.
+
+## Local Wheel Smoke
+
+Repo-owned smoke command:
+
+```bash
+uv run --extra dev python scripts/release_smoke.py --wheel --stdio
+```
+
+Expected canonical entrypoints from the locally built wheel:
+
+- `mcp-index`
+- `index-it-mcp`
+
+Removed legacy alias:
+
+- `code-index-mcp`
+
+## Identity Inventory
+
+| Surface | Current surface | Decision | Rationale |
+| --- | --- | --- | --- |
+| Python distribution name | `index-it-mcp` | keep | Canonical install identity for this repo. |
+| Canonical CLI entrypoints | `mcp-index`, `index-it-mcp` | keep | These are the wheel entrypoints PUBNAME verifies locally. |
+| Legacy console-script alias | `code-index-mcp` | drop | It collides with an external package name and is not needed as the canonical install surface. |
+| Click program name | `code-index-mcp` in `mcp_server/cli/__init__.py` | defer | Runtime label is outside PUBNAME ownership and needs a later runtime-facing phase if it should change. |
+| MCP client server IDs / labels | `code-index`, `code-index-mcp`, `code-index-native`, similar example IDs | keep | These are client-local labels, not Python package names. |
+| Container image name | `ghcr.io/viperjuice/code-index-mcp` | keep | Container naming remains a separate public surface from the Python distribution name. |
+| Profile/config filename | `code-index-mcp.profiles.yaml` | keep | Repo-shipped configuration filename, not an install target. |
+| `.mcp.json` example labels | `code-index-mcp` and related server keys | keep | Example keys identify local client config entries only. |
+| Repository name | `Code-Index-MCP` | keep | Repo rename is outside PUBNAME scope. |
+| npm helper kit | `mcp-index-kit` | keep | Separate helper-kit identity; does not conflict with the Python distribution decision. |
+
+## Public Docs Posture
+
+Until a later release-evidence phase re-proves live parity for the prepared
+`1.3.0` surface, public docs should:
+
+- use `index-it-mcp` as the canonical Python distribution name;
+- avoid `pip install code-index-mcp` or any other `code-index-mcp` package
+  install guidance;
+- prefer `uv sync --locked` or a locally built wheel for repo-owned proof; and
+- classify `code-index-mcp` mentions as container/image naming, profile/config
+  filenames, MCP client labels, or an explicit collision warning.

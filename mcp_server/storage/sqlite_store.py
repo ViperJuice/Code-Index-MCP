@@ -16,6 +16,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.errors import TransientArtifactError
 from ..core.path_resolver import PathResolver
+from ..indexing.friction import extract_friction_markers
+from ..indexing.github_issues import issue_history_dedupe_key
+from ..indexing.source_metadata import (
+    HISTORY_SOURCE_TYPE,
+    HistoryIssueRecord,
+    extract_matching_source_metadata,
+    merge_source_metadata,
+)
 from .connection_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
@@ -30,6 +38,49 @@ _LEXICAL_EXCLUDED_FILENAMES = {
     "mcp_direct_test_results.json",
     "test_queries.json",
 }
+
+_SQLITE_STORAGE_FAILURE_PATTERNS = (
+    ("disk I/O error", "disk_io_error"),
+    ("database or disk is full", "disk_full"),
+)
+
+
+def _merge_chunk_source_metadata(
+    metadata: Optional[Dict[str, Any]],
+    content: str,
+    line_start: int,
+) -> Dict[str, Any]:
+    records = []
+    for marker in extract_friction_markers(content):
+        adjusted = dict(marker)
+        adjusted["line"] = int(marker["line"]) + max(int(line_start) - 1, 0)
+        records.append(adjusted)
+    if not records:
+        return dict(metadata or {})
+    return merge_source_metadata(metadata, records)
+
+
+def _history_issue_document_content(record: HistoryIssueRecord) -> str:
+    labels = ", ".join(record["labels"]) if record["labels"] else "(none)"
+    lines = [
+        f"# Issue #{record['number']}: {record['title']}",
+        f"Repository: {record['repo']}",
+        f"Type: {record['type']}",
+        f"State: {record['state']}",
+        f"Labels: {labels}",
+        f"Created: {record['created_at']}",
+        f"Updated: {record['updated_at']}",
+        f"URL: {record['url']}",
+        "",
+        f"Summary: {record['summary']}",
+    ]
+    closed_at = record.get("closed_at")
+    if closed_at:
+        lines.insert(7, f"Closed: {closed_at}")
+    if record["learnings"]:
+        lines.extend(["", "Learnings:"])
+        lines.extend(f"- {learning}" for learning in record["learnings"])
+    return "\n".join(lines)
 
 
 def _normalized_query_terms(query: str) -> List[str]:
@@ -69,6 +120,22 @@ def _fts_rank_adjustment(query: str, file_path: str) -> float:
     return adjustment
 
 
+def classify_sqlite_storage_failure(error: BaseException) -> Optional[Dict[str, Any]]:
+    """Normalize SQLite operational storage failures into a stable diagnostics shape."""
+    message = str(error)
+    lowered = message.lower()
+    for needle, reason in _SQLITE_STORAGE_FAILURE_PATTERNS:
+        if needle.lower() not in lowered:
+            continue
+        return {
+            "storage_failure_family": "sqlite_operational",
+            "storage_failure_reason": reason,
+            "storage_failure_message": message,
+            "readonly": True,
+        }
+    return None
+
+
 class SQLiteStore:
     """SQLite-based storage implementation with FTS5 support."""
 
@@ -91,10 +158,12 @@ class SQLiteStore:
         self.path_resolver = path_resolver or PathResolver()
         self._pool = pool
         self._readonly = False
+        self._readonly_diagnostics: Optional[Dict[str, Any]] = None
 
         self._init_database()
         self._run_migrations()
         self._ensure_semantic_points_table()
+        self._ensure_chunk_summary_audit_columns()
 
     def _require_writable(self) -> None:
         if self._readonly:
@@ -104,6 +173,25 @@ class SQLiteStore:
         """Close the store.  If a connection pool is attached, drain it."""
         if self._pool is not None:
             self._pool.close_all()
+
+    def get_readonly_diagnostics(self) -> Optional[Dict[str, Any]]:
+        """Return the most recent storage-failure provenance that forced read-only mode."""
+        if self._readonly_diagnostics is None:
+            return None
+        return dict(self._readonly_diagnostics)
+
+    def _mark_readonly_from_storage_failure(
+        self, error: sqlite3.OperationalError
+    ) -> Optional[Dict[str, Any]]:
+        diagnostics = classify_sqlite_storage_failure(error)
+        if diagnostics is None:
+            return None
+        self._readonly = True
+        self._readonly_diagnostics = diagnostics
+        from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
+
+        mcp_storage_readonly_total.inc()
+        return diagnostics
 
     def _ensure_semantic_points_table(self) -> None:
         """Ensure semantic point mapping table exists for stale vector cleanup."""
@@ -125,6 +213,25 @@ class SQLiteStore:
                 CREATE INDEX IF NOT EXISTS idx_semantic_points_collection
                     ON semantic_points(collection);
                 """)
+
+    def _ensure_chunk_summary_audit_columns(self) -> None:
+        """Ensure additive chunk summary audit columns exist."""
+        with self._get_connection() as conn:
+            for column, ddl in (
+                ("provider_name", "ALTER TABLE chunk_summaries ADD COLUMN provider_name TEXT"),
+                ("profile_id", "ALTER TABLE chunk_summaries ADD COLUMN profile_id TEXT"),
+                (
+                    "prompt_fingerprint",
+                    "ALTER TABLE chunk_summaries ADD COLUMN prompt_fingerprint TEXT",
+                ),
+                ("audit_metadata", "ALTER TABLE chunk_summaries ADD COLUMN audit_metadata TEXT"),
+            ):
+                if self._check_column_exists(conn, "chunk_summaries", column):
+                    continue
+                try:
+                    conn.execute(ddl)
+                except sqlite3.OperationalError:
+                    logger.debug("Could not add chunk_summaries.%s", column)
 
     def _init_database(self):
         """Initialize database and create schema if needed."""
@@ -251,13 +358,7 @@ class SQLiteStore:
                     conn.commit()
                 except sqlite3.OperationalError as e:
                     conn.rollback()
-                    if "disk I/O error" in str(e) or "database or disk is full" in str(e):
-                        self._readonly = True
-                        from mcp_server.metrics.prometheus_exporter import (
-                            mcp_storage_readonly_total,
-                        )
-
-                        mcp_storage_readonly_total.inc()
+                    if self._mark_readonly_from_storage_failure(e) is not None:
                         raise TransientArtifactError(str(e)) from e
                     raise
                 except Exception:
@@ -272,11 +373,7 @@ class SQLiteStore:
                 conn.commit()
             except sqlite3.OperationalError as e:
                 conn.rollback()
-                if "disk I/O error" in str(e) or "database or disk is full" in str(e):
-                    self._readonly = True
-                    from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
-
-                    mcp_storage_readonly_total.inc()
+                if self._mark_readonly_from_storage_failure(e) is not None:
                     raise TransientArtifactError(str(e)) from e
                 raise
             except Exception:
@@ -454,6 +551,10 @@ class SQLiteStore:
                 summary_text TEXT NOT NULL,
                 is_authoritative BOOLEAN DEFAULT 0,
                 llm_model TEXT,
+                provider_name TEXT,
+                profile_id TEXT,
+                prompt_fingerprint TEXT,
+                audit_metadata TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
@@ -636,13 +737,8 @@ class SQLiteStore:
                    updated_at=CURRENT_TIMESTAMP""",
                 (path, name, json.dumps(metadata or {})),
             )
-            if cursor.lastrowid:
-                return cursor.lastrowid
-            else:
-                # If lastrowid is None, it means we updated an existing row
-                # Get the id of the existing repository
-                cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
-                return cursor.fetchone()[0]
+            cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
+            return cursor.fetchone()[0]
 
     def get_repository(self, path: str) -> Optional[Dict]:
         """Get repository by path."""
@@ -780,15 +876,14 @@ class SQLiteStore:
                     deleted_at,
                 ),
             )
-            if cursor.lastrowid:
-                return cursor.lastrowid
-            else:
-                # Get the id of the existing file
-                cursor = conn.execute(
-                    "SELECT id FROM files WHERE repository_id = ? AND relative_path = ?",
-                    (repository_id, relative_path_str),
-                )
-                return cursor.fetchone()[0]
+            cursor = conn.execute(
+                "SELECT id FROM files WHERE repository_id = ? AND relative_path = ?",
+                (repository_id, relative_path_str),
+            )
+            row = cursor.fetchone()
+            if row is None:  # pragma: no cover - defensive
+                raise RuntimeError(f"Failed to resolve stored file row for {relative_path_str}")
+            return row[0]
 
     def get_file(
         self, file_path: Union[str, Path], repository_id: Optional[int] = None
@@ -1007,6 +1102,7 @@ class SQLiteStore:
         metadata: Optional[Dict] = None,
     ) -> int:
         """Store a code chunk with stable IDs and token counting."""
+        serialized_metadata = _merge_chunk_source_metadata(metadata, content, line_start)
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """INSERT INTO code_chunks
@@ -1058,7 +1154,7 @@ class SQLiteStore:
                     parent_chunk_id,
                     depth,
                     chunk_index,
-                    json.dumps(metadata or {}),
+                    json.dumps(serialized_metadata),
                 ),
             )
             if cursor.lastrowid:
@@ -1191,6 +1287,20 @@ class SQLiteStore:
             )
             return cursor.rowcount
 
+    def delete_chunk_summaries(self, chunk_ids: List[str]) -> int:
+        """Delete authoritative summary rows for the supplied chunk ids."""
+        if not chunk_ids:
+            return 0
+
+        placeholders = ",".join(["?"] * len(chunk_ids))
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                f"""DELETE FROM chunk_summaries
+                    WHERE chunk_hash IN ({placeholders})""",
+                list(chunk_ids),
+            )
+            return cursor.rowcount
+
     def store_chunks_batch(self, chunks: List[Dict[str, Any]]) -> int:
         """
         Store multiple chunks in a batch operation for efficiency.
@@ -1208,6 +1318,11 @@ class SQLiteStore:
             count = 0
             for chunk in chunks:
                 try:
+                    serialized_metadata = _merge_chunk_source_metadata(
+                        chunk.get("metadata"),
+                        chunk["content"],
+                        int(chunk["line_start"]),
+                    )
                     conn.execute(
                         """INSERT INTO code_chunks
                            (file_id, symbol_id, content, content_start, content_end,
@@ -1262,7 +1377,7 @@ class SQLiteStore:
                             chunk.get("parent_chunk_id"),
                             chunk.get("depth", 0),
                             chunk.get("chunk_index", 0),
-                            json.dumps(chunk.get("metadata") or {}),
+                            json.dumps(serialized_metadata),
                         ),
                     )
                     count += 1
@@ -1271,6 +1386,146 @@ class SQLiteStore:
                     continue
 
             return count
+
+    def search_chunks_by_source_metadata(
+        self,
+        *,
+        source_type: str = "friction",
+        friction_categories: Optional[List[str]] = None,
+        history_labels: Optional[List[str]] = None,
+        history_repos: Optional[List[str]] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Return chunks whose stored source metadata matches the requested filters."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT c.content, c.line_start, c.line_end, c.metadata,
+                          COALESCE(f.path, f.relative_path, CAST(c.file_id AS TEXT)) AS file_path
+                   FROM code_chunks c
+                   JOIN files f ON c.file_id = f.id
+                   WHERE c.metadata LIKE '%"source_metadata"%'
+                   ORDER BY f.path, c.line_start
+                   """,
+            )
+            rows = cursor.fetchall()
+
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            metadata_raw = row["metadata"]
+            if not metadata_raw:
+                continue
+            try:
+                metadata = json.loads(metadata_raw)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            source_metadata = extract_matching_source_metadata(
+                metadata,
+                source_type=source_type,
+                friction_categories=friction_categories,
+                history_labels=history_labels,
+                history_repos=history_repos,
+            )
+            if source_metadata is None:
+                continue
+            results.append(
+                {
+                    "file": row["file_path"],
+                    "line": row["line_start"],
+                    "line_end": row["line_end"],
+                    "snippet": row["content"],
+                    "source_metadata": source_metadata,
+                }
+            )
+            if len(results) >= limit:
+                break
+        return results
+
+    def upsert_history_issue_documents(
+        self,
+        repository_id: int,
+        records: List[HistoryIssueRecord],
+    ) -> Dict[str, int]:
+        """Persist metadata-only GitHub issue history documents for a repository."""
+        self._require_writable()
+        if not records:
+            return {"stored": 0, "skipped": 0}
+
+        grouped_records: Dict[str, List[HistoryIssueRecord]] = {}
+        for record in records:
+            repo_parts = record["repo"].split("/", 1)
+            owner = repo_parts[0]
+            repo_name = repo_parts[1] if len(repo_parts) == 2 else repo_parts[0]
+            relative_path = f".mcp-index/history/{owner}/{repo_name}/issues/{record['number']}.md"
+            grouped_records.setdefault(relative_path, []).append(record)
+
+        stored = 0
+        skipped = 0
+        repository_root = self._repository_root_path(repository_id)
+        for relative_path, file_records in grouped_records.items():
+            absolute_path = str((repository_root / relative_path).resolve())
+            file_id = self.store_file(
+                repository_id,
+                path=absolute_path,
+                relative_path=relative_path,
+                language="history",
+                metadata={"source_type": HISTORY_SOURCE_TYPE},
+            )
+            for index, record in enumerate(
+                sorted(file_records, key=lambda item: (item["type"], item["updated_at"]))
+            ):
+                chunk_id = f"history:{record['type']}"
+                chunk_metadata = merge_source_metadata(
+                    {
+                        "history_dedupe_key": issue_history_dedupe_key(record),
+                        "source_type": HISTORY_SOURCE_TYPE,
+                    },
+                    [record],
+                )
+                self.store_chunk(
+                    file_id=file_id,
+                    content=_history_issue_document_content(record),
+                    content_start=0,
+                    content_end=len(record["summary"]),
+                    line_start=1,
+                    line_end=max(1, len(record["learnings"]) + 10),
+                    chunk_id=chunk_id,
+                    node_id=chunk_id,
+                    treesitter_file_id=relative_path,
+                    chunk_type="document",
+                    language="history",
+                    chunk_index=index,
+                    metadata=chunk_metadata,
+                )
+                stored += 1
+            self._refresh_fts_code_for_file(file_id)
+        return {"stored": stored, "skipped": skipped}
+
+    def _repository_root_path(self, repository_id: int) -> Path:
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT path FROM repositories WHERE id = ?", (repository_id,))
+            row = cursor.fetchone()
+        if row is None or not row[0]:
+            return Path.cwd()
+        return Path(str(row[0]))
+
+    def _refresh_fts_code_for_file(self, file_id: int) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT content
+                   FROM code_chunks
+                   WHERE file_id = ?
+                   ORDER BY line_start, chunk_index, id""",
+                (file_id,),
+            )
+            content = "\n\n".join(
+                row["content"]
+                for row in cursor.fetchall()
+                if isinstance(row["content"], str) and row["content"].strip()
+            )
+            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
+            conn.execute(
+                "INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id)
+            )
 
     # Reference operations
     def store_reference(
@@ -1708,8 +1963,18 @@ class SQLiteStore:
             "fts5": False,
             "wal": False,
             "version": 0,
+            "journal_mode": None,
+            "busy_timeout_ms": 0,
+            "wal_checkpoint": {"status": "not_run"},
+            "database_files": {},
             "error": None,
+            "readonly": self._readonly,
+            "storage_failure_family": None,
+            "storage_failure_reason": None,
+            "storage_failure_message": None,
         }
+        if self._readonly_diagnostics is not None:
+            result.update(self._readonly_diagnostics)
 
         try:
             with self._get_connection() as conn:
@@ -1747,7 +2012,30 @@ class SQLiteStore:
                 # Check WAL mode
                 cursor = conn.execute("PRAGMA journal_mode")
                 journal_mode = cursor.fetchone()[0].upper()
+                result["journal_mode"] = journal_mode
                 result["wal"] = journal_mode == "WAL"
+
+                cursor = conn.execute("PRAGMA busy_timeout")
+                busy_timeout_row = cursor.fetchone()
+                result["busy_timeout_ms"] = (
+                    int(busy_timeout_row[0]) if busy_timeout_row and busy_timeout_row[0] else 0
+                )
+
+                try:
+                    cursor = conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    checkpoint_row = cursor.fetchone()
+                    if checkpoint_row is not None:
+                        result["wal_checkpoint"] = {
+                            "status": "ok",
+                            "busy": int(checkpoint_row[0]),
+                            "log_frames": int(checkpoint_row[1]),
+                            "checkpointed_frames": int(checkpoint_row[2]),
+                        }
+                except sqlite3.OperationalError as exc:
+                    result["wal_checkpoint"] = {
+                        "status": "error",
+                        "error": str(exc),
+                    }
 
                 # Get schema version
                 if result["tables"].get("schema_version", False):
@@ -1757,6 +2045,19 @@ class SQLiteStore:
                         result["version"] = version_row[0] if version_row and version_row[0] else 0
                     except sqlite3.OperationalError:
                         result["version"] = 0
+
+                db_path = Path(self.db_path)
+                for label, candidate in (
+                    ("main", db_path),
+                    ("wal", db_path.with_name(f"{db_path.name}-wal")),
+                    ("shm", db_path.with_name(f"{db_path.name}-shm")),
+                ):
+                    exists = candidate.exists()
+                    result["database_files"][label] = {
+                        "path": str(candidate),
+                        "exists": exists,
+                        "bytes": candidate.stat().st_size if exists else 0,
+                    }
 
                 # Determine health status
                 missing_tables = [table for table, exists in result["tables"].items() if not exists]
@@ -1775,6 +2076,9 @@ class SQLiteStore:
                 elif not result["wal"]:
                     result["status"] = "degraded"
                     result["error"] = "WAL mode not enabled - concurrency may be affected"
+                elif result["wal_checkpoint"].get("status") == "error":
+                    result["status"] = "degraded"
+                    result["error"] = "WAL checkpoint diagnostics failed"
 
         except Exception as e:
             result["status"] = "unhealthy"
@@ -2215,6 +2519,10 @@ class SQLiteStore:
         llm_model: str,
         symbol: Optional[str] = None,
         is_authoritative: bool = False,
+        provider_name: Optional[str] = None,
+        profile_id: Optional[str] = None,
+        prompt_fingerprint: Optional[str] = None,
+        audit_metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Store or update a semantic chunk summary."""
         with self._get_connection() as conn:
@@ -2229,12 +2537,18 @@ class SQLiteStore:
 
             conn.execute(
                 """INSERT INTO chunk_summaries 
-                   (chunk_hash, file_id, chunk_start, chunk_end, symbol, summary_text, is_authoritative, llm_model, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   (chunk_hash, file_id, chunk_start, chunk_end, symbol, summary_text,
+                    is_authoritative, llm_model, provider_name, profile_id,
+                    prompt_fingerprint, audit_metadata, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                    ON CONFLICT(chunk_hash) DO UPDATE SET
                    summary_text=excluded.summary_text,
                    is_authoritative=excluded.is_authoritative,
                    llm_model=excluded.llm_model,
+                   provider_name=excluded.provider_name,
+                   profile_id=excluded.profile_id,
+                   prompt_fingerprint=excluded.prompt_fingerprint,
+                   audit_metadata=excluded.audit_metadata,
                    updated_at=CURRENT_TIMESTAMP
                 """,
                 (
@@ -2246,6 +2560,10 @@ class SQLiteStore:
                     summary_text,
                     is_authoritative,
                     llm_model,
+                    provider_name,
+                    profile_id,
+                    prompt_fingerprint,
+                    json.dumps(audit_metadata) if audit_metadata is not None else None,
                 ),
             )
             return True
@@ -2255,12 +2573,20 @@ class SQLiteStore:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """SELECT chunk_hash, file_id, chunk_start, chunk_end, symbol, 
-                          summary_text, is_authoritative, llm_model, created_at, updated_at
+                          summary_text, is_authoritative, llm_model, provider_name,
+                          profile_id, prompt_fingerprint, audit_metadata,
+                          created_at, updated_at
                    FROM chunk_summaries WHERE chunk_hash = ?""",
                 (chunk_hash,),
             )
             row = cursor.fetchone()
             if row:
+                audit_metadata = None
+                if row[11]:
+                    try:
+                        audit_metadata = json.loads(row[11])
+                    except json.JSONDecodeError:
+                        audit_metadata = None
                 return {
                     "chunk_hash": row[0],
                     "file_id": row[1],
@@ -2270,10 +2596,124 @@ class SQLiteStore:
                     "summary_text": row[5],
                     "is_authoritative": bool(row[6]),
                     "llm_model": row[7],
-                    "created_at": row[8],
-                    "updated_at": row[9],
+                    "provider_name": row[8],
+                    "profile_id": row[9],
+                    "prompt_fingerprint": row[10],
+                    "audit_metadata": audit_metadata,
+                    "created_at": row[12],
+                    "updated_at": row[13],
                 }
             return None
+
+    def plan_semantic_invalidation(
+        self,
+        relative_path: str,
+        repository_id: int,
+        *,
+        profile_id: Optional[str] = None,
+        new_relative_path: Optional[str] = None,
+        preserve_matching_summaries: bool = False,
+        expected_summary_profile_id: Optional[str] = None,
+        expected_prompt_fingerprint: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Plan summary/vector invalidation for a file mutation without mutating state."""
+        result: Dict[str, Any] = {
+            "relative_path": relative_path,
+            "new_relative_path": new_relative_path,
+            "file_id": None,
+            "source_chunk_ids": [],
+            "vector_chunk_ids": [],
+            "summary_chunk_ids_to_delete": [],
+            "summary_chunk_ids_preserved": [],
+            "file_summary_chunk_id": f"{relative_path}:file-summary",
+            "new_file_summary_chunk_id": (
+                f"{new_relative_path}:file-summary" if new_relative_path else None
+            ),
+            "requires_file_summary_regeneration": bool(
+                new_relative_path and new_relative_path != relative_path
+            ),
+            "requires_summary_regeneration": False,
+        }
+
+        file_row = self.get_file_by_path(relative_path, repository_id)
+        if not file_row:
+            return result
+
+        file_id = int(file_row["id"])
+        result["file_id"] = file_id
+
+        chunks = self.get_chunks_for_file(file_id)
+        source_chunk_ids = [str(chunk["chunk_id"]) for chunk in chunks]
+        result["source_chunk_ids"] = source_chunk_ids
+
+        with self._get_connection() as conn:
+            summary_rows = conn.execute(
+                """SELECT chunk_hash, is_authoritative, profile_id, prompt_fingerprint
+                   FROM chunk_summaries
+                   WHERE file_id = ?""",
+                (file_id,),
+            ).fetchall()
+
+            vector_chunk_ids: List[str] = list(source_chunk_ids)
+            if profile_id:
+                if source_chunk_ids:
+                    like_clauses = " OR ".join(
+                        ["chunk_id = ? OR chunk_id LIKE ?"] * len(source_chunk_ids)
+                    )
+                    params: List[Any] = [profile_id]
+                    for chunk_id in source_chunk_ids:
+                        params.extend([chunk_id, f"{chunk_id}:part:%"])
+                    params.append(result["file_summary_chunk_id"])
+                    vector_rows = conn.execute(
+                        f"""SELECT chunk_id
+                            FROM semantic_points
+                            WHERE profile_id = ?
+                              AND (({like_clauses}) OR chunk_id = ?)""",
+                        params,
+                    ).fetchall()
+                else:
+                    vector_rows = conn.execute(
+                        """SELECT chunk_id
+                           FROM semantic_points
+                           WHERE profile_id = ?
+                             AND chunk_id = ?""",
+                        (profile_id, result["file_summary_chunk_id"]),
+                    ).fetchall()
+                vector_chunk_ids.extend(str(row[0]) for row in vector_rows)
+
+        preserved: List[str] = []
+        deleted: List[str] = []
+        for row in summary_rows:
+            chunk_hash = str(row[0])
+            is_authoritative = bool(row[1])
+            row_profile_id = row[2]
+            row_prompt_fingerprint = row[3]
+            matches_profile = (
+                expected_summary_profile_id is None or row_profile_id == expected_summary_profile_id
+            )
+            matches_prompt = (
+                expected_prompt_fingerprint is None
+                or row_prompt_fingerprint == expected_prompt_fingerprint
+            )
+            can_preserve = (
+                preserve_matching_summaries
+                and is_authoritative
+                and matches_profile
+                and matches_prompt
+            )
+            if can_preserve:
+                preserved.append(chunk_hash)
+            else:
+                deleted.append(chunk_hash)
+
+        dedup_vector_chunk_ids = list(dict.fromkeys(vector_chunk_ids))
+        result["vector_chunk_ids"] = dedup_vector_chunk_ids
+        result["summary_chunk_ids_to_delete"] = deleted
+        result["summary_chunk_ids_preserved"] = preserved
+        result["requires_summary_regeneration"] = bool(
+            deleted or result["requires_file_summary_regeneration"]
+        )
+        return result
 
     def get_missing_summaries(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Find chunks that don't have summaries yet."""
@@ -2301,6 +2741,77 @@ class SQLiteStore:
                 for row in cursor.fetchall()
             ]
 
+    def get_semantic_readiness_evidence(
+        self,
+        profile_id: str,
+        *,
+        collection: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Summarize durable semantic evidence without mutating the store."""
+        with self._get_connection() as conn:
+            total_chunks = int(conn.execute("SELECT COUNT(*) FROM code_chunks").fetchone()[0])
+            summary_count = int(
+                conn.execute("SELECT COUNT(DISTINCT chunk_hash) FROM chunk_summaries").fetchone()[0]
+            )
+            missing_summaries = int(conn.execute("""SELECT COUNT(*)
+                       FROM code_chunks c
+                       LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                       WHERE cs.chunk_hash IS NULL""").fetchone()[0])
+
+            vector_link_count = int(
+                conn.execute(
+                    """SELECT COUNT(DISTINCT chunk_id)
+                       FROM semantic_points
+                       WHERE profile_id = ?""",
+                    (profile_id,),
+                ).fetchone()[0]
+            )
+            missing_vectors = int(
+                conn.execute(
+                    """SELECT COUNT(*)
+                       FROM code_chunks c
+                       LEFT JOIN semantic_points sp
+                         ON c.chunk_id = sp.chunk_id
+                        AND sp.profile_id = ?
+                       WHERE sp.chunk_id IS NULL""",
+                    (profile_id,),
+                ).fetchone()[0]
+            )
+
+            matching_collection_links = vector_link_count
+            collection_mismatches = 0
+            if collection is not None:
+                matching_collection_links = int(
+                    conn.execute(
+                        """SELECT COUNT(DISTINCT chunk_id)
+                           FROM semantic_points
+                           WHERE profile_id = ?
+                             AND collection = ?""",
+                        (profile_id, collection),
+                    ).fetchone()[0]
+                )
+                collection_mismatches = int(
+                    conn.execute(
+                        """SELECT COUNT(*)
+                           FROM semantic_points
+                           WHERE profile_id = ?
+                             AND collection != ?""",
+                        (profile_id, collection),
+                    ).fetchone()[0]
+                )
+
+            return {
+                "profile_id": profile_id,
+                "collection": collection,
+                "total_chunks": total_chunks,
+                "summary_count": summary_count,
+                "missing_summaries": missing_summaries,
+                "vector_link_count": vector_link_count,
+                "missing_vectors": missing_vectors,
+                "matching_collection_links": matching_collection_links,
+                "collection_mismatches": collection_mismatches,
+            }
+
     def find_chunk_at_line(self, file_path: str, line: int) -> Optional[Dict[str, Any]]:
         """Return the tightest code chunk that covers *line* in *file_path*.
 
@@ -2312,7 +2823,7 @@ class SQLiteStore:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
-                          c.content, s.name AS symbol
+                          c.content, s.name AS symbol, c.metadata
                    FROM code_chunks c
                    JOIN files f ON c.file_id = f.id
                    LEFT JOIN symbols s ON c.symbol_id = s.id
@@ -2326,6 +2837,12 @@ class SQLiteStore:
             row = cursor.fetchone()
             if row is None:
                 return None
+            metadata: Dict[str, Any] = {}
+            if row[6]:
+                try:
+                    metadata = json.loads(row[6])
+                except (TypeError, json.JSONDecodeError):
+                    metadata = {}
             return {
                 "chunk_hash": row[0],
                 "file_id": row[1],
@@ -2333,4 +2850,5 @@ class SQLiteStore:
                 "chunk_end": row[3] or line,
                 "symbol": row[5] or "unknown",
                 "content": row[4] or "",
+                "metadata": metadata,
             }

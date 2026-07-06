@@ -17,6 +17,12 @@ from .cache import (
 )
 from .cli.index_management import _get_profile_collection_name
 from .cli.preflight_commands import format_preflight_report, run_startup_preflight
+from .client import (
+    ClientValidationError,
+    build_search_options,
+    execute_search_service,
+    search_result_for_gateway,
+)
 from .config.environment import is_production as _is_production
 from .config.settings import get_settings
 from .config.validation import (
@@ -29,6 +35,7 @@ from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
+from .indexing.source_metadata import normalize_friction_category
 from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
@@ -126,7 +133,7 @@ def _get_path_guard() -> Optional[PathTraversalGuard]:
     return PathTraversalGuard(roots)
 
 
-def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
+def _normalize_search_result(raw_result: Any) -> Optional[dict[str, Any]]:
     """Normalize internal search payloads to the public SearchResult schema.
 
     Returns None if the result's file path fails the path traversal guard.
@@ -194,12 +201,15 @@ def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
             f"{start_line + i}: {line}" for i, line in enumerate(snippet_lines)
         )
 
-        return SearchResult(
-            file=str(file_value),
-            start_line=start_line,
-            end_line=end_line,
-            snippet=numbered_snippet,
-        )
+        normalized: dict[str, Any] = {
+            "file": str(file_value),
+            "start_line": start_line,
+            "end_line": end_line,
+            "snippet": numbered_snippet,
+        }
+        if raw_result.get("source_metadata") is not None:
+            normalized["source_metadata"] = raw_result.get("source_metadata")
+        return normalized
 
     file_value = _prefer_path(
         getattr(raw_result, "file", None)
@@ -237,12 +247,28 @@ def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
         f"{start_line + i}: {line}" for i, line in enumerate(snippet_lines)
     )
 
-    return SearchResult(
-        file=str(file_value),
-        start_line=start_line,
-        end_line=end_line,
-        snippet=numbered_snippet,
-    )
+    normalized = {
+        "file": str(file_value),
+        "start_line": start_line,
+        "end_line": end_line,
+        "snippet": numbered_snippet,
+    }
+    source_metadata = getattr(raw_result, "source_metadata", None)
+    if source_metadata is not None:
+        normalized["source_metadata"] = source_metadata
+    return normalized
+
+
+def _normalize_source_metadata_categories(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    return [normalize_friction_category(item) for item in value.split(",") if item.strip()]
+
+
+def _normalize_csv_filters(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    return sorted({item.strip() for item in value.split(",") if item.strip()}, key=str.lower)
 
 
 language_detection_status: Dict[str, Any] | None = None
@@ -1321,7 +1347,7 @@ async def symbol(
         raise HTTPException(500, f"Internal error during symbol lookup: {str(e)}")
 
 
-@app.get("/search", response_model=list[SearchResult])
+@app.get("/search", response_model=list[dict[str, Any]])
 async def search(
     request: Request,
     q: str,
@@ -1330,6 +1356,11 @@ async def search(
     mode: str = "auto",  # "auto", "hybrid", "bm25", "semantic", "fuzzy", "classic"
     language: Optional[str] = None,
     file_filter: Optional[str] = None,
+    source_type: Optional[str] = None,
+    friction_categories: Optional[str] = None,
+    history_labels: Optional[str] = None,
+    history_repos: Optional[str] = None,
+    include_source_metadata: bool = False,
     current_user: User = Depends(require_permission(Permission.READ)),
 ):
     """Search with support for multiple modes including hybrid search.
@@ -1347,14 +1378,48 @@ async def search(
         logger.error("Search attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
 
+    try:
+        options = build_search_options(
+            query=q,
+            repository=request.query_params.get("repository"),
+            semantic=semantic,
+            limit=limit,
+            source_type=source_type,
+            friction_categories=friction_categories,
+            history_labels=history_labels,
+            history_repos=history_repos,
+            include_source_metadata=include_source_metadata,
+        )
+    except ClientValidationError as exc:
+        detail: dict[str, Any] = {"error": exc.error, "details": exc.details}
+        if exc.allowed_categories:
+            detail["allowed_categories"] = exc.allowed_categories
+        raise HTTPException(400, detail) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            400, {"error": "Invalid search source filters", "details": str(exc)}
+        ) from exc
+
     ctx = get_repo_ctx(request)
+    explicit_repository = request.query_params.get("repository")
+    service_repo_resolver = repo_resolver
+    if explicit_repository is None and ctx.repo_id == _FALLBACK_REPO_ID:
+        service_repo_resolver = None
     start_time = time.time()
     try:
         # Determine effective search mode
         effective_mode = mode
+        filtered_search_requested = bool(
+            options.source_type
+            or options.friction_categories
+            or options.history_labels
+            or options.history_repos
+            or options.include_source_metadata
+        )
         if mode == "auto":
-            # Auto mode: semantic requests prefer the dedicated semantic path.
-            if semantic and dispatcher and hasattr(dispatcher, "search"):
+            if filtered_search_requested and dispatcher and hasattr(dispatcher, "search"):
+                effective_mode = "semantic" if semantic else "classic"
+            elif semantic and dispatcher and hasattr(dispatcher, "search"):
                 effective_mode = "semantic"
             # Non-semantic requests use hybrid if available, otherwise fall back.
             elif hybrid_search is not None:
@@ -1373,19 +1438,25 @@ async def search(
         if file_filter:
             filters["file_filter"] = file_filter
 
-        # Try cache first if query cache is available
-        cache_key_parts = [q, effective_mode, str(limit)]
-        if filters:
-            cache_key_parts.extend([f"{k}:{v}" for k, v in sorted(filters.items())])
+        cache_params = {
+            "q": q,
+            "semantic": effective_mode == "semantic",
+            "limit": limit,
+            "language": language,
+            "file_filter": file_filter,
+            "source_type": options.source_type.value if options.source_type else None,
+            "friction_categories": options.friction_categories,
+            "history_labels": options.history_labels,
+            "history_repos": options.history_repos,
+            "include_source_metadata": options.include_source_metadata,
+        }
 
         cached_results = None
         if query_cache and query_cache.config.enabled:
             query_type = (
                 QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             )
-            cached_results = await query_cache.get_cached_result(
-                query_type, q=q, semantic=(effective_mode == "semantic"), limit=limit
-            )
+            cached_results = await query_cache.get_cached_result(query_type, **cache_params)
 
         if cached_results is not None:
             cached_results = [
@@ -1439,10 +1510,46 @@ async def search(
             # Use classic dispatcher with semantic=True
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
-                    results = list(dispatcher.search(ctx, q, semantic=True, limit=limit))
-                    results = [
-                        r for r in (_normalize_search_result(x) for x in results) if r is not None
-                    ]
+                    result = execute_search_service(
+                        dispatcher=dispatcher,
+                        repo_resolver=service_repo_resolver,
+                        options=options,
+                        workspace_root=ctx.workspace_root,
+                        ctx=ctx,
+                    )
+                    if result.index_unavailable is not None:
+                        raise HTTPException(
+                            503,
+                            detail={
+                                "error": "Index unavailable",
+                                "code": result.index_unavailable.code,
+                                "safe_fallback": result.index_unavailable.safe_fallback,
+                                "readiness": result.index_unavailable.readiness,
+                                "message": result.index_unavailable.message,
+                                "remediation": result.index_unavailable.remediation,
+                            },
+                        )
+                    if result.code == "semantic_not_ready":
+                        raise HTTPException(
+                            503,
+                            detail={
+                                "error": "Semantic search not ready",
+                                "code": result.code,
+                                "semantic_readiness": result.semantic_readiness,
+                                "message": result.message,
+                            },
+                        )
+                    if result.code == "semantic_search_failed":
+                        raise HTTPException(
+                            500,
+                            detail={
+                                "error": "Semantic search failed",
+                                "code": result.code,
+                                "semantic_readiness": result.semantic_readiness,
+                                "message": result.message,
+                            },
+                        )
+                    results = search_result_for_gateway(result)
             else:
                 raise HTTPException(
                     503,
@@ -1491,10 +1598,26 @@ async def search(
             # Classic search through dispatcher
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
-                    results = list(dispatcher.search(ctx, q, semantic=False, limit=limit))
-                    results = [
-                        r for r in (_normalize_search_result(x) for x in results) if r is not None
-                    ]
+                    result = execute_search_service(
+                        dispatcher=dispatcher,
+                        repo_resolver=service_repo_resolver,
+                        options=options,
+                        workspace_root=ctx.workspace_root,
+                        ctx=ctx,
+                    )
+                    if result.index_unavailable is not None:
+                        raise HTTPException(
+                            503,
+                            detail={
+                                "error": "Index unavailable",
+                                "code": result.index_unavailable.code,
+                                "safe_fallback": result.index_unavailable.safe_fallback,
+                                "readiness": result.index_unavailable.readiness,
+                                "message": result.index_unavailable.message,
+                                "remediation": result.index_unavailable.remediation,
+                            },
+                        )
+                    results = search_result_for_gateway(result)
             else:
                 raise HTTPException(503, "Classic search not available")
 
@@ -1507,9 +1630,7 @@ async def search(
             await query_cache.cache_result(
                 query_type,
                 results,
-                q=q,
-                semantic=(effective_mode == "semantic"),
-                limit=limit,
+                **cache_params,
             )
 
         # Record business metrics

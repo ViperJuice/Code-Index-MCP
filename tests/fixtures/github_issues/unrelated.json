@@ -1,0 +1,13 @@
+{
+  "number": 14,
+  "title": "Unrelated issue",
+  "labels": [
+    {"name": "bug"}
+  ],
+  "state": "OPEN",
+  "createdAt": "2026-07-05T10:00:00Z",
+  "updatedAt": "2026-07-06T10:00:00Z",
+  "closedAt": null,
+  "url": "https://github.com/owner/repo/issues/14",
+  "body": "No learnings here"
+}

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
 from mcp_server.utils import semantic_indexer as semantic_indexer_module
-from mcp_server.utils.semantic_indexer import SemanticIndexer
+from mcp_server.utils.semantic_indexer import SemanticIndexer, ensure_qdrant_collection
 
 
 class _FakeEmbeddingProvider:
@@ -26,7 +27,28 @@ class _FakeEmbeddingProvider:
 
 
 class _FakeQdrantClient:
-    pass
+    def __init__(self) -> None:
+        self.upserts = []
+        self.collections = {}
+
+    def upsert(self, *, collection_name, points):
+        self.upserts.append((collection_name, list(points)))
+
+    def get_collections(self):
+        return SimpleNamespace(
+            collections=[SimpleNamespace(name=name) for name in self.collections.keys()]
+        )
+
+    def get_collection(self, collection_name):
+        size, distance = self.collections[collection_name]
+        return SimpleNamespace(
+            config=SimpleNamespace(
+                params=SimpleNamespace(vectors=SimpleNamespace(size=size, distance=distance))
+            )
+        )
+
+    def recreate_collection(self, *, collection_name, vectors_config):
+        self.collections[collection_name] = (vectors_config.size, vectors_config.distance)
 
 
 def _sample_profiles() -> dict[str, dict[str, object]]:
@@ -59,6 +81,14 @@ def _sample_profiles() -> dict[str, dict[str, object]]:
 def _patch_indexer_runtime(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
 
+    # The default PathResolver auto-detects the repository root by walking up to
+    # the nearest .git, which under pytest's tmp_path lands on /tmp and prefixes
+    # every repo-relative chunk id with the pytest tmp directory. Pin detection to
+    # tmp_path so relative paths (and the chunk ids derived from them) are stable.
+    from mcp_server.core.path_resolver import PathResolver
+
+    monkeypatch.setattr(PathResolver, "_detect_repository_root", lambda self: Path(tmp_path))
+
     def _fake_init_qdrant(self, qdrant_path):
         self._qdrant_available = True
         self._connection_mode = "memory"
@@ -86,6 +116,37 @@ def _patch_indexer_runtime(monkeypatch, tmp_path) -> None:
         "create_embedding_provider",
         _fake_provider,
     )
+
+
+class _FakeSQLiteStore:
+    def __init__(self, summary_text: str | None) -> None:
+        self.summary_text = summary_text
+        self.semantic_points = []
+
+    def get_chunk_summary(self, _chunk_id: str):
+        if self.summary_text is None:
+            return None
+        return {"summary_text": self.summary_text}
+
+    def upsert_semantic_point(self, **kwargs):
+        self.semantic_points.append(kwargs)
+
+
+def _patch_chunk_file(monkeypatch, chunk_id: str = "chunk-1") -> None:
+    def _fake_chunk_file(*_args, **_kwargs):
+        return [
+            SimpleNamespace(
+                content="def alpha(x):\n    return x + 1\n",
+                metadata={"symbol": "alpha", "kind": "function", "signature_text": "alpha(x)"},
+                start_line=1,
+                end_line=2,
+                node_type="function_definition",
+                chunk_id=chunk_id,
+                node_id=chunk_id,
+            )
+        ]
+
+    monkeypatch.setattr(semantic_indexer_module, "chunk_file", _fake_chunk_file)
 
 
 def test_profile_configuration_is_selected_from_registry(monkeypatch, tmp_path):
@@ -196,3 +257,138 @@ def test_metadata_file_accumulates_multiple_semantic_profiles(monkeypatch, tmp_p
         == "semantic-commercial-high"
     )
     assert metadata["semantic_profiles"]["oss-high"]["collection_name"] == "semantic-oss-high"
+
+
+def test_strict_batch_indexing_refuses_writes_without_authoritative_summary(monkeypatch, tmp_path):
+    _patch_indexer_runtime(monkeypatch, tmp_path)
+    _patch_chunk_file(monkeypatch)
+    registry = SemanticProfileRegistry.from_raw(_sample_profiles(), "oss-high")
+    sqlite_store = _FakeSQLiteStore(summary_text=None)
+    source = tmp_path / "sample.py"
+    source.write_text("def alpha(x):\n    return x + 1\n", encoding="utf-8")
+
+    indexer = SemanticIndexer(
+        collection="code-index",
+        qdrant_path=":memory:",
+        profile_registry=registry,
+        semantic_profile="oss-high",
+        sqlite_store=sqlite_store,
+    )
+
+    result = indexer.index_files_batch([source], require_summaries=True)
+
+    assert result["files_indexed"] == 0
+    assert result["files_blocked"] == 1
+    assert result["missing_summary_chunk_ids"] == ["chunk-1"]
+    assert indexer.qdrant.upserts == []
+
+
+def test_strict_preparation_includes_summary_text_in_embedding_input(monkeypatch, tmp_path):
+    _patch_indexer_runtime(monkeypatch, tmp_path)
+    _patch_chunk_file(monkeypatch)
+    registry = SemanticProfileRegistry.from_raw(_sample_profiles(), "oss-high")
+    sqlite_store = _FakeSQLiteStore(summary_text="Summarizes alpha and its input")
+    source = tmp_path / "sample.py"
+    source.write_text("def alpha(x):\n    return x + 1\n", encoding="utf-8")
+
+    indexer = SemanticIndexer(
+        collection="code-index",
+        qdrant_path=":memory:",
+        profile_registry=registry,
+        semantic_profile="oss-high",
+        sqlite_store=sqlite_store,
+    )
+
+    prep = indexer._prepare_file_for_indexing(Path(source))
+
+    assert prep is not None
+    assert any("Summarizes alpha and its input" in text for text in prep["embedding_inputs"])
+    assert any("return x + 1" in text for text in prep["embedding_inputs"])
+
+
+def test_successful_strict_batch_indexing_persists_chunk_point_links(monkeypatch, tmp_path):
+    _patch_indexer_runtime(monkeypatch, tmp_path)
+    _patch_chunk_file(monkeypatch, chunk_id="chunk-link")
+    registry = SemanticProfileRegistry.from_raw(_sample_profiles(), "oss-high")
+    sqlite_store = _FakeSQLiteStore(summary_text="Summarizes alpha and its input")
+    source = tmp_path / "sample.py"
+    source.write_text("def alpha(x):\n    return x + 1\n", encoding="utf-8")
+
+    indexer = SemanticIndexer(
+        collection="code-index",
+        qdrant_path=":memory:",
+        profile_registry=registry,
+        semantic_profile="oss-high",
+        sqlite_store=sqlite_store,
+    )
+
+    result = indexer.index_files_batch([source], require_summaries=True)
+
+    assert result["files_indexed"] == 1
+    assert {point["chunk_id"] for point in sqlite_store.semantic_points} == {
+        "chunk-link:part:1:1",
+        "sample.py:file-summary",
+        "chunk-link",
+    }
+    assert all(point["profile_id"] == "oss-high" for point in sqlite_store.semantic_points)
+
+
+def test_preflight_blocker_prevents_any_qdrant_upsert(monkeypatch, tmp_path):
+    _patch_indexer_runtime(monkeypatch, tmp_path)
+    _patch_chunk_file(monkeypatch)
+    registry = SemanticProfileRegistry.from_raw(_sample_profiles(), "oss-high")
+    sqlite_store = _FakeSQLiteStore(summary_text="Summarizes alpha and its input")
+    source = tmp_path / "sample.py"
+    source.write_text("def alpha(x):\n    return x + 1\n", encoding="utf-8")
+
+    indexer = SemanticIndexer(
+        collection="code-index",
+        qdrant_path=":memory:",
+        profile_registry=registry,
+        semantic_profile="oss-high",
+        sqlite_store=sqlite_store,
+    )
+
+    result = indexer.index_files_batch(
+        [source],
+        require_summaries=True,
+        semantic_preflight={
+            "can_write_semantic_vectors": False,
+            "blocker": {"code": "collection_missing", "message": "Collection missing"},
+        },
+    )
+
+    assert result["files_blocked"] == 1
+    assert indexer.qdrant.upserts == []
+
+
+def test_ensure_qdrant_collection_creates_missing_collection():
+    client = _FakeQdrantClient()
+
+    result = ensure_qdrant_collection(
+        client,
+        collection_name="semantic-oss-high",
+        expected_dimension=4096,
+        distance_metric="cosine",
+        allow_recreate=False,
+    )
+
+    assert result.status == "created"
+    assert "semantic-oss-high" in client.collections
+
+
+def test_ensure_qdrant_collection_blocks_shape_mismatch_when_recreate_disallowed():
+    client = _FakeQdrantClient()
+    distance = SemanticIndexer.resolve_qdrant_distance("dot")
+    client.collections["semantic-oss-high"] = (1024, distance)
+
+    result = ensure_qdrant_collection(
+        client,
+        collection_name="semantic-oss-high",
+        expected_dimension=4096,
+        distance_metric="cosine",
+        allow_recreate=False,
+    )
+
+    assert result.status == "blocked"
+    assert result.actual_dimension == 1024

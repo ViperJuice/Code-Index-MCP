@@ -3,12 +3,14 @@ import logging
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from ..core.path_resolver import PathResolver
+from ..core.repo_context import RepoContext
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..plugins.language_registry import get_all_extensions
 
@@ -81,10 +83,24 @@ class _Handler(FileSystemEventHandler):
         dispatcher: EnhancedDispatcher,
         query_cache=None,
         path_resolver: Optional[PathResolver] = None,
+        ctx: Optional[RepoContext] = None,
     ):
         self.dispatcher = dispatcher
         self.query_cache = query_cache
         self.path_resolver = path_resolver or PathResolver()
+        workspace_root = getattr(self.path_resolver, "repository_root", None) or Path.cwd()
+        self.ctx = ctx or RepoContext(
+            repo_id=str(Path(workspace_root).resolve()),
+            sqlite_store=getattr(dispatcher, "sqlite_store", None),
+            workspace_root=Path(workspace_root),
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                repository_id=str(Path(workspace_root).resolve()),
+                path=Path(workspace_root),
+                tracked_branch="main",
+                name=Path(workspace_root).name,
+            ),
+        )
         self.code_extensions = get_all_extensions()
 
         # Pending per-path action: path -> (due_monotonic, action, extra)
@@ -189,8 +205,16 @@ class _Handler(FileSystemEventHandler):
         if not path.exists():
             return
         logger.info("Re-indexing %s", path)
-        self.dispatcher.remove_file(path)
-        self.dispatcher.index_file(path)
+        if self.ctx is None:
+            return
+        guarded_index = getattr(type(self.dispatcher), "index_file_guarded", None)
+        if guarded_index is not None:
+            observed_hash = self.path_resolver.compute_content_hash(path)
+            self.dispatcher.remove_file(self.ctx, path)
+            self.dispatcher.index_file_guarded(self.ctx, path, observed_hash)
+        else:
+            self.dispatcher.remove_file(path)
+            self.dispatcher.index_file(path)
         self._kick_cache_invalidation(path)
 
     def trigger_reindex(self, path: Path) -> None:
@@ -198,9 +222,17 @@ class _Handler(FileSystemEventHandler):
         if path.suffix not in self.code_extensions:
             return
         logger.info("Re-indexing %s", path)
+        if self.ctx is None:
+            return
         try:
-            self.dispatcher.remove_file(path)
-            self.dispatcher.index_file(path)
+            guarded_index = getattr(type(self.dispatcher), "index_file_guarded", None)
+            if guarded_index is not None:
+                observed_hash = self.path_resolver.compute_content_hash(path)
+                self.dispatcher.remove_file(self.ctx, path)
+                self.dispatcher.index_file_guarded(self.ctx, path, observed_hash)
+            else:
+                self.dispatcher.remove_file(path)
+                self.dispatcher.index_file(path)
             self._kick_cache_invalidation(path)
         except Exception:
             logger.exception("trigger_reindex failed for %s", path)
@@ -209,7 +241,12 @@ class _Handler(FileSystemEventHandler):
         if path.suffix not in self.code_extensions:
             return
         logger.info("Removing from index: %s", path)
-        self.dispatcher.remove_file(path)
+        if self.ctx is None:
+            return
+        if getattr(type(self.dispatcher), "index_file_guarded", None) is not None:
+            self.dispatcher.remove_file(self.ctx, path)
+        else:
+            self.dispatcher.remove_file(path)
         self._kick_cache_invalidation(path)
 
     def remove_file_from_index(self, path: Path) -> None:
@@ -226,7 +263,12 @@ class _Handler(FileSystemEventHandler):
             return
         content_hash = self.path_resolver.compute_content_hash(new_path)
         logger.info("Moving in index: %s -> %s", old_path, new_path)
-        self.dispatcher.move_file(old_path, new_path, content_hash)
+        if self.ctx is None:
+            return
+        if getattr(type(self.dispatcher), "index_file_guarded", None) is not None:
+            self.dispatcher.move_file(self.ctx, old_path, new_path, content_hash)
+        else:
+            self.dispatcher.move_file(old_path, new_path, content_hash)
         self._kick_cache_invalidation(new_path)
 
     # ------------------------------------------------------------------
@@ -260,9 +302,22 @@ class FileWatcher:
         dispatcher: EnhancedDispatcher,
         query_cache=None,
         path_resolver: Optional[PathResolver] = None,
+        ctx: Optional[RepoContext] = None,
     ):
         self._observer = Observer()
-        self._handler = _Handler(dispatcher, query_cache, path_resolver)
+        handler_ctx = ctx or RepoContext(
+            repo_id=str(root.resolve()),
+            sqlite_store=getattr(dispatcher, "sqlite_store", None),
+            workspace_root=root,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                repository_id=str(root.resolve()),
+                path=root,
+                tracked_branch="main",
+                name=root.name,
+            ),
+        )
+        self._handler = _Handler(dispatcher, query_cache, path_resolver, ctx=handler_ctx)
         self._observer.schedule(self._handler, str(root), recursive=True)
 
     def start(self) -> None:

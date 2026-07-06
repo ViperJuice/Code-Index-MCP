@@ -47,6 +47,14 @@ pip install -r requirements.txt
 - Linux: `sudo apt-get install build-essential`
 - Mac: `xcode-select --install`
 
+### Windows Path-Length Fallback
+**Problem**: Windows tools still report long-path failures after cloning the repo.
+
+**Solution**:
+- Keep the checkout on the cleaned source tree; tracked files are held to the 160-character tracked-path limit and the release audit checks wheel member depth separately.
+- Prefer a short local clone path first.
+- If your machine or a third-party tool still hits Windows path limits, use `git config --global core.longpaths true` as a fallback after the repo tree is clean.
+
 ## Server Startup Problems
 
 ### Port Already in Use

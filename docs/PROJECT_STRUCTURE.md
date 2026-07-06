@@ -1,205 +1,62 @@
 # Project Structure
-Updated: 2025-01-06
+Updated: 2026-07-06
 
 ## Overview
-This document describes the organized structure of the Code-Index-MCP project after the root directory consolidation.
 
-## Root Directory
-The root directory has been streamlined to contain only essential files:
+This repository keeps tracked source, docs, tests, and durable evidence in git.
+Generated analysis dumps, scratch result trees, runtime indexes, and local
+operator state are intentionally excluded from the public source layout.
 
-### MCP Core Files (Must Stay in Root)
-- `mcp_server/` - Core MCP server implementation
-- `mcp-index-kit/` - MCP indexing toolkit
-- `.mcp-index/` - MCP index data
-- `.mcp-index.json` - MCP index configuration
-- `.mcp.json` - MCP server configuration
-- `.mcp.json.example` - MCP config example
-- `.mcp-index-ignore` - MCP ignore patterns
+## Tracked Top-Level Layout
 
-### AI & Architecture (Must Stay in Root)
-- `ai_docs/` - AI framework documentation
-- `architecture/` - System architecture docs and diagrams
-- `.claude/` - Claude AI configuration
-- `.claude.json` - Claude config file
-- `.cursor/` - Cursor IDE configuration
-- `AGENTS.md` - AI agent instructions
-- `CLAUDE.md` - Claude navigation stub
+- `mcp_server/` - Core MCP server package, plugins, CLI, storage, and watcher code
+- `scripts/` - Developer and operator helper scripts that remain part of the repo surface
+- `tests/` - Unit, docs-contract, smoke, and security coverage
+- `docs/` - Product, operations, validation, and status documentation
+- `mcp-index-kit/` - Shared MCP indexing toolkit and examples
+- `architecture/` - Architecture diagrams and supporting design material
+- `docker/` - Container build and compose assets
+- `specs/`, `plans/` - Roadmaps and bounded phase plans
 
-### Essential Documentation
-- `README.md` - Project overview
-- `LICENSE` - MIT license
-- `CHANGELOG.md` - Version history
-- `CODE_OF_CONDUCT.md` - Community standards
-- `CONTRIBUTING.md` - Contribution guidelines
-- `ROADMAP.md` - Development roadmap
-- `SECURITY.md` - Security policy
-- `TROUBLESHOOTING.md` - Common issues
+## Public Root Files
 
-### Python Configuration
-- `pyproject.toml` - Python dependencies
-- `pyproject.toml production extra` - Production dependencies
-- `pyproject.toml` - Python project config
-- `pytest.ini` - Pytest configuration
-- `tox.ini` - Testing configuration
+The root keeps the public-facing repository surfaces that users and reviewers
+need directly:
 
-### Build & Deploy
-- `Makefile` - Build automation
-- `docker-compose.yml` - Main Docker composition
-- `docker-compose.mcp.yml` - MCP-specific Docker config
-- `plugins.yaml` - Plugin configuration
+- `README.md`, `TROUBLESHOOTING.md`, `CHANGELOG.md`, `LICENSE`
+- `pyproject.toml`, `uv.lock`, `pytest.ini`, `Makefile`
+- `AGENTS.md`, `CLAUDE.md`, `.mcp.json.example`, `.mcp.json.templates/`
+- `code-index-mcp.profiles.yaml`, `docker-compose*.yml`
 
-### Essential Scripts
-- `dev.sh` - Development helper script
-- `docker-setup.sh` - Docker initialization
-- `setup-documentation.sh` - Documentation setup
+## Durable Evidence
 
-## Organized Directories
+Tracked evidence belongs under committed documentation paths such as:
 
-### `/scripts/`
-Organized scripts by function:
-```
-scripts/
-├── cli/
-│   ├── mcp_cli.py              # MCP command-line interface
-│   └── mcp_server_cli.py       # Server CLI
-├── development/
-│   ├── scaffold_code.py        # Code scaffolding
-│   └── scaffold_mcp.sh         # MCP scaffolding
-├── testing/
-│   └── simple_test.py          # Simple test runner
-└── utilities/                  # Various utility scripts
-```
+- `docs/status/` for status and release-boundary notes
+- `docs/benchmarks/` for intentionally retained benchmark material
+- `docs/validation/` for contract and verification documents
 
-### `/docker/`
-Docker-related files:
-```
-docker/
-├── compose/
-│   ├── development/
-│   │   ├── docker-compose.dev.yml
-│   │   └── docker-compose.development.yml
-│   └── production/
-│       ├── docker-compose.production.yml
-│       └── docker-compose.monitoring.yml
-└── dockerfiles/
-    └── [Various Dockerfiles]
-```
+These locations replace ad hoc root-level result dumps and scratch directories.
 
-### `/tests/`
-Test organization:
-```
-tests/
-├── fixtures/
-│   ├── complete_behavior/      # Complete behavior test files
-│   ├── files/                  # Test file samples
-│   ├── repos/                  # Test repositories
-│   └── data/                   # Test data files
-├── results/                    # Test output and results
-├── coverage/                   # Coverage reports
-├── post_migration/             # Migration validation tests
-└── [Test modules]
-```
+## Local-Only Outputs
 
-### `/data/`
-Data and index storage:
-```
-data/
-├── indexes/
-│   └── vector_index.qdrant/    # Vector search index
-└── databases/
-    └── [SQLite databases]
-```
+The following classes are local runtime or generated outputs, not first-class
+tracked layout:
 
-### `/monitoring/`
-Monitoring configuration:
-```
-monitoring/
-├── config/
-│   └── prometheus.yml          # Prometheus configuration
-├── grafana/                    # Grafana dashboards
-└── prometheus/                 # Prometheus rules
-```
+- local indexes and caches such as `.indexes/`, `.mcp-index/`, `build/`, `dist/`
+- generated reports and scratch result trees
+- local phase-loop or dev-skill runtime state
+- temporary logs, coverage artifacts, and benchmark output
 
-### `/docs/`
-Documentation:
-```
-docs/
-├── api/                        # API documentation
-├── configuration/              # Configuration guides
-├── development/                # Development guides
-├── guides/                     # User guides
-├── history/                    # Historical docs
-├── implementation/             # Implementation details
-├── performance/                # Performance reports
-├── plugins/                    # Plugin documentation
-├── reports/                    # Various reports
-├── status/                     # Status updates
-├── templates/                  # Document templates
-├── tools/                      # Tool documentation
-└── validation/                 # Validation reports
-```
+If these need to be retained as evidence, summarize them into `docs/status/` or
+another approved committed documentation path instead of committing the raw
+output tree.
 
-## File Movement Summary
+## Windows Path Guidance
 
-### Scripts Moved
-- `mcp_cli.py` → `scripts/cli/`
-- `mcp_server_cli.py` → `scripts/cli/`
-- `scaffold_code.py` → `scripts/development/`
-- `scaffold_mcp.sh` → `scripts/development/`
-- `simple_test.py` → `scripts/testing/`
-
-### Docker Files Moved
-- `docker-compose.dev.yml` → `docker/compose/development/`
-- `docker-compose.development.yml` → `docker/compose/development/`
-- `docker-compose.production.yml` → `docker/compose/production/`
-- `docker-compose.monitoring.yml` → `docker/compose/production/`
-
-### Configuration Moved
-- `prometheus.yml` → `monitoring/config/`
-
-### Test Directories Moved
-- `test_complete_behavior/` → `tests/fixtures/complete_behavior/`
-- `test_files/` → `tests/fixtures/files/`
-- `test_repos/` → `tests/fixtures/repos/`
-- `test_data/` → `tests/fixtures/data/`
-- `test_results/` → `tests/results/`
-- `htmlcov/` → `tests/coverage/`
-
-### Data Moved
-- `vector_index.qdrant/` → `data/indexes/`
-
-## Updated References
-
-### Makefile
-- Docker compose paths updated to reference new locations
-- Example: `-f docker/compose/development/docker-compose.dev.yml`
-
-### docker-compose.yml
-- Prometheus config path updated: `./monitoring/config/prometheus.yml`
-
-### .gitignore
-- Updated paths for moved directories
-- Added new test result locations
-
-### Test Files
-- Updated hardcoded paths in test files
-- Example: `test_repos/` → `tests/fixtures/repos/`
-
-## Benefits of New Structure
-
-1. **Cleaner Root Directory**: Reduced from 44+ files to ~30 essential files
-2. **Logical Organization**: Related files grouped together
-3. **MCP Compliance**: Preserves standard MCP server structure
-4. **Easy Navigation**: Clear directory hierarchy
-5. **Better Maintenance**: Easier to find and manage files
-
-## Migration Validation
-
-A post-migration test script is available at:
-`tests/post_migration/test_mcp_functionality.py`
-
-This script verifies:
-- All moved files exist in their new locations
-- MCP server functionality remains intact
-- File references are properly updated
-- No functionality has been broken
+REPOCLEAN keeps tracked repository-relative paths at or below the
+160-character tracked-path limit and records a wheel-content path-depth audit
+for installed files. If a Windows clone still encounters long-path failures
+because of a deep checkout root or third-party tooling, use
+`git config --global core.longpaths true` as a fallback after the repo tree is
+clean.

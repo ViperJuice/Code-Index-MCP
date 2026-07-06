@@ -89,3 +89,42 @@ class TestEnospcReadonly:
                 repository_id=1,
                 relative_path="foo/bar.py",
             )
+
+    def test_disk_io_error_sets_readonly_provenance(self, tmp_path):
+        """disk I/O errors reuse the same read-only family with exact provenance."""
+        store = _make_store(tmp_path)
+        assert store._readonly is False
+
+        disk_io = sqlite3.OperationalError("disk I/O error")
+
+        class _CommitFailProxy:
+            def __init__(self, real):
+                self._real = real
+                self._failed = False
+
+            def commit(self):
+                if not self._failed:
+                    self._failed = True
+                    raise disk_io
+                self._real.commit()
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        original_connect = sqlite3.connect
+
+        def patched_connect(*args, **kwargs):
+            return _CommitFailProxy(original_connect(*args, **kwargs))
+
+        with patch("mcp_server.storage.sqlite_store.sqlite3.connect", side_effect=patched_connect):
+            with pytest.raises(TransientArtifactError, match="disk I/O error"):
+                with store._get_connection() as conn:
+                    conn.execute("SELECT 1")
+
+        assert store._readonly is True
+        assert store.get_readonly_diagnostics() == {
+            "storage_failure_family": "sqlite_operational",
+            "storage_failure_reason": "disk_io_error",
+            "storage_failure_message": "disk I/O error",
+            "readonly": True,
+        }

@@ -62,6 +62,11 @@ class DispatcherProtocol(Protocol):
         semantic: bool = False,
         fuzzy: bool = False,
         limit: int = 20,
+        source_type: Optional[str] = None,
+        friction_categories: Optional[List[str]] = None,
+        history_labels: Optional[List[str]] = None,
+        history_repos: Optional[List[str]] = None,
+        include_source_metadata: bool = False,
     ) -> Iterable[SearchResult]:
         """Code search scoped to ``ctx.repo_id``."""
         ...

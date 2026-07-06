@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS chunk_summaries (
     summary_text TEXT NOT NULL,
     is_authoritative BOOLEAN DEFAULT 0,
     llm_model TEXT,
+    provider_name TEXT,
+    profile_id TEXT,
+    prompt_fingerprint TEXT,
+    audit_metadata TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE

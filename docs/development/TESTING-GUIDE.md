@@ -1,5 +1,25 @@
 # Code-Index-MCP Testing Guide
 
+## LOCALCI Command Contract
+
+Use the repo-local `make agent-*` surface as the default validation interface:
+
+- `make agent-doctor` reports local prerequisites plus whether Dagger or
+  `AGENT_REMOTE_HOST` offload is configured.
+- `make agent-fast` is the cheap and offline by default gate: lock sanity,
+  static checks, and focused docs/package truth.
+- `make agent-gate` is the pre-PR gate and matches the substantive suite the
+  protected GitHub Actions posture consumes.
+- `make agent-full` extends `agent-gate` with heavier validation such as
+  container smoke.
+- `make agent-fix` runs deterministic local formatting fixes only.
+- `make agent-affected` routes docs-only changes to `agent-fast` and routes
+  source, workflow, package, lockfile, or unknown changes to `agent-gate`.
+
+Hosted GitHub Actions are minimal orchestration or protected evidence. Heavy
+validation should stay local, use Dagger explicitly, or run on an owned
+`AGENT_REMOTE_HOST`; silent hosted fallback is not allowed.
+
 This guide provides comprehensive instructions for testing the Code-Index-MCP project, covering unit tests, integration tests, plugin testing, performance testing, and test coverage.
 
 ## Table of Contents
@@ -64,7 +84,7 @@ tests/
 
 ```bash
 # Install test dependencies
-uv sync --locked dev extra
+uv sync --locked --extra dev
 
 # Or install with development extras
 pip install -e ".[test]"
@@ -896,60 +916,24 @@ class Class_{i}:
 
 ### Coverage Configuration
 
-Add to `pyproject.toml`:
-
-```toml
-[tool.coverage.run]
-source = ["mcp_server"]
-omit = [
-    "*/tests/*",
-    "*/test_*.py",
-    "*/__pycache__/*",
-    "*/venv/*",
-    "*/.venv/*"
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "class .*\\(Protocol\\):",
-    "@abstractmethod"
-]
-precision = 2
-show_missing = true
-skip_covered = false
-
-[tool.coverage.html]
-directory = "htmlcov"
-
-[tool.coverage.xml]
-output = "coverage.xml"
-```
+Coverage configuration is canonical in `.coveragerc`. Do not duplicate the
+primary coverage settings in `pyproject.toml` unless a later phase explicitly
+re-freezes the contract.
 
 ### Running Coverage
 
 ```bash
-# Run tests with coverage
-pytest --cov=mcp_server --cov-report=html --cov-report=term
+# Measure the baseline before any threshold change
+make coverage-baseline
 
-# Run specific test categories with coverage
-pytest -m unit --cov=mcp_server
-# Integration tests are excluded from CI by default (pytest.ini addopts).
-# Run locally with --override-ini to bypass the exclusion:
-pytest tests/test_watcher.py::TestReindexIntegration --override-ini="addopts=" -v
-pytest -m plugin --cov=mcp_server
+# Generate the local/offloaded coverage report
+make coverage
 
-# Generate detailed HTML report
-pytest --cov=mcp_server --cov-report=html
-open htmlcov/index.html
+# Reject tracked or staged generated coverage outputs
+make coverage-artifact-guard
 
-# Check coverage thresholds
-pytest --cov=mcp_server --cov-fail-under=80
+# Routine validation ownership
+make agent-full
 ```
 
 ### Coverage Goals
@@ -964,110 +948,11 @@ pytest --cov=mcp_server --cov-fail-under=80
 
 ### GitHub Actions Workflow
 
-Create `.github/workflows/test.yml`:
-
-```yaml
-name: Tests
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.9, '3.10', 3.11]
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        uv sync --locked
-        uv sync --locked dev extra
-    
-    - name: Run linting
-      run: |
-        black --check mcp_server tests
-        isort --check-only mcp_server tests
-        flake8 mcp_server tests
-        mypy mcp_server
-    
-    - name: Run unit tests
-      run: |
-        pytest -v --cov=mcp_server --cov-report=xml
-        # Note: pytest.ini addopts excludes @pytest.mark.integration and @pytest.mark.slow
-        # by default. Integration tests are run locally only (they require a full
-        # filesystem and SQLite environment, not available in CI).
-    
-    - name: Run plugin tests
-      run: |
-        pytest -m plugin -v --cov=mcp_server --cov-append --cov-report=xml
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-    
-    - name: Generate coverage report
-      run: |
-        coverage report
-        coverage html
-    
-    - name: Upload coverage artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: coverage-report
-        path: htmlcov/
-  
-  performance:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.11
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        uv sync --locked
-        uv sync --locked dev extra
-    
-    - name: Run performance tests
-      run: |
-        pytest -m performance -v --benchmark-only
-    
-    - name: Upload benchmark results
-      uses: actions/upload-artifact@v3
-      with:
-        name: benchmark-results
-        path: .benchmarks/
-```
+The protected hosted posture stays on `make agent-gate`. Codecov upload is not
+part of the default COVERAGE contract, and any future hosted upload must be
+restricted to a trusted event or manual dispatch with freshly generated
+evidence. Until that proof exists, the badge remains deferred and coverage
+artifacts stay local/offloaded only.
 
 ## Best Practices
 

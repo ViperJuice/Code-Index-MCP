@@ -185,6 +185,30 @@ No operator actions required. P12 is fully codebase-internal.
   vulnerability scans, cleanup, signing, and publish-only container manifest work
   are informational for private alpha unless promoted by a later phase.
 
+### 3.5B Phase LOCALCI - Local Validation And CI Offload Contract
+
+#### Before LOCALCI
+
+- [ ] **Keep self-hosted runner registration out of scope.** LOCALCI may
+  document offload targets such as Dagger or `AGENT_REMOTE_HOST`, but it does
+  not register runners for you.
+- [ ] **Keep GitHub secret changes out of scope.** LOCALCI must not mutate or
+  require new repository secrets.
+- [ ] **Use manual release dispatch for release publishing.** LOCALCI reduces
+  routine hosted validation; release automation remains a manual-only workflow.
+
+#### After LOCALCI merge
+
+- [ ] **Use the repo-local command contract.** `make agent-doctor`,
+  `make agent-fast`, `make agent-gate`, `make agent-full`, `make agent-fix`,
+  and `make agent-affected` are the validation entrypoints for agents and
+  operators.
+- [ ] **Keep offload explicit and fail-closed.** Dagger or `AGENT_REMOTE_HOST`
+  are opt-in only; if offload is requested but unavailable, the run must fail.
+- [ ] **Do not restore silent hosted fallback.** Hosted GitHub Actions remain
+  protected evidence, manual-only orchestration, offloaded integration, or
+  retired workflows. The local command contract stays primary.
+
 ### 3.5A Phase GAGOV - Enforced Release Governance
 
 #### Before GAGOV
@@ -508,7 +532,7 @@ No operator actions required. P12 is fully codebase-internal.
 
 - [ ] **Prepare only the repo-owned stable surface.** Update package metadata,
   runtime version, active install docs, Docker install defaults, and release
-  workflow defaults to `v1.2.0` / `1.2.0` without dispatching the release.
+  workflow defaults to `v1.3.0` / `1.3.0` without dispatching the release.
 - [ ] **Route release evidence to the downstream owner.** Keep
   `docs/validation/ga-release-evidence.md` absent during GAREL and reserve it
   for `GADISP`.
@@ -522,7 +546,7 @@ No operator actions required. P12 is fully codebase-internal.
   release evidence belong only to `GADISP`.
 - [ ] **Treat older downstream dispatch plans as stale.** If a `GADISP` plan
   predates the accepted `actions/download-artifact@v8` warning disposition or
-  the prepared `v1.2.0` surface, re-plan it before execution.
+  the prepared `v1.3.0` surface, re-plan it before execution.
 
 ---
 

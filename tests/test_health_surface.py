@@ -23,6 +23,10 @@ EXPECTED_KEYS = {
     "ready",
     "readiness_code",
     "remediation",
+    "semantic_readiness",
+    "semantic_ready",
+    "semantic_readiness_code",
+    "semantic_remediation",
     "rollout_status",
     "rollout_remediation",
     "query_status",
@@ -52,6 +56,8 @@ class TestBuildHealthRow:
         assert row["staleness_reason"] is None
         assert row["readiness"] == "ready"
         assert row["ready"] is True
+        assert row["semantic_readiness"] == "enrichment_unavailable"
+        assert row["semantic_ready"] is False
         assert row["rollout_status"] == "local_only"
         assert row["query_status"] == "ready"
         assert row["index_path_exists"] is True
@@ -152,6 +158,28 @@ class TestBuildHealthRow:
         info = make_repo_info(tmp_path)
         row = build_health_row(info)
         assert row["last_indexed_commit"] is None
+
+    def test_semantic_preflight_is_additive_runtime_metadata(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+
+        info = make_repo_info(tmp_path)
+        row = build_health_row(
+            info,
+            semantic_preflight={
+                "overall_ready": False,
+                "can_write_semantic_vectors": False,
+                "blocker": {
+                    "code": "collection_missing",
+                    "message": "Qdrant collection is missing for the active semantic profile",
+                    "failing_checks": [],
+                    "remediation": ["Create the expected collection"],
+                    "can_write_semantic_vectors": False,
+                },
+            },
+        )
+        semantic_feature = row["features"]["semantic"]
+        assert semantic_feature["preflight"]["overall_ready"] is False
+        assert semantic_feature["preflight"]["blocker"]["code"] == "collection_missing"
 
 
 # ---------------------------------------------------------------------------

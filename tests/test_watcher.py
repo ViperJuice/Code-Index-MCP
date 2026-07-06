@@ -68,6 +68,31 @@ class TestHandlerEventHandling:
         names = [c[0] for c in dispatcher_with_mock.method_calls]
         assert names.index("remove_file") < names.index("index_file")
 
+    def test_trigger_reindex_uses_ctx_aware_dispatcher_shape_when_guarded_method_exists(
+        self, tmp_path
+    ):
+        class GuardedDispatcher:
+            def __init__(self):
+                self.calls = []
+
+            def remove_file(self, ctx, path):
+                self.calls.append(("remove", ctx, path))
+
+            def index_file_guarded(self, ctx, path, observed_hash):
+                self.calls.append(("guarded", ctx, path, observed_hash))
+
+        dispatcher = GuardedDispatcher()
+        handler = _Handler(dispatcher, ctx=FileWatcher(tmp_path, dispatcher)._handler.ctx)
+
+        test_path = tmp_path / "guarded.py"
+        test_path.write_text("print('hello')\n")
+        handler.trigger_reindex(test_path)
+
+        assert dispatcher.calls[0][0] == "remove"
+        assert dispatcher.calls[1][0] == "guarded"
+        assert dispatcher.calls[0][1] is handler.ctx
+        assert dispatcher.calls[1][1] is handler.ctx
+
     def test_trigger_reindex_unsupported_file(self, dispatcher_with_mock):
         """Test triggering reindex for unsupported file."""
         handler = _Handler(dispatcher_with_mock)

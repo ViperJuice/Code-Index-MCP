@@ -1,4 +1,4 @@
-"""Release metadata assertions for the prepared stable v1.2.0 contract.
+"""Release metadata assertions for the prepared stable v1.3.0 contract.
 
 Historical GARC soak target: v1.2.0-rc6.
 """
@@ -15,8 +15,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.2.0"
-EXPECTED_TAG = "v1.2.0"
+EXPECTED_VERSION = "1.3.0"
+EXPECTED_TAG = "v1.3.0"
 GA_RC_EVIDENCE = REPO / "docs" / "validation" / "ga-rc-evidence.md"
 DOCKER_INSTALLERS = (
     "scripts/install-mcp-docker.sh",
@@ -49,8 +49,8 @@ def test_python_distribution_identity_is_frozen():
 
     assert data["project"]["name"] == "index-it-mcp"
     assert data["project"]["scripts"]["mcp-index"] == "mcp_server.cli:cli"
-    assert data["project"]["scripts"]["code-index-mcp"] == "mcp_server.cli:cli"
     assert data["project"]["scripts"]["index-it-mcp"] == "mcp_server.cli:cli"
+    assert "code-index-mcp" not in data["project"]["scripts"]
 
 
 def test_readme_distribution_identity_remains_stable():
@@ -58,12 +58,13 @@ def test_readme_distribution_identity_remains_stable():
 
     assert "**Python distribution**: `index-it-mcp`" in readme
     assert "**Container image**: `ghcr.io/viperjuice/code-index-mcp`" in readme
+    assert "docs/status/public-package-identity.md" in readme
 
 
 def test_changelog_has_stable_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-04-25" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-07-06" in changelog
 
 
 def test_release_workflow_matches_rc_contract():
@@ -74,7 +75,7 @@ def test_release_workflow_matches_rc_contract():
     assert "default: 'custom'" in workflow
     assert f"GAREL stable release contract target: {EXPECTED_TAG}" in workflow
     assert (
-        'gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false'
+        'gh workflow run "Release Automation" -f version=v1.3.0 -f release_type=custom -f auto_merge=false'
         in workflow
     )
     assert "peter-evans/create-pull-request@v8" in workflow
@@ -132,9 +133,9 @@ def test_installers_and_download_helper_match_stable_identity_contract():
     powershell = _read_text("scripts/install-mcp-docker.ps1")
     download_helper = _read_text("scripts/download-release.py")
 
-    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.2.0}"' in shell
-    assert 'param(\n    [string]$Variant = "v1.2.0"' in powershell
-    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0' in powershell
+    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.3.0}"' in shell
+    assert 'param(\n    [string]$Variant = "v1.3.0"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.3.0' in powershell
 
     for expected in (
         "index_it_mcp-",

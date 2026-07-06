@@ -5,7 +5,12 @@ supporting incremental updates and artifact management.
 """
 
 import logging
+import json
+import os
+import shutil
+import sqlite3
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -36,6 +41,7 @@ def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) ->
 
 
 logger = logging.getLogger(__name__)
+_FORCE_FULL_EXIT_TRACE = "force_full_exit_trace.json"
 
 # Callback type: (repo_id, current_branch, tracked_branch) -> None
 _DriftCallback = Optional[Any]
@@ -70,6 +76,7 @@ class IndexSyncResult:
     duration_seconds: float = 0.0
     code: Optional[str] = None
     readiness: Optional[Dict[str, Any]] = None
+    semantic: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -82,6 +89,8 @@ class UpdateResult:
     failed: int = 0
     skipped: int = 0
     errors: List[str] = None
+    semantic: Optional[Dict[str, Any]] = None
+    low_level: Optional[Dict[str, Any]] = None
     duration_seconds: float = 0.0
 
     def __post_init__(self) -> None:
@@ -95,6 +104,29 @@ class UpdateResult:
     @property
     def clean(self) -> bool:
         return self.failed == 0 and self.skipped == 0 and not self.errors
+
+
+@dataclass
+class RuntimeSnapshot:
+    """Temporary backup of the active runtime before a force-full mutation."""
+
+    backup_dir: Path
+    db_path: Path
+    qdrant_path: Path
+    db_existed: bool
+    qdrant_existed: bool
+    counts_before: Dict[str, int]
+    sqlite_sidecars: List[str]
+
+
+@dataclass
+class RuntimeRestoreResult:
+    """Outcome of restoring or preserving the active runtime after a blocked run."""
+
+    restored: bool
+    mode: str
+    counts_before: Dict[str, int]
+    counts_after: Dict[str, int]
 
 
 class GitAwareIndexManager:
@@ -262,12 +294,17 @@ class GitAwareIndexManager:
                         result = self._incremental_index_update(repo_id, ctx, changed_files)
                         if not result.clean:
                             self.registry.update_staleness_reason(repo_id, "partial_index_failure")
+                            self.registry.update_last_sync_error(
+                                repo_id,
+                                "; ".join(result.errors) or "Incremental index update failed",
+                            )
                             return IndexSyncResult(
                                 action="failed",
                                 commit=current_commit,
                                 files_processed=result.files_processed,
                                 error="; ".join(result.errors) or "Incremental index update failed",
                                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                                semantic=result.semantic,
                             )
                         if self._index_exists(repo_info) and self.registry.update_indexed_commit(
                             repo_id, current_commit, branch=current_branch
@@ -283,26 +320,226 @@ class GitAwareIndexManager:
                 logger.warning(f"Incremental update failed, falling back to full index: {e}")
 
         # Full index needed
-        result = self._normalize_update_result(self._full_index(repo_id, ctx))
+        runtime_snapshot = self._snapshot_active_runtime(repo_info)
+        if force_full:
+            self._write_force_full_exit_trace(
+                repo_info,
+                {
+                    "status": "running",
+                    "stage": "force_full_started",
+                    "stage_family": "lexical",
+                    "current_commit": current_commit,
+                    "indexed_commit_before": last_indexed_commit,
+                    "last_progress_path": None,
+                    "in_flight_path": None,
+                    "summary_call_timed_out": False,
+                    "summary_call_file_path": None,
+                    "summary_call_chunk_ids": [],
+                    "summary_call_timeout_seconds": None,
+                    "blocker_source": "lexical_mutation",
+                },
+            )
+        progress_callback = None
+        if force_full:
+            progress_callback = self._make_force_full_progress_callback(
+                repo_info=repo_info,
+                current_commit=current_commit,
+                indexed_commit_before=last_indexed_commit,
+            )
+        try:
+            full_index_value = self._full_index(
+                repo_id,
+                ctx,
+                progress_callback=progress_callback,
+            )
+        except TypeError as exc:
+            if progress_callback is not None and "progress_callback" in str(exc):
+                try:
+                    full_index_value = self._full_index(repo_id, ctx)
+                except BaseException:
+                    if force_full:
+                        self._finalize_running_force_full_trace_as_interrupted(
+                            repo_info=repo_info,
+                            current_commit=current_commit,
+                            indexed_commit_before=last_indexed_commit,
+                        )
+                    raise
+            else:
+                raise
+        except BaseException:
+            if force_full:
+                self._finalize_running_force_full_trace_as_interrupted(
+                    repo_info=repo_info,
+                    current_commit=current_commit,
+                    indexed_commit_before=last_indexed_commit,
+                )
+            raise
+        result = self._normalize_update_result(full_index_value)
+        restore_result = self._restore_zero_summary_runtime_if_needed(
+            repo_id,
+            repo_info,
+            ctx,
+            result,
+            runtime_snapshot,
+        )
+        if restore_result is not None:
+            self._write_force_full_exit_trace(
+                repo_info,
+                {
+                    "status": "completed",
+                    "stage": "runtime_restore_completed",
+                    "stage_family": "final_closeout",
+                    "current_commit": current_commit,
+                    "indexed_commit_before": last_indexed_commit,
+                    "last_progress_path": (result.low_level or {}).get("last_progress_path")
+                    or (result.semantic or {}).get("summary_call_file_path"),
+                    "in_flight_path": (result.low_level or {}).get("in_flight_path"),
+                    "summary_call_timed_out": (result.semantic or {}).get(
+                        "summary_call_timed_out", False
+                    ),
+                    "summary_call_file_path": (result.semantic or {}).get(
+                        "summary_call_file_path"
+                    ),
+                    "summary_call_chunk_ids": (result.semantic or {}).get(
+                        "summary_call_chunk_ids", []
+                    ),
+                    "summary_call_timeout_seconds": (result.semantic or {}).get(
+                        "summary_call_timeout_seconds"
+                    ),
+                    "blocker_source": self._trace_blocker_source(result),
+                    "storage_failure_family": (result.semantic or {}).get(
+                        "storage_failure_family"
+                    ),
+                    "storage_failure_reason": (result.semantic or {}).get(
+                        "storage_failure_reason"
+                    ),
+                    "storage_failure_message": (result.semantic or {}).get(
+                        "storage_failure_message"
+                    ),
+                    "storage_diagnostics": (result.semantic or {}).get("storage_diagnostics"),
+                    "runtime_restore_performed": True,
+                    "runtime_restore_mode": restore_result.mode,
+                    "runtime_restore_declined_reason": None,
+                },
+            )
         if not result.clean:
+            self.registry.update_staleness_reason(repo_id, "partial_index_failure")
+            error_detail = self._format_sync_error_with_restore_context(
+                "; ".join(result.errors) or "Full index failed",
+                restore_result,
+            )
+            if force_full and restore_result is None:
+                self._write_force_full_exit_trace(
+                    repo_info,
+                    {
+                        "status": "completed",
+                        "stage": "force_full_failed",
+                        "stage_family": "final_closeout",
+                        "current_commit": current_commit,
+                        "indexed_commit_before": last_indexed_commit,
+                        "last_progress_path": (result.low_level or {}).get("last_progress_path")
+                        or (result.semantic or {}).get("summary_call_file_path"),
+                        "in_flight_path": (result.low_level or {}).get("in_flight_path"),
+                        "summary_call_timed_out": (result.semantic or {}).get(
+                            "summary_call_timed_out", False
+                        ),
+                        "summary_call_file_path": (result.semantic or {}).get(
+                            "summary_call_file_path"
+                        ),
+                        "summary_call_chunk_ids": (result.semantic or {}).get(
+                            "summary_call_chunk_ids", []
+                        ),
+                        "summary_call_timeout_seconds": (result.semantic or {}).get(
+                            "summary_call_timeout_seconds"
+                        ),
+                        "blocker_source": self._trace_blocker_source(result),
+                        "storage_failure_family": (result.semantic or {}).get(
+                            "storage_failure_family"
+                        ),
+                        "storage_failure_reason": (result.semantic or {}).get(
+                            "storage_failure_reason"
+                        ),
+                        "storage_failure_message": (result.semantic or {}).get(
+                            "storage_failure_message"
+                        ),
+                        "storage_diagnostics": (result.semantic or {}).get("storage_diagnostics"),
+                        "runtime_restore_performed": False,
+                        "runtime_restore_mode": None,
+                        "runtime_restore_declined_reason": (result.semantic or {}).get(
+                            "runtime_restore_declined_reason"
+                        ),
+                    },
+                )
+            self.registry.update_last_sync_error(
+                repo_id,
+                error_detail,
+            )
             return IndexSyncResult(
                 action="failed",
                 commit=current_commit,
                 files_processed=result.files_processed,
-                error="; ".join(result.errors) or "Full index failed",
+                error=error_detail,
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                semantic=result.semantic,
+            )
+        if not self._index_has_durable_rows(repo_info):
+            self.registry.update_staleness_reason(repo_id, "index_empty")
+            self.registry.update_last_sync_error(
+                repo_id,
+                "Full index completed without durable SQLite file rows",
+            )
+            return IndexSyncResult(
+                action="failed",
+                commit=current_commit,
+                files_processed=result.files_processed,
+                error="Full index completed without durable SQLite file rows",
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+                semantic=result.semantic,
             )
         if self._index_exists(repo_info) and self.registry.update_indexed_commit(
             repo_id, current_commit, branch=current_branch
         ):
             repo_info.last_indexed_commit = current_commit
+            self.registry.update_last_sync_error(repo_id, None)
+            if force_full:
+                self._write_force_full_exit_trace(
+                    repo_info,
+                    {
+                        "status": "completed",
+                        "stage": "force_full_completed",
+                        "stage_family": "final_closeout",
+                        "current_commit": current_commit,
+                        "indexed_commit_before": last_indexed_commit,
+                        "last_progress_path": (result.low_level or {}).get("last_progress_path")
+                        or (result.semantic or {}).get("summary_call_file_path"),
+                        "in_flight_path": None,
+                        "summary_call_timed_out": (result.semantic or {}).get(
+                            "summary_call_timed_out", False
+                        ),
+                        "summary_call_file_path": (result.semantic or {}).get(
+                            "summary_call_file_path"
+                        ),
+                        "summary_call_chunk_ids": (result.semantic or {}).get(
+                            "summary_call_chunk_ids", []
+                        ),
+                        "summary_call_timeout_seconds": (result.semantic or {}).get(
+                            "summary_call_timeout_seconds"
+                        ),
+                        "blocker_source": "final_closeout",
+                    },
+                )
         elif not self._index_exists(repo_info):
+            self.registry.update_last_sync_error(
+                repo_id,
+                "Full index did not create a durable SQLite index",
+            )
             return IndexSyncResult(
                 action="failed",
                 commit=current_commit,
                 files_processed=result.files_processed,
                 error="Full index did not create a durable SQLite index",
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                semantic=result.semantic,
             )
 
         return IndexSyncResult(
@@ -310,6 +547,7 @@ class GitAwareIndexManager:
             commit=current_commit,
             files_processed=result.indexed,
             duration_seconds=(datetime.now() - start_time).total_seconds(),
+            semantic=result.semantic,
         )
 
     def _resolve_ctx(self, repo_id: str) -> Optional[RepoContext]:
@@ -361,6 +599,27 @@ class GitAwareIndexManager:
         if index_location is None:
             return False
         return (Path(index_location) / "current.db").exists()
+
+    def _index_has_durable_rows(self, repo_info: Any) -> bool:
+        index_path = getattr(repo_info, "index_path", None)
+        if index_path is None:
+            return False
+        path = Path(index_path)
+        if not path.exists():
+            return False
+        try:
+            import sqlite3
+
+            conn = sqlite3.connect(str(path))
+            try:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
+                )
+                return int(cursor.fetchone()[0]) > 0
+            finally:
+                conn.close()
+        except Exception:
+            return False
 
     def _normalize_update_result(self, value: Any) -> UpdateResult:
         if isinstance(value, UpdateResult):
@@ -528,6 +787,7 @@ class GitAwareIndexManager:
         success_counter: str,
         action_label: str,
     ) -> None:
+        self._merge_semantic_result(result, mutation.semantic)
         if mutation.status == success_status:
             setattr(result, success_counter, getattr(result, success_counter) + 1)
             return
@@ -543,6 +803,61 @@ class GitAwareIndexManager:
 
         result.failed += 1
         result.errors.append(f"{action_label}: {detail}")
+
+    def _merge_semantic_result(
+        self, result: UpdateResult, semantic: Optional[Dict[str, Any]]
+    ) -> None:
+        if not semantic:
+            return
+        if result.semantic is None:
+            result.semantic = {
+                "summaries_written": 0,
+                "summary_chunks_attempted": 0,
+                "summary_missing_chunks": 0,
+                "semantic_indexed": 0,
+                "semantic_failed": 0,
+                "semantic_skipped": 0,
+                "semantic_blocked": 0,
+                "vectors_deleted": 0,
+                "mappings_deleted": 0,
+                "summaries_deleted": 0,
+                "summaries_preserved": 0,
+                "semantic_stage": "not_run",
+                "semantic_error": None,
+            }
+        for key in [
+            "summaries_written",
+            "summary_chunks_attempted",
+            "summary_missing_chunks",
+            "semantic_indexed",
+            "semantic_failed",
+            "semantic_skipped",
+            "semantic_blocked",
+            "vectors_deleted",
+            "mappings_deleted",
+            "summaries_deleted",
+            "summaries_preserved",
+        ]:
+            result.semantic[key] = result.semantic.get(key, 0) + int(semantic.get(key, 0) or 0)
+
+        stage = semantic.get("semantic_stage")
+        if stage:
+            result.semantic["semantic_stage"] = stage
+        if semantic.get("semantic_error"):
+            result.semantic["semantic_error"] = semantic.get("semantic_error")
+        for key in [
+            "summary_call_timed_out",
+            "summary_call_file_path",
+            "summary_call_chunk_ids",
+            "summary_call_timeout_seconds",
+            "storage_failure_family",
+            "storage_failure_reason",
+            "storage_failure_message",
+            "storage_diagnostics",
+            "runtime_restore_declined_reason",
+        ]:
+            if key in semantic:
+                result.semantic[key] = semantic.get(key)
 
     def _should_full_reindex(self, repo_path: Path, changes: ChangeSet) -> bool:
         """Decide whether change volume warrants a full reindex."""
@@ -564,7 +879,49 @@ class GitAwareIndexManager:
         except subprocess.CalledProcessError:
             return False
 
-    def _full_index(self, repo_id: str, ctx: RepoContext) -> UpdateResult:
+    def _semantic_stage_error(self, semantic: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Return an exact force-full blocker when the semantic stage did not finish cleanly."""
+        if not semantic:
+            return None
+
+        stage = semantic.get("semantic_stage")
+        if stage in {None, "not_run", "skipped", "indexed"}:
+            return None
+
+        error = semantic.get("semantic_error")
+        if isinstance(error, str) and error.strip():
+            return error.strip()
+
+        blocker = semantic.get("semantic_blocker")
+        if isinstance(blocker, dict):
+            message = blocker.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()
+
+        return f"Semantic stage ended with {stage}"
+
+    def _low_level_stage_error(self, low_level: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Return an exact lexical/storage blocker before semantic-stage accounting starts."""
+        if not low_level:
+            return None
+
+        blocker = low_level.get("low_level_blocker")
+        if isinstance(blocker, dict):
+            message = blocker.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()
+
+        stage = low_level.get("lexical_stage")
+        if stage in {None, "not_run", "completed"}:
+            return None
+        return f"Lexical stage ended with {stage}"
+
+    def _full_index(
+        self,
+        repo_id: str,
+        ctx: RepoContext,
+        progress_callback: Optional[Any] = None,
+    ) -> UpdateResult:
         """Perform full repository indexing.
 
         Args:
@@ -596,7 +953,18 @@ class GitAwareIndexManager:
         # Index the directory
         logger.info(f"Starting full index of {repo_info.name}")
         try:
-            stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
+            try:
+                stats = self.dispatcher.index_directory(
+                    ctx,
+                    repo_path,
+                    recursive=True,
+                    progress_callback=progress_callback,
+                )
+            except TypeError as exc:
+                if progress_callback is not None and "progress_callback" in str(exc):
+                    stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
+                else:
+                    raise
         except Exception as exc:
             result.failed += 1
             result.errors.append(f"Full index failed: {exc}")
@@ -608,7 +976,55 @@ class GitAwareIndexManager:
         errors = stats.get("errors", []) if isinstance(stats, dict) else []
         result.indexed = total_indexed
         result.failed = failed_files
+        if isinstance(stats, dict):
+            result.semantic = {
+                "summaries_written": stats.get("summaries_written", 0),
+                "summary_chunks_attempted": stats.get("summary_chunks_attempted", 0),
+                "summary_missing_chunks": stats.get("summary_missing_chunks", 0),
+                "summary_passes": stats.get("summary_passes", 0),
+                "summary_remaining_chunks": stats.get("summary_remaining_chunks", 0),
+                "summary_scope_drained": stats.get("summary_scope_drained", True),
+                "summary_continuation_required": stats.get(
+                    "summary_continuation_required", False
+                ),
+                "summary_call_timed_out": stats.get("summary_call_timed_out", False),
+                "summary_call_file_path": stats.get("summary_call_file_path"),
+                "summary_call_chunk_ids": stats.get("summary_call_chunk_ids", []),
+                "summary_call_timeout_seconds": stats.get("summary_call_timeout_seconds"),
+                "semantic_indexed": stats.get("semantic_indexed", 0),
+                "semantic_failed": stats.get("semantic_failed", 0),
+                "semantic_skipped": stats.get("semantic_skipped", 0),
+                "semantic_blocked": stats.get("semantic_blocked", 0),
+                "semantic_stage": stats.get("semantic_stage"),
+                "semantic_error": stats.get("semantic_error"),
+                "storage_failure_family": stats.get("storage_failure_family"),
+                "storage_failure_reason": stats.get("storage_failure_reason"),
+                "storage_failure_message": stats.get("storage_failure_message"),
+                "storage_diagnostics": stats.get("storage_diagnostics"),
+                "runtime_restore_declined_reason": stats.get(
+                    "runtime_restore_declined_reason"
+                ),
+            }
+            if (
+                stats.get("low_level_blocker") is not None
+                or stats.get("lexical_stage") not in {None, "not_run", "completed"}
+            ):
+                result.low_level = {
+                    "lexical_stage": stats.get("lexical_stage"),
+                    "lexical_files_attempted": stats.get("lexical_files_attempted", 0),
+                    "lexical_files_completed": stats.get("lexical_files_completed", 0),
+                    "last_progress_path": stats.get("last_progress_path"),
+                    "in_flight_path": stats.get("in_flight_path"),
+                    "low_level_blocker": stats.get("low_level_blocker"),
+                    "storage_diagnostics": stats.get("storage_diagnostics"),
+                }
         result.errors.extend(str(error) for error in errors)
+        low_level_error = self._low_level_stage_error(result.low_level)
+        if low_level_error:
+            result.errors.append(low_level_error)
+        semantic_error = self._semantic_stage_error(result.semantic)
+        if semantic_error:
+            result.errors.append(semantic_error)
         result.duration_seconds = (datetime.now() - start_time).total_seconds()
         logger.info(f"Indexed {total_indexed} files in {repo_info.name}")
 
@@ -669,6 +1085,301 @@ class GitAwareIndexManager:
         """Trigger a guarded full rescan without bypassing the tracked-branch check."""
         return self.sync_repository_index(repo_id, force_full=True)
 
+    def _runtime_paths(self, repo_info: Any) -> Tuple[Path, Path]:
+        index_location = Path(repo_info.index_location)
+        return index_location / "current.db", index_location / "semantic_qdrant"
+
+    def _snapshot_active_runtime(self, repo_info: Any) -> RuntimeSnapshot:
+        db_path, qdrant_path = self._runtime_paths(repo_info)
+        backup_dir = Path(tempfile.mkdtemp(prefix="mcp-index-runtime-"))
+        backup_db = backup_dir / "current.db"
+        backup_qdrant = backup_dir / "semantic_qdrant"
+        counts_before = self._read_runtime_counts(db_path)
+        if db_path.exists():
+            shutil.copy2(db_path, backup_db)
+        sqlite_sidecars: List[str] = []
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(f"{db_path}{suffix}")
+            if sidecar.exists():
+                try:
+                    shutil.copy2(sidecar, backup_dir / sidecar.name)
+                except FileNotFoundError:
+                    continue
+                sqlite_sidecars.append(suffix)
+        if qdrant_path.exists():
+            shutil.copytree(qdrant_path, backup_qdrant)
+        return RuntimeSnapshot(
+            backup_dir=backup_dir,
+            db_path=db_path,
+            qdrant_path=qdrant_path,
+            db_existed=db_path.exists(),
+            qdrant_existed=qdrant_path.exists(),
+            counts_before=counts_before,
+            sqlite_sidecars=sqlite_sidecars,
+        )
+
+    def _restore_zero_summary_runtime_if_needed(
+        self,
+        repo_id: str,
+        repo_info: Any,
+        ctx: RepoContext,
+        result: UpdateResult,
+        snapshot: RuntimeSnapshot,
+    ) -> Optional[RuntimeRestoreResult]:
+        semantic = result.semantic or {}
+        timed_out = semantic.get("semantic_stage") == "blocked_summary_call_timeout"
+        storage_closeout = self._semantic_storage_closeout(semantic)
+        zero_summary = int(semantic.get("summaries_written", 0) or 0) == 0
+        zero_vectors = self._read_runtime_counts(snapshot.db_path).get("semantic_points", 0) == 0
+        if (timed_out or storage_closeout) and (not zero_summary or not zero_vectors):
+            semantic["runtime_restore_declined_reason"] = (
+                "authoritative summaries or semantic vectors were already written"
+            )
+            result.semantic = semantic
+        if not (timed_out or storage_closeout) or not zero_summary or not zero_vectors:
+            self._cleanup_runtime_snapshot(snapshot)
+            return None
+
+        self._release_runtime_handles(repo_id, repo_info, ctx)
+        try:
+            restore_mode = self._restore_runtime_snapshot(snapshot)
+        finally:
+            counts_after = self._read_runtime_counts(snapshot.db_path)
+            self._cleanup_runtime_snapshot(snapshot)
+
+        semantic["runtime_restore_performed"] = True
+        semantic["runtime_restore_mode"] = restore_mode
+        semantic["runtime_counts_before"] = dict(snapshot.counts_before)
+        semantic["runtime_counts_after"] = dict(counts_after)
+        result.semantic = semantic
+        return RuntimeRestoreResult(
+            restored=True,
+            mode=restore_mode,
+            counts_before=dict(snapshot.counts_before),
+            counts_after=dict(counts_after),
+        )
+
+    def _restore_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> str:
+        for suffix in ("", "-wal", "-shm"):
+            runtime_file = Path(f"{snapshot.db_path}{suffix}")
+            if runtime_file.exists():
+                runtime_file.unlink()
+        if snapshot.qdrant_path.exists():
+            shutil.rmtree(snapshot.qdrant_path)
+
+        mode_parts: List[str] = []
+        backup_db = snapshot.backup_dir / "current.db"
+        backup_qdrant = snapshot.backup_dir / "semantic_qdrant"
+        if snapshot.db_existed and backup_db.exists():
+            snapshot.db_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(backup_db, snapshot.db_path)
+            for suffix in snapshot.sqlite_sidecars:
+                backup_sidecar = snapshot.backup_dir / f"{snapshot.db_path.name}{suffix}"
+                if backup_sidecar.exists():
+                    shutil.copy2(backup_sidecar, Path(f"{snapshot.db_path}{suffix}"))
+            mode_parts.append("sqlite_restored")
+        else:
+            mode_parts.append("sqlite_preserved_empty")
+
+        if snapshot.qdrant_existed and backup_qdrant.exists():
+            shutil.copytree(backup_qdrant, snapshot.qdrant_path)
+            mode_parts.append("qdrant_restored")
+        else:
+            mode_parts.append("qdrant_preserved_empty")
+        return "+".join(mode_parts)
+
+    def _release_runtime_handles(
+        self,
+        repo_id: str,
+        repo_info: Any,
+        ctx: RepoContext,
+    ) -> None:
+        if self.store_registry is not None:
+            self.store_registry.close(repo_id)
+        sqlite_store = getattr(ctx, "sqlite_store", None)
+        if sqlite_store is not None:
+            try:
+                sqlite_store.close()
+            except Exception:
+                pass
+        if self.dispatcher is not None and hasattr(self.dispatcher, "evict_repository_state"):
+            self.dispatcher.evict_repository_state(repo_id, repo_info.path)
+
+    def _cleanup_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
+        shutil.rmtree(snapshot.backup_dir, ignore_errors=True)
+
+    def _read_runtime_counts(self, db_path: Path) -> Dict[str, int]:
+        counts = {
+            "files": 0,
+            "code_chunks": 0,
+            "chunk_summaries": 0,
+            "semantic_points": 0,
+        }
+        if not db_path.exists():
+            return counts
+        try:
+            with sqlite3.connect(db_path) as conn:
+                for table in counts:
+                    row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+                    counts[table] = int(row[0]) if row else 0
+        except sqlite3.Error:
+            return counts
+        return counts
+
+    def _format_sync_error_with_restore_context(
+        self,
+        error: str,
+        restore_result: Optional[RuntimeRestoreResult],
+    ) -> str:
+        if restore_result is None or not restore_result.restored:
+            return error
+        return (
+            f"{error} [runtime restored via {restore_result.mode}; "
+            f"counts {restore_result.counts_before} -> {restore_result.counts_after}]"
+        )
+
+    def _force_full_exit_trace_path(self, repo_info: Any) -> Path:
+        return Path(repo_info.index_location) / _FORCE_FULL_EXIT_TRACE
+
+    def _trace_timestamp(self) -> str:
+        return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+    def _read_force_full_exit_trace(self, repo_info: Any) -> Optional[Dict[str, Any]]:
+        path = self._force_full_exit_trace_path(repo_info)
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _write_force_full_exit_trace(self, repo_info: Any, update: Dict[str, Any]) -> None:
+        path = self._force_full_exit_trace_path(repo_info)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = self._read_force_full_exit_trace(repo_info) or {}
+        payload.update(update)
+        payload["trace_timestamp"] = self._trace_timestamp()
+        temp_path = path.with_suffix(".json.tmp")
+        temp_path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
+        temp_path.replace(path)
+
+    def _force_full_trace_process_alive(self, trace: Dict[str, Any]) -> Optional[bool]:
+        process_id = trace.get("process_id")
+        if not isinstance(process_id, int) or process_id <= 0:
+            return None
+        try:
+            os.kill(process_id, 0)
+        except OSError:
+            return False
+        return True
+
+    def _make_force_full_progress_callback(
+        self,
+        *,
+        repo_info: Any,
+        current_commit: Optional[str],
+        indexed_commit_before: Optional[str],
+    ) -> Any:
+        def callback(snapshot: Dict[str, Any]) -> None:
+            previous_trace = self._read_force_full_exit_trace(repo_info) or {}
+            last_progress_path = snapshot.get("last_progress_path")
+            if last_progress_path is None:
+                last_progress_path = previous_trace.get("last_progress_path")
+            self._write_force_full_exit_trace(
+                repo_info,
+                {
+                    "status": "running",
+                    "stage": snapshot.get("stage"),
+                    "stage_family": snapshot.get("stage_family"),
+                    "current_commit": current_commit,
+                    "indexed_commit_before": indexed_commit_before,
+                    "last_progress_path": last_progress_path,
+                    "in_flight_path": snapshot.get("in_flight_path"),
+                    "summary_call_timed_out": snapshot.get("summary_call_timed_out", False),
+                    "summary_call_file_path": snapshot.get("summary_call_file_path"),
+                    "summary_call_chunk_ids": snapshot.get("summary_call_chunk_ids", []),
+                    "summary_call_timeout_seconds": snapshot.get(
+                        "summary_call_timeout_seconds"
+                    ),
+                    "process_id": os.getpid(),
+                    "blocker_source": snapshot.get("blocker_source"),
+                    "semantic_stage": snapshot.get("semantic_stage"),
+                    "lexical_stage": snapshot.get("lexical_stage"),
+                    "storage_failure_family": snapshot.get("storage_failure_family"),
+                    "storage_failure_reason": snapshot.get("storage_failure_reason"),
+                    "storage_failure_message": snapshot.get("storage_failure_message"),
+                    "storage_diagnostics": snapshot.get("storage_diagnostics"),
+                    "runtime_restore_performed": snapshot.get("runtime_restore_performed"),
+                    "runtime_restore_mode": snapshot.get("runtime_restore_mode"),
+                    "runtime_restore_declined_reason": snapshot.get(
+                        "runtime_restore_declined_reason"
+                    ),
+                },
+            )
+
+        return callback
+
+    def _trace_blocker_source(self, result: UpdateResult) -> str:
+        if result.low_level is not None:
+            return "lexical_mutation"
+        semantic = result.semantic or {}
+        blocker = semantic.get("semantic_blocker")
+        if isinstance(blocker, dict) and blocker.get("code") == "storage_closeout":
+            return "storage_closeout"
+        if semantic.get("storage_failure_family"):
+            return "storage_closeout"
+        if semantic.get("summary_call_timed_out"):
+            return "summary_call_shutdown"
+        return "final_closeout"
+
+    def _finalize_running_force_full_trace_as_interrupted(
+        self,
+        *,
+        repo_info: Any,
+        current_commit: Optional[str],
+        indexed_commit_before: Optional[str],
+    ) -> None:
+        previous_trace = self._read_force_full_exit_trace(repo_info) or {}
+        if previous_trace.get("status") != "running":
+            return
+        self._write_force_full_exit_trace(
+            repo_info,
+            {
+                "status": "interrupted",
+                "stage": previous_trace.get("stage") or "force_full_interrupted",
+                "stage_family": previous_trace.get("stage_family") or "final_closeout",
+                "current_commit": current_commit,
+                "indexed_commit_before": indexed_commit_before,
+                "last_progress_path": previous_trace.get("last_progress_path"),
+                "in_flight_path": previous_trace.get("in_flight_path"),
+                "summary_call_timed_out": previous_trace.get("summary_call_timed_out", False),
+                "summary_call_file_path": previous_trace.get("summary_call_file_path"),
+                "summary_call_chunk_ids": previous_trace.get("summary_call_chunk_ids", []),
+                "summary_call_timeout_seconds": previous_trace.get(
+                    "summary_call_timeout_seconds"
+                ),
+                "process_id": previous_trace.get("process_id"),
+                "blocker_source": previous_trace.get("blocker_source") or "process_interrupt",
+                "semantic_stage": previous_trace.get("semantic_stage"),
+                "lexical_stage": previous_trace.get("lexical_stage"),
+                "storage_failure_family": previous_trace.get("storage_failure_family"),
+                "storage_failure_reason": previous_trace.get("storage_failure_reason"),
+                "storage_failure_message": previous_trace.get("storage_failure_message"),
+                "storage_diagnostics": previous_trace.get("storage_diagnostics"),
+                "runtime_restore_performed": previous_trace.get("runtime_restore_performed"),
+                "runtime_restore_mode": previous_trace.get("runtime_restore_mode"),
+                "runtime_restore_declined_reason": previous_trace.get(
+                    "runtime_restore_declined_reason"
+                ),
+            },
+        )
+
+    def _semantic_storage_closeout(self, semantic: Dict[str, Any]) -> bool:
+        blocker = semantic.get("semantic_blocker")
+        if isinstance(blocker, dict) and blocker.get("code") == "storage_closeout":
+            return True
+        return bool(semantic.get("storage_failure_family"))
+
     def sync_all_repositories(self) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates sequentially."""
         results = {}
@@ -716,6 +1427,7 @@ class GitAwareIndexManager:
             "artifact_enabled": repo_info.artifact_enabled,
             "artifact_backend": repo_info.artifact_backend,
             "artifact_health": repo_info.artifact_health,
+            "last_sync_error": getattr(repo_info, "last_sync_error", None),
         }
 
         # Check index file
@@ -726,6 +1438,45 @@ class GitAwareIndexManager:
         else:
             status["index_exists"] = False
             status["index_size_mb"] = 0
+        trace = self._read_force_full_exit_trace(repo_info)
+        if trace is not None and trace.get("status") == "running":
+            is_alive = self._force_full_trace_process_alive(trace)
+            if is_alive is False:
+                self._write_force_full_exit_trace(
+                    repo_info,
+                    {
+                        "status": "interrupted",
+                        "stage": trace.get("stage") or "force_full_interrupted",
+                        "stage_family": trace.get("stage_family") or "final_closeout",
+                        "current_commit": trace.get("current_commit") or repo_info.current_commit,
+                        "indexed_commit_before": trace.get("indexed_commit_before")
+                        or repo_info.last_indexed_commit,
+                        "last_progress_path": trace.get("last_progress_path"),
+                        "in_flight_path": trace.get("in_flight_path"),
+                        "summary_call_timed_out": trace.get("summary_call_timed_out", False),
+                        "summary_call_file_path": trace.get("summary_call_file_path"),
+                        "summary_call_chunk_ids": trace.get("summary_call_chunk_ids", []),
+                        "summary_call_timeout_seconds": trace.get(
+                            "summary_call_timeout_seconds"
+                        ),
+                        "process_id": trace.get("process_id"),
+                        "blocker_source": trace.get("blocker_source") or "process_interrupt",
+                        "semantic_stage": trace.get("semantic_stage"),
+                        "lexical_stage": trace.get("lexical_stage"),
+                        "storage_failure_family": trace.get("storage_failure_family"),
+                        "storage_failure_reason": trace.get("storage_failure_reason"),
+                        "storage_failure_message": trace.get("storage_failure_message"),
+                        "storage_diagnostics": trace.get("storage_diagnostics"),
+                        "runtime_restore_performed": trace.get("runtime_restore_performed"),
+                        "runtime_restore_mode": trace.get("runtime_restore_mode"),
+                        "runtime_restore_declined_reason": trace.get(
+                            "runtime_restore_declined_reason"
+                        ),
+                    },
+                )
+                trace = self._read_force_full_exit_trace(repo_info)
+        if trace is not None:
+            status["force_full_exit_trace"] = trace
 
         status.update(build_health_row(repo_info))
 

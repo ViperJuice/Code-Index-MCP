@@ -89,6 +89,102 @@ class DocumentSection:
             self.subsections = []
 
 
+@dataclass(frozen=True)
+class CollectionEnsureResult:
+    """Outcome of verifying or creating a Qdrant collection."""
+
+    status: str
+    collection_name: str
+    expected_dimension: int
+    expected_distance_metric: str
+    actual_dimension: Optional[int] = None
+    actual_distance_metric: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "collection_name": self.collection_name,
+            "expected_dimension": self.expected_dimension,
+            "expected_distance_metric": self.expected_distance_metric,
+            "actual_dimension": self.actual_dimension,
+            "actual_distance_metric": self.actual_distance_metric,
+        }
+
+
+def ensure_qdrant_collection(
+    client: Any,
+    *,
+    collection_name: str,
+    expected_dimension: int,
+    distance_metric: str,
+    allow_recreate: bool = True,
+) -> CollectionEnsureResult:
+    """Verify the target collection and create it when the contract allows."""
+    expected_distance = SemanticIndexer.resolve_qdrant_distance(distance_metric)
+    collections = client.get_collections()
+    exists = any(c.name == collection_name for c in collections.collections)
+
+    if not exists:
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=models.VectorParams(
+                size=expected_dimension,
+                distance=expected_distance,
+            ),
+        )
+        return CollectionEnsureResult(
+            status="created",
+            collection_name=collection_name,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance.value,
+            actual_dimension=expected_dimension,
+            actual_distance_metric=expected_distance.value,
+        )
+
+    collection_info = client.get_collection(collection_name)
+    vectors_config = collection_info.config.params.vectors
+    actual_dimension = getattr(vectors_config, "size", None)
+    actual_distance = getattr(vectors_config, "distance", None)
+    mismatch = actual_dimension not in (None, expected_dimension) or actual_distance not in (
+        None,
+        expected_distance,
+    )
+    if mismatch:
+        if not allow_recreate:
+            return CollectionEnsureResult(
+                status="blocked",
+                collection_name=collection_name,
+                expected_dimension=expected_dimension,
+                expected_distance_metric=expected_distance.value,
+                actual_dimension=actual_dimension,
+                actual_distance_metric=getattr(actual_distance, "value", None),
+            )
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=models.VectorParams(
+                size=expected_dimension,
+                distance=expected_distance,
+            ),
+        )
+        return CollectionEnsureResult(
+            status="recreated",
+            collection_name=collection_name,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance.value,
+            actual_dimension=expected_dimension,
+            actual_distance_metric=expected_distance.value,
+        )
+
+    return CollectionEnsureResult(
+        status="reused",
+        collection_name=collection_name,
+        expected_dimension=expected_dimension,
+        expected_distance_metric=expected_distance.value,
+        actual_dimension=actual_dimension,
+        actual_distance_metric=getattr(actual_distance, "value", None),
+    )
+
+
 class SemanticIndexer:
     """Index code using semantic profile embeddings stored in Qdrant."""
 
@@ -907,52 +1003,22 @@ class SemanticIndexer:
             raise RuntimeError("Qdrant is not available - cannot ensure collection")
 
         try:
-            collections = self.qdrant.get_collections()
-            exists = any(c.name == self.collection for c in collections.collections)
-            should_recreate = False
-
-            if not exists:
-                logger.info(f"Creating Qdrant collection: {self.collection}")
-            else:
-                try:
-                    collection_info = self.qdrant.get_collection(self.collection)
-                    vectors_config = collection_info.config.params.vectors
-                    expected_distance = self._resolve_qdrant_distance(self.distance_metric)
-                    current_size = getattr(vectors_config, "size", None)
-                    current_distance = getattr(vectors_config, "distance", None)
-                    should_recreate = current_size not in (
-                        None,
-                        self.embedding_dimension,
-                    ) or current_distance not in (None, expected_distance)
-                    if should_recreate:
-                        logger.warning(
-                            "Recreating Qdrant collection %s due to config mismatch "
-                            "(size=%s, distance=%s, expected_size=%s, expected_distance=%s)",
-                            self.collection,
-                            current_size,
-                            current_distance,
-                            self.embedding_dimension,
-                            expected_distance,
-                        )
-                    else:
-                        logger.debug(f"Collection already exists: {self.collection}")
-                except Exception as info_error:
-                    logger.warning(
-                        "Failed to inspect collection %s; recreating. Error: %s",
-                        self.collection,
-                        info_error,
-                    )
-                    should_recreate = True
-
-            if not exists or should_recreate:
-                self.qdrant.recreate_collection(
-                    collection_name=self.collection,
-                    vectors_config=models.VectorParams(
-                        size=self.embedding_dimension,
-                        distance=self._resolve_qdrant_distance(self.distance_metric),
-                    ),
+            result = ensure_qdrant_collection(
+                self.qdrant,
+                collection_name=self.collection,
+                expected_dimension=self.embedding_dimension,
+                distance_metric=self.distance_metric,
+                allow_recreate=True,
+            )
+            if result.status == "created":
+                logger.info("Successfully created collection: %s", self.collection)
+            elif result.status == "recreated":
+                logger.warning(
+                    "Recreated Qdrant collection %s due to config mismatch",
+                    self.collection,
                 )
-                logger.info(f"Successfully created collection: {self.collection}")
+            else:
+                logger.debug("Collection already exists: %s", self.collection)
         except Exception as e:
             logger.error(
                 f"Failed to ensure collection '{self.collection}': {type(e).__name__}: {e}"
@@ -963,7 +1029,8 @@ class SemanticIndexer:
             )
 
     # ------------------------------------------------------------------
-    def _resolve_qdrant_distance(self, metric: str) -> models.Distance:
+    @staticmethod
+    def resolve_qdrant_distance(metric: str) -> models.Distance:
         """Map profile distance metric to Qdrant enum."""
         metric_value = (metric or "").strip().lower()
         mapping = {
@@ -979,6 +1046,10 @@ class SemanticIndexer:
             logger.warning("Unknown distance metric '%s', defaulting to cosine", metric)
             return models.Distance.COSINE
         return resolved
+
+    def _resolve_qdrant_distance(self, metric: str) -> models.Distance:
+        """Backward-compatible instance wrapper for distance resolution."""
+        return self.resolve_qdrant_distance(metric)
 
     # ------------------------------------------------------------------
     def _build_metadata(self) -> Dict[str, Any]:
@@ -1147,6 +1218,7 @@ class SemanticIndexer:
 
         is_impl = normalized.startswith(("mcp_server/", "src/"))
         is_script = normalized.startswith("scripts/")
+        is_plan = normalized.startswith("plans/") or "/plans/" in normalized
         is_test = normalized.startswith("tests/") or "/tests/" in normalized
         is_doc = normalized.startswith(
             ("docs/", "ai_docs/", "architecture/")
@@ -1162,6 +1234,8 @@ class SemanticIndexer:
             multiplier *= 1.15
         elif is_script:
             multiplier *= 1.05
+        elif is_plan:
+            multiplier *= 0.45
         elif is_test:
             multiplier *= 0.75
         elif is_doc or doc_type_normalized in {
@@ -1180,6 +1254,8 @@ class SemanticIndexer:
                 multiplier *= 1.25
             elif is_script:
                 multiplier *= 1.1
+            if is_plan:
+                multiplier *= 0.2
             if is_test:
                 multiplier *= 0.55
             if is_doc or doc_type_normalized in {
@@ -1376,6 +1452,7 @@ class SemanticIndexer:
     ) -> List[dict[str, Any]]:
         """Apply lightweight query-aware reranking to semantic results."""
         code_intent = self._looks_like_code_intent(query)
+        symbol_precise = self._looks_like_symbol_precise_query(query)
         reranked: List[dict[str, Any]] = []
 
         for result in results:
@@ -1396,17 +1473,42 @@ class SemanticIndexer:
             normalized_path = path.replace("\\", "/").lower().lstrip("./")
             is_test = normalized_path.startswith("tests/") or "/tests/" in normalized_path
             is_impl = normalized_path.startswith(("mcp_server/", "src/"))
-            if self._looks_like_symbol_precise_query(query):
+            is_plan = normalized_path.startswith("plans/") or "/plans/" in normalized_path
+            is_doc = normalized_path.startswith(
+                ("docs/", "ai_docs/", "architecture/")
+            ) or normalized_path.endswith(("readme.md", "readme.rst", "readme.txt"))
+            is_benchmark_artifact = (
+                "/benchmarks/" in normalized_path
+                or normalized_path.startswith("benchmarks/")
+                or normalized_path.endswith("run_e2e_retrieval_validation.py")
+                or normalized_path.endswith("test_benchmark_query_regressions.py")
+            )
+            if symbol_precise:
                 if is_test:
-                    score *= 0.45
+                    score *= 0.35
+                elif is_plan:
+                    score *= 0.12
+                elif is_doc:
+                    score *= 0.2
+                elif is_benchmark_artifact:
+                    score *= 0.18
                 elif is_impl:
-                    score *= 1.1
+                    score *= 1.18
 
             adjusted["score"] = score
             reranked.append(adjusted)
 
         reranked.sort(key=lambda item: float(item.get("score", 0.0)), reverse=True)
         return self._prefer_unique_files(reranked, limit)
+
+    def _semantic_result_metadata(self) -> dict[str, Any]:
+        """Return stable metadata for semantic-path query results."""
+        return {
+            "source": "semantic",
+            "semantic_source": "semantic",
+            "semantic_profile_id": self.semantic_profile.profile_id,
+            "semantic_collection_name": self.collection,
+        }
 
     def _build_chunk_embedding_text(
         self,
@@ -1526,6 +1628,7 @@ class SemanticIndexer:
         normalized_chunks: List[Dict[str, Any]] = []
         embedding_inputs: List[str] = []
         file_embedding_text: Optional[str] = None
+        missing_summary_chunk_ids: List[str] = []
 
         if chunks:
             for chunk in chunks:
@@ -1548,6 +1651,8 @@ class SemanticIndexer:
                     summary = _sqlite_store.get_chunk_summary(source_chunk_id)
                     if summary:
                         summary_text = summary["summary_text"]
+                    else:
+                        missing_summary_chunk_ids.append(source_chunk_id)
 
                 units = self._expand_chunk_embedding_units(
                     relative_path=relative_path,
@@ -1618,6 +1723,23 @@ class SemanticIndexer:
             "relative_path": relative_path,
             "chunk_count": len(chunks),
             "used_fallback_chunks": used_fallback_chunks,
+            "missing_summary_chunk_ids": sorted(set(missing_summary_chunk_ids)),
+        }
+
+    def _preflight_blocker_details(
+        self, semantic_preflight: Optional[Mapping[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        if not semantic_preflight:
+            return None
+        if semantic_preflight.get("can_write_semantic_vectors", True):
+            return None
+        blocker = semantic_preflight.get("blocker")
+        if isinstance(blocker, Mapping):
+            return dict(blocker)
+        return {
+            "code": "semantic_preflight_blocked",
+            "message": "Semantic preflight blocked vector writes",
+            "can_write_semantic_vectors": False,
         }
 
     def _store_file_embeddings(
@@ -1719,8 +1841,35 @@ class SemanticIndexer:
                 )
             )
 
+        point_links: List[tuple[str, int]] = []
+        source_chunk_links: Dict[str, int] = {}
         try:
             self._upsert_points_batched(path, points)
+            sqlite_store = getattr(self, "sqlite_store", None)
+            if sqlite_store is not None:
+                effective_profile_id = self.semantic_profile.profile_id
+                for point in points:
+                    payload = point.payload or {}
+                    chunk_id = payload.get("chunk_id")
+                    if chunk_id:
+                        point_links.append((str(chunk_id), int(point.id)))
+                    source_chunk_id = payload.get("source_chunk_id")
+                    if source_chunk_id:
+                        source_chunk_links[str(source_chunk_id)] = int(point.id)
+                for chunk_id, point_id in point_links:
+                    sqlite_store.upsert_semantic_point(
+                        profile_id=effective_profile_id,
+                        chunk_id=chunk_id,
+                        point_id=point_id,
+                        collection=self.collection,
+                    )
+                for source_chunk_id, point_id in source_chunk_links.items():
+                    sqlite_store.upsert_semantic_point(
+                        profile_id=effective_profile_id,
+                        chunk_id=source_chunk_id,
+                        point_id=point_id,
+                        collection=self.collection,
+                    )
         except Exception as e:
             logger.error(
                 f"Failed to upsert {len(points)} points for file {path}: "
@@ -1737,10 +1886,30 @@ class SemanticIndexer:
             "embedding_unit_count": len(normalized_chunks),
             "file_summary_indexed": file_embed is not None,
             "used_fallback_chunks": prep["used_fallback_chunks"],
+            "semantic_points_linked": len(point_links),
         }
 
-    def index_file(self, path: Path) -> Dict[str, Any]:
+    def index_file(
+        self,
+        path: Path,
+        *,
+        require_summaries: bool = False,
+        semantic_preflight: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Index a single file and return the shard info."""
+        blocker = self._preflight_blocker_details(semantic_preflight)
+        if blocker is not None:
+            return {
+                "file": str(path),
+                "symbols": [],
+                "language": self._infer_chunk_language(path),
+                "chunk_count": 0,
+                "embedding_unit_count": 0,
+                "file_summary_indexed": False,
+                "used_fallback_chunks": False,
+                "blocked": True,
+                "semantic_blocker": blocker,
+            }
         prep = self._prepare_file_for_indexing(path)
         if prep is None:
             return {
@@ -1752,10 +1921,31 @@ class SemanticIndexer:
                 "file_summary_indexed": False,
                 "used_fallback_chunks": False,
             }
+        missing_summary_chunk_ids = prep.get("missing_summary_chunk_ids", [])
+        if require_summaries and missing_summary_chunk_ids:
+            return {
+                "file": str(path),
+                "symbols": prep["symbols"],
+                "language": prep["language"],
+                "chunk_count": prep["chunk_count"],
+                "embedding_unit_count": 0,
+                "file_summary_indexed": False,
+                "used_fallback_chunks": prep["used_fallback_chunks"],
+                "blocked": True,
+                "missing_summary_chunk_ids": missing_summary_chunk_ids,
+                "semantic_error": "Missing authoritative summaries for strict semantic indexing",
+            }
         embeds = self._embed_texts(prep["embedding_inputs"], input_type="document")
         return self._store_file_embeddings(path, prep, embeds)
 
-    def index_files_batch(self, paths: List[Path], embed_batch_size: int = 1000) -> Dict[str, Any]:
+    def index_files_batch(
+        self,
+        paths: List[Path],
+        embed_batch_size: int = 1000,
+        *,
+        require_summaries: bool = False,
+        semantic_preflight: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Index multiple files with batched embedding API calls.
 
         Collects all embedding texts from all files first, then submits them
@@ -1765,14 +1955,34 @@ class SemanticIndexer:
         if not self._qdrant_available:
             raise RuntimeError("Qdrant is not available — cannot batch-index files")
 
+        blocker = self._preflight_blocker_details(semantic_preflight)
+        if blocker is not None:
+            return {
+                "files_indexed": 0,
+                "files_failed": 0,
+                "files_skipped": 0,
+                "files_blocked": len(paths),
+                "blocked_files": [str(path) for path in paths],
+                "total_embedding_units": 0,
+                "semantic_blocker": blocker,
+                "semantic_error": blocker.get("message"),
+            }
+
         # Phase 1: prepare all files — chunking + build embedding texts, no API calls
         preparations: List[tuple] = []
         skipped = 0
+        blocked_files: List[str] = []
+        missing_summary_chunk_ids: List[str] = []
         for path in paths:
             try:
                 prep = self._prepare_file_for_indexing(path)
                 if prep:
-                    preparations.append((path, prep))
+                    prep_missing = prep.get("missing_summary_chunk_ids", [])
+                    if require_summaries and prep_missing:
+                        blocked_files.append(str(path))
+                        missing_summary_chunk_ids.extend(str(chunk_id) for chunk_id in prep_missing)
+                    else:
+                        preparations.append((path, prep))
                 else:
                     skipped += 1
             except Exception as exc:
@@ -1784,6 +1994,9 @@ class SemanticIndexer:
                 "files_indexed": 0,
                 "files_failed": 0,
                 "files_skipped": skipped,
+                "files_blocked": len(blocked_files),
+                "blocked_files": blocked_files,
+                "missing_summary_chunk_ids": sorted(set(missing_summary_chunk_ids)),
                 "total_embedding_units": 0,
             }
 
@@ -1861,6 +2074,9 @@ class SemanticIndexer:
             "files_indexed": indexed,
             "files_failed": failed,
             "files_skipped": skipped,
+            "files_blocked": len(blocked_files),
+            "blocked_files": blocked_files,
+            "missing_summary_chunk_ids": sorted(set(missing_summary_chunk_ids)),
             "total_embedding_units": len(all_texts),
         }
 
@@ -1911,8 +2127,9 @@ class SemanticIndexer:
 
             rerank_input: List[dict[str, Any]] = []
             for res in results:
-                payload = res.payload or {}
+                payload = dict(res.payload or {})
                 payload["score"] = res.score
+                payload.update(self._semantic_result_metadata())
                 rerank_input.append(payload)
 
             yield from self._rerank_query_results(text, rerank_input, limit)
@@ -2038,7 +2255,7 @@ class SemanticIndexer:
         if sqlite_store is None or not chunk_ids:
             return 0
 
-        point_ids = sqlite_store.get_semantic_point_ids(profile_id, chunk_ids)
+        point_ids = list(dict.fromkeys(sqlite_store.get_semantic_point_ids(profile_id, chunk_ids)))
 
         if point_ids and self._qdrant_available:
             try:
@@ -2057,6 +2274,58 @@ class SemanticIndexer:
 
         sqlite_store.delete_semantic_point_mappings(profile_id, chunk_ids)
         return len(point_ids)
+
+    def cleanup_stale_semantic_artifacts(
+        self,
+        profile_id: str,
+        invalidation: Mapping[str, Any],
+        sqlite_store: Optional["SQLiteStore"] = None,
+    ) -> Dict[str, Any]:
+        """Delete stale vectors, mappings, and invalidated summaries for a file mutation."""
+        if sqlite_store is None:
+            return {
+                "vectors_deleted": 0,
+                "mappings_deleted": 0,
+                "summaries_deleted": 0,
+                "summaries_preserved": len(invalidation.get("summary_chunk_ids_preserved", [])),
+                "requires_summary_regeneration": bool(
+                    invalidation.get("requires_summary_regeneration", False)
+                ),
+            }
+
+        vector_chunk_ids = list(invalidation.get("vector_chunk_ids", []) or [])
+        point_ids = list(
+            dict.fromkeys(sqlite_store.get_semantic_point_ids(profile_id, vector_chunk_ids))
+        )
+
+        if point_ids and self._qdrant_available:
+            try:
+                self.qdrant.delete(
+                    collection_name=self.collection,
+                    points_selector=models.PointIdsList(points=point_ids),
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed deleting stale semantic artifacts for profile '%s': %s",
+                    profile_id,
+                    e,
+                )
+                self._qdrant_available = False
+                raise RuntimeError(f"Failed to delete stale semantic artifacts from Qdrant: {e}")
+
+        deleted_mappings = sqlite_store.delete_semantic_point_mappings(profile_id, vector_chunk_ids)
+        deleted_summaries = sqlite_store.delete_chunk_summaries(
+            list(invalidation.get("summary_chunk_ids_to_delete", []) or [])
+        )
+        return {
+            "vectors_deleted": len(point_ids),
+            "mappings_deleted": deleted_mappings,
+            "summaries_deleted": deleted_summaries,
+            "summaries_preserved": len(invalidation.get("summary_chunk_ids_preserved", [])),
+            "requires_summary_regeneration": bool(
+                invalidation.get("requires_summary_regeneration", False)
+            ),
+        }
 
     # ------------------------------------------------------------------
     def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:

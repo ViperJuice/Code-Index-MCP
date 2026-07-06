@@ -1,0 +1,13 @@
+{
+  "number": 13,
+  "title": "Retrospective on history indexing",
+  "labels": [
+    {"name": "retrospective"}
+  ],
+  "state": "OPEN",
+  "createdAt": "2026-07-05T10:00:00Z",
+  "updatedAt": "2026-07-06T10:00:00Z",
+  "closedAt": null,
+  "url": "https://github.com/owner/repo/issues/13",
+  "body": ""
+}

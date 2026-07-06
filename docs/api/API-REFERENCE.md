@@ -1,7 +1,7 @@
 # Code-Index-MCP API Reference
 
-> **Beta status**: This API reference describes the `1.2.0-rc8` beta release
-> surface and should not be read as a GA guarantee.
+> **Beta status**: This API reference describes the prepared `1.3.0` surface
+> and should not be read as a GA guarantee.
 
 ## Overview
 
@@ -254,6 +254,53 @@ Search for code patterns, symbols, or text across indexed files.
 - `symbol_type` (string, optional): Filter by symbol type (function, class, variable, etc.)
 - `limit` (integer, optional): Maximum results (default: 20, max: 100)
 - `offset` (integer, optional): Result offset for pagination (default: 0)
+- `source_type` (string, optional): `friction` for stored friction markers or
+  `history` for metadata-only issue history documents
+- `friction_categories` (string, optional): comma-separated subset of
+  `todo,fixme,hack,workaround,wish,extraction_hint`
+- `history_labels` (string, optional): comma-separated history labels
+- `history_repos` (string, optional): comma-separated owner/repo filters for
+  history issue documents
+- `include_source_metadata` (boolean, optional): include
+  `search_source_metadata.v1` on returned results
+
+Unfiltered lexical searches keep the legacy result shape. Unknown friction
+categories return a metadata-only validation error rather than an empty result.
+History ingestion is explicit through `mcp-index history ingest`, is
+fixture-backed in tests, and does not persist raw issue bodies by default.
+
+#### Python client (beta local API)
+
+The supported programmatic import path is `mcp_server.client`. Use it for local
+scripts and applications that can access the same registered checkout and
+SQLite-backed index directly. MCP tools remain the preferred LLM surface.
+
+```python
+from mcp_server.client import open_client
+from mcp_server.client_types import ClientSearchOptions
+
+with open_client(workspace_root="/path/to/repo") as client:
+    search = client.search_code(
+        ClientSearchOptions(
+            query="TODO",
+            source_type="friction",
+            friction_categories=("todo",),
+            include_source_metadata=True,
+        )
+    )
+    status = client.get_status()
+```
+
+Supported local client calls:
+- `search_code(ClientSearchOptions(...))`
+- `symbol_lookup(symbol, repository=...)`
+- `reindex(repository=...)`
+- `get_status(repository=...)`
+
+The client shares readiness-aware search behavior with MCP `search_code`. A
+non-ready repo returns typed `index_unavailable` data with
+`safe_fallback="native_search"`. This beta client is intentionally local-only:
+no remote service client is supported here.
 
 **Example:**
 ```bash

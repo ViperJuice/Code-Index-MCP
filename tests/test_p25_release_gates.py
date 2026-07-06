@@ -10,22 +10,9 @@ import yaml
 REPO = Path(__file__).parent.parent
 
 REQUIRED_GATES = {
-    "Alpha Gate - Dependency Sync",
-    "Alpha Gate - Format And Lint",
-    "Alpha Gate - Unit And Release Smoke",
-    "Alpha Gate - Integration Smoke",
-    "Alpha Gate - Production Multi-Repo Matrix",
+    "Protected Evidence - Agent Gate",
+    "Protected Evidence - Agent Gate Passed",
     "Alpha Gate - Docker Build And Smoke",
-    "Alpha Gate - Docs Truth",
-    "Alpha Gate - Required Gates Passed",
-}
-
-MAIN_CI_REQUIRED_JOB_IDS = {
-    "alpha-format-lint",
-    "alpha-unit-release-smoke",
-    "alpha-integration-smoke",
-    "alpha-docs-truth",
-    "alpha-production-matrix",
 }
 
 
@@ -61,28 +48,26 @@ def _is_true(value: Any) -> bool:
     return str(value).lower() == "true"
 
 
-def test_required_alpha_gate_names_are_exposed():
+def test_required_localci_gate_names_are_exposed():
     names = _job_names(
         ".github/workflows/ci-cd-pipeline.yml",
-        ".github/workflows/lockfile-check.yml",
         ".github/workflows/container-registry.yml",
     )
 
     assert REQUIRED_GATES <= names
 
 
-def test_main_ci_required_aggregator_depends_on_blocking_gates():
+def test_main_ci_required_aggregator_depends_on_agent_gate():
     jobs = _jobs(".github/workflows/ci-cd-pipeline.yml")
-    aggregator = jobs["alpha-required-gates-passed"]
+    aggregator = jobs["agent-gate-passed"]
 
-    assert aggregator["name"] == "Alpha Gate - Required Gates Passed"
-    assert _needs(aggregator) == MAIN_CI_REQUIRED_JOB_IDS
+    assert aggregator["name"] == "Protected Evidence - Agent Gate Passed"
+    assert _needs(aggregator) == {"agent-gate"}
     assert "continue-on-error" not in aggregator
 
-    for job_id in MAIN_CI_REQUIRED_JOB_IDS:
-        job = jobs[job_id]
-        assert job["name"].startswith("Alpha Gate - ")
-        assert "continue-on-error" not in job
+    gate = jobs["agent-gate"]
+    assert gate["name"] == "Protected Evidence - Agent Gate"
+    assert "continue-on-error" not in gate
 
 
 def test_informational_jobs_are_named_and_excluded_from_required_aggregator():
@@ -91,29 +76,16 @@ def test_informational_jobs_are_named_and_excluded_from_required_aggregator():
         ".github/workflows/container-registry.yml",
     ):
         jobs = _jobs(workflow_path)
-        aggregator_needs = _needs(jobs.get("alpha-required-gates-passed", {}))
+        aggregator_needs = _needs(jobs.get("agent-gate-passed", {}))
         for job_id, job in jobs.items():
             if job["name"].startswith("Informational - "):
                 assert job_id not in aggregator_needs
                 assert _is_true(job.get("continue-on-error")) or (
-                    "schedule" in str(job.get("if", ""))
-                    or "workflow_dispatch" in str(job.get("if", ""))
-                    or "pull_request" in str(job.get("if", ""))
+                    "workflow_dispatch" in str(job.get("if", ""))
                     or "refs/tags/v" in str(job.get("if", ""))
                 )
             elif "continue-on-error" in job:
                 assert job["name"].startswith("Informational - ")
-
-
-def test_lockfile_workflow_is_always_visible_dependency_gate():
-    workflow = _load_workflow(".github/workflows/lockfile-check.yml")
-    job = workflow["jobs"]["alpha-dependency-sync"]
-
-    assert job["name"] == "Alpha Gate - Dependency Sync"
-    assert "continue-on-error" not in job
-    assert "paths" not in workflow["on"]["push"]
-    assert "paths" not in workflow["on"]["pull_request"]
-    assert "make alpha-dependency-sync" in _read(".github/workflows/lockfile-check.yml")
 
 
 def test_container_alpha_gate_builds_and_smokes_without_push():
@@ -132,9 +104,9 @@ def test_release_automation_refuses_before_mutating_or_publishing():
     workflow_text = _read(".github/workflows/release-automation.yml")
 
     assert jobs["preflight-release-gates"]["name"] == "Preflight Release Gates"
-    assert "make alpha-release-gates" in workflow_text
+    assert "make agent-gate" in workflow_text
     assert "make release-smoke-container" in workflow_text
-    assert workflow_text.index("make alpha-release-gates") < workflow_text.index(
+    assert workflow_text.index("make agent-gate") < workflow_text.index(
         "make release-smoke-container"
     )
     assert workflow_text.index("make release-smoke-container") < workflow_text.index(

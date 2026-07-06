@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
+from .semantic_namespace import SemanticNamespaceResolver
+
 
 @dataclass(frozen=True)
 class SemanticProfile:
@@ -57,6 +59,12 @@ class SemanticProfile:
         if vector_dimension <= 0:
             raise ValueError(f"Profile '{profile_id}' vector_dimension must be > 0")
 
+        namespace_resolver = SemanticNamespaceResolver()
+        build_metadata = dict(payload.get("build_metadata") or {})
+        supplemental = _supplement_enrichment_metadata(profile_id, payload)
+        for key, value in supplemental.items():
+            build_metadata.setdefault(key, value)
+
         canonical = {
             "profile_id": profile_id,
             "provider": str(payload["provider"]),
@@ -67,13 +75,33 @@ class SemanticProfile:
             "normalization_policy": str(payload["normalization_policy"]),
             "chunk_schema_version": str(payload["chunk_schema_version"]),
             "chunker_version": str(payload["chunker_version"]),
+            "enrichment_model": _string_or_none(
+                build_metadata.get("enrichment_model") or payload.get("enrichment_model")
+            ),
+            "enrichment_base_url_identity": namespace_resolver.normalize_endpoint_identity(
+                build_metadata.get("enrichment_base_url")
+                or payload.get("enrichment_base_url")
+                or build_metadata.get("summarization_base_url")
+            ),
+            "prompt_template_hash": _prompt_template_hash(
+                build_metadata.get("prompt_template") or payload.get("prompt_template")
+            ),
+            "collection_name": namespace_resolver.normalize_collection_name(
+                build_metadata.get("collection_name") or payload.get("collection_name")
+            ),
         }
 
         fingerprint = _compute_compatibility_fingerprint(canonical)
 
-        metadata = payload.get("build_metadata") or {}
+        metadata = build_metadata
         metadata.setdefault("created_at", created_at or datetime.now(timezone.utc).isoformat())
         metadata.setdefault("tool_version", tool_version)
+        metadata["compatibility_contract"] = {
+            "enrichment_model": canonical["enrichment_model"],
+            "enrichment_base_url_identity": canonical["enrichment_base_url_identity"],
+            "prompt_template_hash": canonical["prompt_template_hash"],
+            "collection_name": canonical["collection_name"],
+        }
 
         return cls(
             profile_id=profile_id,
@@ -186,6 +214,53 @@ def _compute_compatibility_fingerprint(canonical_payload: Mapping[str, Any]) -> 
     """Compute deterministic compatibility fingerprint for a profile."""
     raw = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+
+def _prompt_template_hash(prompt_template: Any) -> Optional[str]:
+    if not isinstance(prompt_template, str):
+        return None
+    normalized = prompt_template.strip()
+    if not normalized:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def _string_or_none(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _supplement_enrichment_metadata(
+    profile_id: str,
+    payload: Mapping[str, Any],
+) -> Dict[str, Any]:
+    build_metadata = payload.get("build_metadata")
+    if isinstance(build_metadata, Mapping) and all(
+        build_metadata.get(key) for key in ("enrichment_model", "enrichment_base_url", "prompt_template")
+    ):
+        return {}
+
+    try:
+        from mcp_server.config.settings import get_settings
+
+        settings = get_settings()
+        summarization = settings.get_profile_summarization_config(profile_id)
+    except Exception:
+        summarization = {}
+
+    if not isinstance(summarization, Mapping):
+        return {}
+
+    supplemental: Dict[str, Any] = {}
+    if summarization.get("model_name"):
+        supplemental["enrichment_model"] = str(summarization["model_name"])
+    if summarization.get("base_url"):
+        supplemental["enrichment_base_url"] = str(summarization["base_url"])
+    if summarization.get("prompt_template"):
+        supplemental["prompt_template"] = str(summarization["prompt_template"])
+    return supplemental
 
 
 def extract_semantic_profile_metadata(

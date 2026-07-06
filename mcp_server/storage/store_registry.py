@@ -5,6 +5,7 @@ Thread-safe registry of SQLiteStore instances keyed by repo_id.
 import logging
 import sqlite3
 import threading
+from pathlib import Path
 from typing import Dict
 
 from mcp_server.core.path_resolver import PathResolver
@@ -71,6 +72,8 @@ class StoreRegistry:
                 existing = self._cache.get(repo_id)
                 if existing is not None:
                     return existing
+            index_path_obj = Path(info.index_path)
+            index_path_obj.parent.mkdir(parents=True, exist_ok=True)
             pool = ConnectionPool(
                 factory=lambda p=index_path: sqlite3.connect(p, check_same_thread=False),
                 size=4,

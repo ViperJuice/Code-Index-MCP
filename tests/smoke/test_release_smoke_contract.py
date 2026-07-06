@@ -43,6 +43,9 @@ def test_release_smoke_entrypoints_exist():
     for contract in ("get_status", "index_unavailable", "safe_fallback", "native_search"):
         assert contract in text
     assert "unregistered_repository" in text
+    for entrypoint in ('"mcp-index"', '"index-it-mcp"'):
+        assert entrypoint in text
+    assert '"code-index-mcp"' in text
 
     makefile = _read("Makefile")
     assert re.search(r"^release-smoke:", makefile, re.MULTILINE)
@@ -57,6 +60,8 @@ def test_pyproject_has_console_script_and_build_dependency():
 
     scripts = data["project"]["scripts"]
     assert scripts["mcp-index"] == "mcp_server.cli:cli"
+    assert scripts["index-it-mcp"] == "mcp_server.cli:cli"
+    assert "code-index-mcp" not in scripts
 
     dev_deps = data["project"]["optional-dependencies"]["dev"]
     assert any(dep.startswith("build>=") for dep in dev_deps)
@@ -68,7 +73,7 @@ def test_workflows_reuse_shared_release_smoke_commands():
         for path in (REPO / ".github/workflows").glob("*.yml")
     }
 
-    assert "make release-smoke" in workflows["ci-cd-pipeline.yml"]
+    assert "make agent-gate" in workflows["ci-cd-pipeline.yml"]
     assert "make release-smoke" in workflows["release-automation.yml"]
     assert "make release-smoke-container" in workflows["container-registry.yml"]
     assert "pip install build wheel" not in workflows["release-automation.yml"]
@@ -83,9 +88,9 @@ def test_alpha_docs_truth_and_release_preflight_cover_p34_and_container_smoke():
     )[0]
     assert "tests/docs/test_p34_public_alpha_recut.py" in alpha_docs_truth
 
-    assert "make alpha-release-gates" in release_automation
+    assert "make agent-gate" in release_automation
     assert "make release-smoke-container" in release_automation
-    assert release_automation.index("make alpha-release-gates") < release_automation.index(
+    assert release_automation.index("make agent-gate") < release_automation.index(
         "make release-smoke-container"
     )
     assert release_automation.index("make release-smoke-container") < release_automation.index(

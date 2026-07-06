@@ -10,6 +10,8 @@ from mcp_server.core.ignore_patterns import (
     build_walker_filter,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 class TestDefaultPatterns:
     """When no .mcp-index-ignore file is present, built-in defaults apply."""
@@ -78,6 +80,27 @@ class TestCustomIgnoreFile:
         (tmp_path / ".mcp-index-ignore").write_text("*.foo\n")
         manager = IgnorePatternManager(root_path=tmp_path)
         assert manager.should_ignore(Path("thing.py")) is False
+
+    def test_repo_fast_report_boundary_is_explicit_and_narrow(self):
+        manager = IgnorePatternManager(root_path=REPO_ROOT)
+        assert manager.should_ignore(Path("fast_test_results/fast_report_20250628_193425.md")) is True
+        assert manager.should_ignore(Path("docs/status/SEMANTIC_DOGFOOD_REBUILD.md")) is False
+
+    def test_repo_test_workspace_boundary_is_explicit_and_narrow(self):
+        manager = IgnorePatternManager(root_path=REPO_ROOT)
+        assert (
+            manager.should_ignore(Path("test_workspace/real_repos/search_scaling/package.json"))
+            is True
+        )
+        assert manager.should_ignore(Path("tests/test_repository_commands.py")) is False
+
+    def test_repo_coverage_artifacts_are_ignored(self):
+        manager = IgnorePatternManager(root_path=REPO_ROOT)
+        assert manager.should_ignore(Path("coverage.xml")) is True
+        assert manager.should_ignore(Path("coverage.json")) is True
+        assert manager.should_ignore(Path(".coverage")) is True
+        assert manager.should_ignore(Path(".coverage.unit")) is True
+        assert manager.should_ignore(Path("htmlcov/index.html")) is True
 
 
 class TestGitignoreIntegration:
@@ -211,6 +234,17 @@ class TestBuildWalkerFilter:
         assert f(tmp_path / "node_modules" / "pkg" / "index.js") is True
         assert f(tmp_path / "__pycache__" / "module.cpython-311.pyc") is True
         assert f(tmp_path / ".git" / "HEAD") is True
+
+    def test_repo_walker_filter_ignores_fast_report_and_test_workspace_paths(self):
+        f = build_walker_filter(REPO_ROOT)
+        assert (
+            f(REPO_ROOT / "fast_test_results" / "fast_report_20250628_193425.md") is True
+        )
+        assert (
+            f(REPO_ROOT / "test_workspace" / "real_repos" / "search_scaling" / "package.json")
+            is True
+        )
+        assert f(REPO_ROOT / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md") is False
 
 
 class TestWalkerIntegration:

@@ -459,6 +459,7 @@ _REDACTION_PATTERNS = [
     (re.compile(r"(Bearer\s+)\S+"), r"\1[REDACTED]"),
     (re.compile(r"(JWT_SECRET_KEY=)\S+"), r"\1[REDACTED]"),
     (re.compile(r"(GITHUB_TOKEN=)\S+"), r"\1[REDACTED]"),
+    (re.compile(r"(MCP_CLIENT_SECRET=)\S+"), r"\1[REDACTED]"),
 ]
 
 

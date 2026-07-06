@@ -1,11 +1,35 @@
-.PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage benchmark security docker release-smoke release-smoke-container
+.PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage coverage-baseline coverage-artifact-guard benchmark security docker release-smoke release-smoke-container
 .PHONY: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix alpha-release-gates
+.PHONY: agent-doctor agent-fast agent-gate agent-full agent-fix agent-affected
+.PHONY: agent-fast-local agent-gate-local agent-full-local agent-fix-local
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
 .PHONY: semantic-up semantic-down semantic-preflight semantic-setup
 
 UV_RUN := UV_LINK_MODE=copy uv run
+COVERAGE_PYTEST_ADDOPTS := --override-ini=addopts="--verbose --strict-markers --tb=short --benchmark-disable -p no:warnings -m 'not integration and not slow'"
+COVERAGE_BASELINE_TESTS := \
+	tests/test_coverage_artifact_guard.py \
+	tests/test_coverage_command_contract.py \
+	tests/test_coverage_workflow_posture.py \
+	tests/test_release_metadata.py \
+	tests/smoke/test_release_smoke_contract.py \
+	tests/docs/test_p23_doc_truth.py \
+	tests/test_agent_validation.py \
+	tests/test_localci_workflow_posture.py \
+	tests/docs/test_coverage_docs.py \
+	tests/docs/test_localci_agent_validation_docs.py \
+	tests/docs/test_localci_validation_contract.py \
+	tests/test_multi_repo_production_matrix.py \
+	tests/test_multi_repo_failure_matrix.py \
+	tests/test_repository_readiness.py \
+	tests/test_tool_readiness_fail_closed.py \
+	tests/test_git_index_manager.py \
+	tests/test_ref_poller_edges.py \
+	tests/test_rename_atomicity.py \
+	tests/test_artifact_download.py
+COVERAGE_TESTS := $(COVERAGE_BASELINE_TESTS) tests/docs/test_coverage_evidence_contract.py
 
 help:
 	@echo "Available commands:"
@@ -29,6 +53,12 @@ help:
 	@echo "  release-smoke   Run wheel and lexical MCP release smoke"
 	@echo "  release-smoke-container Run production container release smoke"
 	@echo "  alpha-production-matrix Run P33 production multi-repo release gate"
+	@echo "  agent-doctor    Report local/offload validation readiness"
+	@echo "  agent-fast      Run the cheap offline-first validation gate"
+	@echo "  agent-gate      Run the pre-PR validation gate"
+	@echo "  agent-full      Run the full validation gate including container smoke"
+	@echo "  agent-fix       Run deterministic local formatting fixes"
+	@echo "  agent-affected  Route changed files to agent-fast or agent-gate"
 	@echo ""
 	@echo "🐳 Docker Operations:"
 	@echo "  docker          Build Docker image"
@@ -97,7 +127,7 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
-	find . -type f -name "*.coverage" -delete
+	find . -type f -name ".coverage*" -delete
 	find . -type d -name "*.egg-info" -exec rm -rf {} +
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
@@ -106,8 +136,15 @@ clean:
 	find . -type f -name "coverage.xml" -delete
 	find . -type f -name "coverage.json" -delete
 
-coverage:
-	pytest tests --cov=mcp_server --cov-report=term-missing --cov-report=html --cov-report=xml
+coverage-artifact-guard:
+	$(UV_RUN) --extra dev python scripts/check_coverage_artifacts.py
+
+coverage-baseline: coverage-artifact-guard
+	$(UV_RUN) --extra dev pytest $(COVERAGE_BASELINE_TESTS) $(COVERAGE_PYTEST_ADDOPTS) --cov=mcp_server --cov-report=term-missing --cov-report=html --cov-report=xml
+	@echo "Coverage baseline generated in htmlcov/index.html"
+
+coverage: coverage-artifact-guard
+	$(UV_RUN) --extra dev pytest $(COVERAGE_TESTS) $(COVERAGE_PYTEST_ADDOPTS) --cov=mcp_server --cov-report=term-missing --cov-report=html --cov-report=xml
 	@echo "Coverage report generated in htmlcov/index.html"
 
 # Comprehensive parallel testing
@@ -205,6 +242,118 @@ alpha-production-matrix:
 		-v --no-cov
 
 alpha-release-gates: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix
+
+agent-doctor:
+	$(UV_RUN) --extra dev python scripts/agent_validation.py doctor
+
+agent-fast:
+	$(UV_RUN) --extra dev python scripts/agent_validation.py run fast
+
+agent-gate:
+	$(UV_RUN) --extra dev python scripts/agent_validation.py run gate
+
+agent-full:
+	$(UV_RUN) --extra dev python scripts/agent_validation.py run full
+
+agent-fix:
+	$(UV_RUN) --extra dev python scripts/agent_validation.py run fix
+
+agent-affected:
+	$(UV_RUN) --extra dev python scripts/agent_validation.py affected
+
+agent-fast-local: alpha-dependency-sync coverage-artifact-guard
+	$(UV_RUN) --extra dev black --check \
+		scripts/check_coverage_artifacts.py \
+		scripts/agent_validation.py \
+		tests/test_coverage_artifact_guard.py \
+		tests/test_coverage_command_contract.py \
+		tests/test_coverage_workflow_posture.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_coverage_docs.py \
+		tests/docs/test_coverage_evidence_contract.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py
+	$(UV_RUN) --extra dev isort --check-only \
+		scripts/check_coverage_artifacts.py \
+		scripts/agent_validation.py \
+		tests/test_coverage_artifact_guard.py \
+		tests/test_coverage_command_contract.py \
+		tests/test_coverage_workflow_posture.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_coverage_docs.py \
+		tests/docs/test_coverage_evidence_contract.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py
+	$(UV_RUN) --extra dev flake8 \
+		scripts/check_coverage_artifacts.py \
+		scripts/agent_validation.py \
+		tests/test_coverage_artifact_guard.py \
+		tests/test_coverage_command_contract.py \
+		tests/test_coverage_workflow_posture.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_coverage_docs.py \
+		tests/docs/test_coverage_evidence_contract.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py
+	$(UV_RUN) --extra dev pylint \
+		scripts/check_coverage_artifacts.py \
+		scripts/agent_validation.py \
+		tests/test_coverage_artifact_guard.py \
+		tests/test_coverage_command_contract.py \
+		tests/test_coverage_workflow_posture.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_coverage_docs.py \
+		tests/docs/test_coverage_evidence_contract.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py \
+		--fail-under=7.0
+	$(UV_RUN) --extra dev pytest \
+		tests/test_coverage_artifact_guard.py \
+		tests/test_coverage_command_contract.py \
+		tests/test_coverage_workflow_posture.py \
+		tests/test_release_metadata.py \
+		tests/smoke/test_release_smoke_contract.py \
+		tests/docs/test_p23_doc_truth.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_coverage_docs.py \
+		tests/docs/test_coverage_evidence_contract.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py \
+		-q --no-cov
+
+agent-gate-local: agent-fast-local
+	$(MAKE) release-smoke
+	SEMANTIC_SEARCH_ENABLED=false $(UV_RUN) --extra dev pytest \
+		tests/test_multi_repo_production_matrix.py \
+		tests/test_multi_repo_failure_matrix.py \
+		tests/test_repository_readiness.py \
+		tests/test_tool_readiness_fail_closed.py \
+		tests/test_git_index_manager.py \
+		tests/test_ref_poller_edges.py \
+		tests/test_rename_atomicity.py \
+		tests/test_artifact_download.py \
+		-q --no-cov
+
+agent-full-local: agent-gate-local coverage release-smoke-container
+
+agent-fix-local:
+	$(UV_RUN) --extra dev black \
+		scripts/agent_validation.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py
+	$(UV_RUN) --extra dev isort \
+		scripts/agent_validation.py \
+		tests/test_agent_validation.py \
+		tests/test_localci_workflow_posture.py \
+		tests/docs/test_localci_agent_validation_docs.py \
+		tests/docs/test_localci_validation_contract.py
 
 # Docker operations
 docker-up:

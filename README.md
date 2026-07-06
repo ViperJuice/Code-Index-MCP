@@ -6,16 +6,16 @@ Code-Index-MCP is a fast, **local-first** search index for your code. It plugs i
 
 > **New to Code-Index-MCP?** Start with the [Getting Started Guide](docs/GETTING_STARTED.md).
 >
-> **Status:** v1.2.0 — MCP tools (`search_code`, `symbol_lookup`) are the primary interface; a FastAPI admin gateway is available for diagnostics.
+> **Status:** v1.3.0 prepared surface — MCP tools (`search_code`, `symbol_lookup`) are the primary interface; a FastAPI admin gateway is available for diagnostics.
 
-> **Stable-surface prep status**: This guide targets `1.2.0` and reflects the
-> repo-owned stable install surface prepared by GAREL. MCP STDIO remains the
-> primary LLM surface, FastAPI remains a secondary admin surface, and final
-> release publication plus GA release evidence remain downstream-only in
-> `GADISP`.
+> **Stable-surface prep status**: This guide targets the repo-owned `1.3.0`
+> identity freeze. MCP STDIO remains the primary LLM surface and FastAPI
+> remains a secondary admin surface, but the July 6, 2026 PyPI check recorded
+> live `index-it-mcp` at `2.14.9`, so this guide uses source and local-wheel
+> proof instead of claiming live PyPI parity for the prepared `1.3.0` surface.
 
 ## Project Status
-**Version**: 1.2.0 (stable surface prepared; dispatch pending)
+**Version**: 1.3.0 (repo-owned prepared surface; live PyPI parity not re-proven on July 6, 2026)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -23,9 +23,14 @@ Code-Index-MCP is a fast, **local-first** search index for your code. It plugs i
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
-**GA decision**: see [docs/validation/ga-final-decision.md](docs/validation/ga-final-decision.md); the current decision is `ship GA`, but stable release mutation and release evidence remain downstream-only in `GADISP`.
+**GA decision**: see [docs/validation/ga-final-decision.md](docs/validation/ga-final-decision.md); the current product decision is `ship GA`, while install-surface claims remain bounded by [docs/status/public-package-identity.md](docs/status/public-package-identity.md).
 **GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
 **Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
+
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard for `mcp-index stdio`.
+The FastAPI gateway uses separate admin/debug bearer token authentication, and
+no remote MCP authorization is implemented while remote MCP transport remains
+deferred.
 
 ## Why it exists
 
@@ -121,6 +126,11 @@ Code-Index-MCP implements defense-in-depth security hardening (Phase 15):
 - **Token Validation**: GitHub tokens are validated for required scopes at startup (`contents:read`, `metadata:read`, `actions:read`, `actions:write`, `attestations:write`). See [docs/security/token-scopes.md](docs/security/token-scopes.md).
 - **Metrics Authentication**: The `/metrics` endpoint requires bearer token authentication.
 
+`MCP_CLIENT_SECRET` is a local STDIO handshake guard only. It is not the
+gateway's admin/debug bearer token authentication, and no remote MCP
+authorization is implemented while the repository continues to defer remote
+MCP transport.
+
 For a comprehensive operator runbook, see [docs/operations/user-action-runbook.md](docs/operations/user-action-runbook.md).
 
 ## 📁 Project Structure
@@ -134,10 +144,8 @@ Key directories:
 - `docs/` - Documentation and guides
 - `architecture/` - System design and diagrams
 - `docker/` - Docker configurations and compose files
-- `data/` - Database files and indexes
-- `logs/` - Application and test logs
-- `reports/` - Generated performance reports and analysis
-- `analysis_archive/` - Historical analysis and archived research
+- `mcp-index-kit/` - Shared MCP indexing toolkit and examples
+- `docs/status/` - Durable evidence notes kept under version control
 
 ## 🛠️ Language Support
 
@@ -150,7 +158,8 @@ quality or default sandbox behavior.
 ## 🚀 Quick Start
 
 Supported stable install paths are native Python/STDIO with
-`uv sync --locked` and the `ghcr.io/viperjuice/code-index-mcp` container image.
+`uv sync --locked`, a locally built `index-it-mcp` wheel, and the documented
+`ghcr.io/viperjuice/code-index-mcp` container image.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
 [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md),
@@ -178,7 +187,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.0
 ```
 
 #### Option 2: AI-Powered Search
@@ -187,7 +196,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.3.0
 ```
 
 ### 💻 Environment-Specific Setup
@@ -198,7 +207,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.0
 ```
 
 #### 🍎 macOS
@@ -240,6 +249,15 @@ docker-compose -f docker/compose/development/docker-compose.mcp-sidecar.yml up -
 cp .mcp.json.templates/docker-sidecar.json .mcp.json
 ```
 
+### Windows Path-Length Fallback
+
+Tracked repository paths are kept at or below the 160-character tracked-path
+limit, and the REPOCLEAN audit also checks wheel-content path depth for
+installed `site-packages` members. If a Windows checkout still hits a
+path-length edge because of a deeply nested clone location or third-party
+tooling, use `git config --global core.longpaths true` as a fallback rather
+than as the primary mitigation.
+
 ### 📋 MCP.json Configuration Examples
 
 The setup script creates the appropriate `.mcp.json` for your environment. Manual examples:
@@ -266,7 +284,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
       ]
     }
   }
@@ -290,10 +308,10 @@ Index many unrelated repositories from a single running server instance.
 export MCP_ALLOWED_ROOTS=/abs/a:/abs/b
 ```
 
-**Start the server** (with secrets via `op run` or plain `python`):
+**Start the server** (with secrets via `op run` or plain `mcp-index stdio`):
 
 ```bash
-op run --env-file=.mcp.env -- python -m mcp_server.cli.server_commands
+op run --env-file=.mcp.env -- mcp-index stdio
 ```
 
 **Register each repo** — register one worktree per git common directory. The
@@ -312,6 +330,50 @@ mcp-index repository register /abs/b
 search_code(query="def parse", repository="my-repo")
 symbol_lookup(symbol="Parser", repository="my-repo")
 ```
+
+**Python client (beta local API)**: for local scripts and applications on the
+same machine as the registered repo, use `mcp_server.client` instead of
+starting STDIO or calling FastAPI. MCP tools remain the preferred LLM surface.
+
+```python
+from mcp_server.client import open_client
+from mcp_server.client_types import ClientSearchOptions
+
+with open_client(workspace_root="/path/to/repo") as client:
+    result = client.search_code(
+        ClientSearchOptions(
+            query="TODO",
+            source_type="friction",
+            friction_categories=("todo",),
+            include_source_metadata=True,
+        )
+    )
+    if result.index_unavailable:
+        print(result.index_unavailable.safe_fallback)
+    else:
+        print(result.results[0].file)
+```
+
+The supported Python client surface is local-only: `search_code`,
+`symbol_lookup`, `reindex`, and `get_status` share the same readiness-aware
+service as the MCP `search_code` tool. It is a local programmatic API, not a
+remote service client.
+
+Friction pattern metadata is available as an additive filter on `search_code`.
+Use `source_type="friction"` with optional `friction_categories=["todo",
+"fixme", "hack", "workaround", "wish", "extraction_hint"]`. Set
+`include_source_metadata=true` to attach the stored
+`search_source_metadata.v1` envelope to returned results. Ordinary unfiltered
+lexical calls keep the legacy result shape; invalid friction categories return
+a metadata-only validation error instead of a silent empty result.
+
+Historical GitHub issue context uses the same metadata envelope and search
+surface. Run `mcp-index history ingest --repo owner/repo` to ingest
+metadata-only issue documents, then filter them with `source_type="history"`
+plus optional `history_labels=["reflection"]` or
+`history_repos=["owner/repo"]`. The HISTORY contract is fixture-backed in
+tests, requires no live GitHub credentials, and does not persist raw issue
+bodies by default.
 
 **Index tracking**: each repo's tracked/default branch is followed by
 `MultiRepositoryWatcher` (`RefPoller` every 30 s). Same-repo multiple worktrees
@@ -349,6 +411,9 @@ docker run -p 8000:8000 vllm/vllm-openai --model Qwen/Qwen3-Embedding-8B
 
 Both profiles and their collection names are defined in `code-index-mcp.profiles.yaml` and can be customized.
 
+`code-index-mcp.profiles.yaml` is a repo-shipped profile filename, not a pip
+install target.
+
 ### Costs & Optional Features
 
 The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
@@ -365,16 +430,7 @@ for language/runtime support details.
 
 ### Installation
 
-#### Option 1: Install via pip (Recommended)
-```bash
-# Install the prepared stable package surface
-pip install index-it-mcp==1.2.0
-
-# Or install with dev tools for testing
-pip install "index-it-mcp[dev]==1.2.0"
-```
-
-#### Option 2: Install from Source
+#### Option 1: Use the repo-owned source install (Recommended)
 ```bash
 # Clone the repository
 git clone https://github.com/ViperJuice/Code-Index-MCP.git
@@ -382,7 +438,23 @@ cd Code-Index-MCP
 
 # Install locked project dependencies
 uv sync --locked
+
+# Verify the canonical CLI entrypoint
+uv run mcp-index --version
 ```
+
+#### Option 2: Build the local wheel
+```bash
+# From the repo root
+uv run --extra dev python -m build --wheel
+python -m pip install dist/index_it_mcp-1.3.0-py3-none-any.whl
+index-it-mcp --version
+```
+
+The canonical Python distribution name remains `index-it-mcp`, but the live
+PyPI package currently does not prove this repo's prepared `1.3.0` surface.
+Use the local wheel or source install above until a later release-evidence
+phase re-proves live package parity.
 
 ### Quick Start After Installation
 
@@ -408,9 +480,10 @@ mcp-index artifact sync
 mcp-index index status
 
 # Start the MCP STDIO runner (primary surface used by LLMs via .mcp.json)
-python -m mcp_server.cli.stdio_runner
+mcp-index stdio
 
-# Or start the FastAPI admin REST gateway (secondary, for diagnostics)
+# Or start the FastAPI admin REST gateway (secondary, for diagnostics only;
+# this is not the repo's MCP Streamable HTTP transport)
 mcp-index serve
 mcp-index serve --port 9123   # alternate port
 ```
@@ -449,6 +522,33 @@ an absolute path inside `MCP_ALLOWED_ROOTS`) for multi-repo scoping. See the
 ordinary no-match payloads (`results: []` for `search_code` or
 `result: "not_found"` for `symbol_lookup`) with readiness metadata; unavailable
 indexes return `index_unavailable` instead.
+
+The STDIO `tools/list` surface is deterministic and now advertises richer MCP
+metadata for every public tool: stable `title` values, explicit JSON Schema
+input contracts (`required`, defaults, and `additionalProperties` posture),
+annotations for read-only versus mutating behavior, and implementation-owned
+`outputSchema` drafts. The STDIO `tools/call` surface now returns SDK-native
+`CallToolResult` objects with object-shaped `structuredContent`, preserved JSON
+text fallback content in `content` for older clients, and `isError` on refusal
+and error branches. Legacy array-like payloads such as plain lexical search
+hits are wrapped under `structuredContent.results`, while readiness failures
+still carry `index_unavailable` with `safe_fallback: "native_search"` where
+that contract already applied.
+
+`reindex` and `write_summaries` also support task-augmented execution through
+the SDK-native MCP tasks surface. Both tools advertise
+`execution.taskSupport = "optional"`, so clients can either keep the current
+synchronous path or include a `task` object in `tools/call` and then use
+`tasks/get`, `tasks/list`, `tasks/result`, and `tasks/cancel` for progress,
+terminal payload retrieval, and best-effort cancellation. Readiness refusals,
+path sandbox failures, conflicting scope errors, and
+summarizer-unavailable preflights still fail synchronously before any task is created.
+
+Current verified MCP client posture is summarized in the
+[MCP compatibility matrix](docs/status/MCP_COMPATIBILITY_EVALUATION.md). The
+phase-owned direct smoke is the official Python SDK over STDIO; Claude Code and
+other STDIO launchers are documented against that same server contract, while
+remote Streamable HTTP MCP remains deferred.
 
 ### 🔧 Configuration
 
@@ -782,8 +882,8 @@ Create or edit `.mcp.json` in your project root:
 {
   "mcpServers": {
     "code-index-mcp": {
-      "command": "uvicorn",
-      "args": ["mcp_server.gateway:app", "--host", "0.0.0.0", "--port", "8000"],
+      "command": "mcp-index",
+      "args": ["stdio"],
       "env": {
         "VOYAGE_API_KEY": "your-voyage-ai-api-key-here",
         "SEMANTIC_SEARCH_ENABLED": "true"
@@ -793,10 +893,13 @@ Create or edit `.mcp.json` in your project root:
 }
 ```
 
+The server label `code-index-mcp` in these examples is a client-local MCP
+server ID, not the Python distribution name.
+
 **Method 2: Claude Code CLI**
 
 ```bash
-claude mcp add code-index-mcp -e VOYAGE_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app
+claude mcp add code-index-mcp -e VOYAGE_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- mcp-index stdio
 ```
 
 **Method 3: Environment Variables**
@@ -1023,9 +1126,20 @@ pytest
 # Run specific test
 pytest test_python_plugin.py
 
-# Run with coverage
-pytest --cov=mcp_server --cov-report=html
+# Measure the current local/offloaded coverage baseline
+make coverage-baseline
+
+# Generate the local/offloaded coverage report
+make coverage
+
+# Reject tracked or staged generated coverage outputs
+make coverage-artifact-guard
 ```
+
+The COVERAGE contract is local/offloaded first: `make coverage` emits terminal
+missing-line output plus `coverage.xml`, and `make agent-full` owns routine
+coverage generation. The README badge remains deferred until a trusted event
+produces real uploaded evidence.
 
 ### Architecture Visualization
 
@@ -1065,6 +1179,34 @@ GET /search?query=async+def.*parse&file_extensions=.py,.js
 Query parameters:
 - `query` (required): Search pattern (regex supported)
 - `file_extensions` (optional): Comma-separated list of extensions
+- `source_type` (optional): `friction` or `history`
+- `friction_categories` (optional): comma-separated friction categories
+- `history_labels` (optional): comma-separated history issue labels
+- `history_repos` (optional): comma-separated owner/repo filters for history
+  issue documents
+- `include_source_metadata` (optional): include `search_source_metadata.v1`
+  records on matching results
+
+### Python Client API (beta local API)
+
+Use the Python client when you need local programmatic access from the same
+machine and registered checkout. Use MCP tools when an assistant needs the
+primary LLM tool surface.
+
+```python
+from mcp_server.client import open_client
+from mcp_server.client_types import ClientSearchOptions
+
+with open_client(workspace_root="/path/to/repo") as client:
+    search = client.search_code(ClientSearchOptions(query="Reflection issue"))
+    symbol = client.symbol_lookup("IndexItClient")
+    status = client.get_status()
+```
+
+Readiness remains fail-closed. Non-ready repositories return typed
+`index_unavailable` data with `safe_fallback="native_search"` instead of
+dispatching against a stale index. The beta Python client intentionally has no
+remote service client.
 
 ### Response Format
 
@@ -1179,10 +1321,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0
+python scripts/create-release.py --version 1.3.0
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0 --publish
+python scripts/create-release.py --version 1.3.0 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1252,10 +1394,10 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0 stable surface prepared; downstream GADISP dispatch still pending
+**Current Status**: 1.3.0 stable surface prepared; downstream GADISP dispatch still pending
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
-- ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients
+- ✅ **MCP Protocol**: Verified official Python SDK compatibility over STDIO; see `docs/status/MCP_COMPATIBILITY_EVALUATION.md` for named client posture
 - ✅ **Performance**: Sub-100ms queries with BM25 optimization
 - 🔄 **Index Sync**: Beta support via GitHub Artifacts
 - 🔄 **Semantic Search**: Optional feature requiring Voyage AI API

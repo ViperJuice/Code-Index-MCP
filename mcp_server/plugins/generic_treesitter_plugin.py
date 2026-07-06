@@ -33,6 +33,47 @@ logger = logging.getLogger(__name__)
 class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     """Generic plugin that can handle any tree-sitter supported language."""
 
+    _EXACT_BOUNDED_JSON_PATHS = {
+        ".devcontainer/devcontainer.json": "exact_devcontainer_json_rebound",
+        "analysis_archive/semantic_vs_sql_comparison_1750926162.json": (
+            "exact_archive_tail_json_walk_gap"
+        ),
+        "final_optimized_report_final_report_1750958096/final_report_data.json": (
+            "exact_optimized_final_report_json_tail"
+        ),
+    }
+
+    @classmethod
+    def _exact_bounded_legacy_codex_phase_loop_json_reason(cls, normalized_path: str) -> Optional[str]:
+        parts = Path(normalized_path).parts
+        if len(parts) < 3 or parts[0] != ".codex" or parts[1] != "phase-loop":
+            return None
+        if parts[2] == "runs" and len(parts) >= 5:
+            if parts[-1] == "launch.json":
+                return "exact_legacy_codex_phase_loop_launch_json"
+            if parts[-1] == "heartbeat.json":
+                return "exact_legacy_codex_phase_loop_heartbeat_json"
+            if parts[-1] == "terminal-summary.json":
+                return "exact_legacy_codex_phase_loop_terminal_summary_json"
+        if parts[2] == "archive" and len(parts) >= 4 and parts[-1] == "state.json":
+            return "exact_legacy_codex_phase_loop_archive_state_json"
+        if len(parts) == 3 and parts[-1] == "state.json":
+            return "exact_legacy_codex_phase_loop_state_json"
+        return None
+
+    @classmethod
+    def _exact_bounded_legacy_codex_phase_loop_jsonl_reason(
+        cls, normalized_path: str
+    ) -> Optional[str]:
+        parts = Path(normalized_path).parts
+        if len(parts) < 3 or parts[0] != ".codex" or parts[1] != "phase-loop":
+            return None
+        if parts[2] == "archive" and len(parts) >= 4 and parts[-1] == "events.jsonl":
+            return "exact_legacy_codex_phase_loop_archive_events_jsonl"
+        if len(parts) == 3 and parts[-1] == "events.jsonl":
+            return "exact_legacy_codex_phase_loop_events_jsonl"
+        return None
+
     def __init__(
         self,
         language_config: Dict[str, Any],
@@ -105,6 +146,54 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     def supports(self, path: str | Path) -> bool:
         """Check if this plugin supports the given file."""
         return Path(path).suffix in self.file_extensions
+
+    @classmethod
+    def _normalized_relative_path(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> str:
+        candidate = Path(path)
+        if workspace_root is not None:
+            root = Path(workspace_root)
+            if candidate.is_absolute():
+                try:
+                    candidate = candidate.relative_to(root)
+                    return candidate.as_posix()
+                except ValueError:
+                    pass
+        if candidate.is_absolute():
+            try:
+                candidate = candidate.relative_to(Path.cwd())
+            except ValueError:
+                return candidate.as_posix()
+        return candidate.as_posix()
+
+    @classmethod
+    def uses_exact_bounded_json_path(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> bool:
+        return cls.exact_bounded_json_reason(path, workspace_root) is not None
+
+    @classmethod
+    def exact_bounded_json_reason(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> Optional[str]:
+        normalized_path = cls._normalized_relative_path(path, workspace_root)
+        return cls._EXACT_BOUNDED_JSON_PATHS.get(
+            normalized_path
+        ) or cls._exact_bounded_legacy_codex_phase_loop_json_reason(normalized_path)
+
+    @classmethod
+    def uses_exact_bounded_jsonl_path(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> bool:
+        return cls.exact_bounded_jsonl_reason(path, workspace_root) is not None
+
+    @classmethod
+    def exact_bounded_jsonl_reason(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> Optional[str]:
+        normalized_path = cls._normalized_relative_path(path, workspace_root)
+        return cls._exact_bounded_legacy_codex_phase_loop_jsonl_reason(normalized_path)
 
     def indexFile(self, path: str | Path, content: str) -> IndexShard:
         """Index a file with optional semantic embeddings."""

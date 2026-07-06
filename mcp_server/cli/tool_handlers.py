@@ -16,13 +16,22 @@ from typing import Any, Optional, Sequence
 
 import mcp.types as types
 
+from mcp_server.client import ClientValidationError, build_search_options, execute_search_service
 from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, validate_index
+from mcp_server.cli.task_reindex import run_reindex_task
+from mcp_server.cli.task_write_summaries import run_write_summaries_task
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
+from mcp_server.dispatcher.dispatcher_enhanced import SemanticSearchFailure
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.health.repository_readiness import (
+    ReadinessClassifier,
     RepositoryReadiness,
     RepositoryReadinessState,
+)
+from mcp_server.indexing.source_metadata import (
+    FRICTION_CATEGORIES,
+    normalize_friction_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +76,10 @@ def _ensure_response(data: Any) -> str:
         )
 
 
+def _json_text_response(data: Any) -> list[types.TextContent]:
+    return [types.TextContent(type="text", text=_ensure_response(data))]
+
+
 def _translate_path(path: str) -> str:
     """Translate legacy Docker paths to current environment paths."""
     if not path:
@@ -83,6 +96,32 @@ def _translate_path(path: str) -> str:
         if full_path.exists():
             return str(full_path)
     return path
+
+
+def _normalize_friction_categories_argument(value: Any) -> list[str]:
+    if value in (None, "", []):
+        return []
+    raw_categories: list[str]
+    if isinstance(value, str):
+        raw_categories = [item.strip() for item in value.split(",") if item.strip()]
+    elif isinstance(value, list):
+        raw_categories = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        raise ValueError("friction_categories must be a string or array of strings")
+    return [normalize_friction_category(category) for category in raw_categories]
+
+
+def _normalize_string_list_argument(value: Any, name: str) -> list[str]:
+    if value in (None, "", []):
+        return []
+    raw_items: list[str]
+    if isinstance(value, str):
+        raw_items = [item.strip() for item in value.split(",") if item.strip()]
+    elif isinstance(value, list):
+        raw_items = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        raise ValueError(f"{name} must be a string or array of strings")
+    return sorted(set(raw_items), key=str.lower)
 
 
 def _resolve_ctx(
@@ -127,19 +166,14 @@ def _classify_ctx(
 
 
 def _unsupported_worktree_response(readiness: RepositoryReadiness) -> list[types.TextContent]:
-    return [
-        types.TextContent(
-            type="text",
-            text=_ensure_response(
-                {
-                    "results": [],
-                    "code": readiness.code,
-                    "readiness": readiness.to_dict(),
-                    "message": "Repository path is an unsupported sibling worktree.",
-                }
-            ),
-        )
-    ]
+    return _json_text_response(
+        {
+            "results": [],
+            "code": readiness.code,
+            "readiness": readiness.to_dict(),
+            "message": "Repository path is an unsupported sibling worktree.",
+        }
+    )
 
 
 def _index_unavailable_response(
@@ -162,7 +196,7 @@ def _index_unavailable_response(
         response["query"] = query
     if symbol is not None:
         response["symbol"] = symbol
-    return [types.TextContent(type="text", text=_ensure_response(response))]
+    return _json_text_response(response)
 
 
 def _secondary_readiness_refusal_response(
@@ -181,7 +215,56 @@ def _secondary_readiness_refusal_response(
         response["mutation_performed"] = False
     else:
         response["persisted"] = False
-    return [types.TextContent(type="text", text=_ensure_response(response))]
+    return _json_text_response(response)
+
+
+def _semantic_not_ready_response(
+    semantic_readiness: Any,
+    *,
+    query: str,
+) -> list[types.TextContent]:
+    response = {
+        "results": [],
+        "code": "semantic_not_ready",
+        "query": query,
+        "semantic_requested": True,
+        "semantic_source": "semantic",
+        "semantic_profile_id": semantic_readiness.profile_id,
+        "semantic_collection_name": semantic_readiness.collection_name,
+        "semantic_fallback_status": "refused_not_ready",
+        "semantic_readiness": semantic_readiness.to_dict(),
+        "message": "Semantic search requested, but enriched semantic vectors are not ready.",
+        "remediation": semantic_readiness.remediation,
+    }
+    return _json_text_response(response)
+
+
+def _semantic_failure_response(
+    *,
+    query: str,
+    semantic_readiness: Any | None,
+    error: Exception,
+) -> list[types.TextContent]:
+    profile_id = getattr(semantic_readiness, "profile_id", None)
+    collection_name = getattr(semantic_readiness, "collection_name", None)
+    if isinstance(error, SemanticSearchFailure):
+        profile_id = error.profile_id or profile_id
+        collection_name = error.collection_name or collection_name
+
+    response = {
+        "results": [],
+        "code": "semantic_search_failed",
+        "query": query,
+        "semantic_requested": True,
+        "semantic_source": "semantic",
+        "semantic_profile_id": profile_id,
+        "semantic_collection_name": collection_name,
+        "semantic_fallback_status": "failed_runtime",
+        "semantic_readiness": semantic_readiness.to_dict() if semantic_readiness else None,
+        "message": "Semantic search failed at runtime; lexical fallback was not used.",
+        "details": str(error),
+    }
+    return _json_text_response(response)
 
 
 def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path: Path) -> int:
@@ -241,20 +324,15 @@ async def handle_symbol_lookup(
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [
-                types.TextContent(
-                    type="text",
-                    text=_ensure_response(
-                        {
-                            "error": "Path outside allowed roots",
-                            "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
-                            "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
-                        }
-                    ),
-                )
-            ]
+            return _json_text_response(
+                {
+                    "error": "Path outside allowed roots",
+                    "code": "path_outside_allowed_roots",
+                    "path": str(Path(repository).resolve()),
+                    "allowed_roots": [str(r) for r in allowed],
+                    "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+                }
+            )
 
     readiness = _classify_ctx(repo_resolver, repository)
     if readiness is not None and not readiness.ready:
@@ -347,9 +425,6 @@ async def handle_search_code(
             )
         ]
 
-    semantic = (arguments or {}).get("semantic", False)
-    fuzzy = (arguments or {}).get("fuzzy", False)
-    limit = (arguments or {}).get("limit", 20)
     repository = (arguments or {}).get("repository")
 
     if repository and _looks_like_path(repository):
@@ -370,32 +445,41 @@ async def handle_search_code(
                 )
             ]
 
-    readiness = _classify_ctx(repo_resolver, repository)
-    if readiness is not None and not readiness.ready:
-        return _index_unavailable_response(readiness, "search_code", query=query)
-
-    # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
-    ctx = _resolve_ctx(repo_resolver, repository)
+    try:
+        options = build_search_options(
+            query=query,
+            repository=repository,
+            semantic=(arguments or {}).get("semantic", False),
+            fuzzy=(arguments or {}).get("fuzzy", False),
+            limit=(arguments or {}).get("limit", 20),
+            source_type=(arguments or {}).get("source_type"),
+            friction_categories=(arguments or {}).get("friction_categories"),
+            history_labels=(arguments or {}).get("history_labels"),
+            history_repos=(arguments or {}).get("history_repos"),
+            include_source_metadata=bool(
+                (arguments or {}).get("include_source_metadata", False)
+            ),
+        )
+    except ClientValidationError as exc:
+        payload = {"error": exc.error, "details": exc.details}
+        if exc.allowed_categories:
+            payload["allowed_categories"] = exc.allowed_categories
+        return _json_text_response(payload)
+    except ValueError as exc:
+        return _json_text_response({"error": "Invalid search source filters", "details": str(exc)})
 
     try:
-        if ctx is not None:
-            results_iter = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: list(dispatcher.search(ctx, query, semantic=semantic, fuzzy=fuzzy, limit=limit)),  # type: ignore[call-arg]
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: execute_search_service(
+                    dispatcher=dispatcher,
+                    repo_resolver=repo_resolver,
+                    options=options,
                 ),
-                timeout=10.0,
-            )
-        else:
-            # Pre-SL-1 fallback — search without ctx
-            results_iter = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: list(dispatcher.search(query, semantic=semantic, fuzzy=fuzzy, limit=limit)),  # type: ignore[call-arg]
-                ),
-                timeout=10.0,
-            )
-        results = list(results_iter)
+            ),
+            timeout=10.0,
+        )
     except asyncio.TimeoutError:
         return [
             types.TextContent(
@@ -425,31 +509,92 @@ async def handle_search_code(
             )
         ]
 
-    logger.info(f"Search completed with {len(results)} results")
+    logger.info(f"Search completed with {len(result.results)} results")
 
     _indexing_active = indexing_thread is not None and indexing_thread.is_alive()
+    semantic = result.semantic_requested
+    source_type = result.source_type.value if result.source_type is not None else None
+    friction_categories = list(result.friction_categories)
+    history_labels = list(result.history_labels)
+    history_repos = list(result.history_repos)
+    include_source_metadata = result.include_source_metadata
+    readiness = result.readiness
+    semantic_readiness = result.semantic_readiness
+    semantic_profile_id = (
+        semantic_readiness.get("profile_id")
+        if isinstance(semantic_readiness, dict)
+        else getattr(semantic_readiness, "profile_id", None)
+    )
+    semantic_collection_name = (
+        semantic_readiness.get("collection_name")
+        if isinstance(semantic_readiness, dict)
+        else getattr(semantic_readiness, "collection_name", None)
+    )
 
-    if results:
+    if result.index_unavailable is not None:
+        return _json_text_response(
+            {
+                "error": "Index unavailable",
+                "code": result.index_unavailable.code,
+                "tool": "search_code",
+                "safe_fallback": result.index_unavailable.safe_fallback,
+                "readiness": result.index_unavailable.readiness,
+                "message": result.index_unavailable.message,
+                "remediation": result.index_unavailable.remediation,
+                "query": query,
+            }
+        )
+    if result.code == "semantic_not_ready":
+        return _json_text_response(
+            {
+                "results": [],
+                "code": "semantic_not_ready",
+                "query": query,
+                "semantic_requested": True,
+                "semantic_source": "semantic",
+                "semantic_profile_id": result.semantic_profile_id,
+                "semantic_collection_name": result.semantic_collection_name,
+                "semantic_fallback_status": "refused_not_ready",
+                "semantic_readiness": semantic_readiness,
+                "message": result.message,
+                "remediation": semantic_readiness.get("remediation") if semantic_readiness else None,
+            }
+        )
+    if result.code == "semantic_search_failed":
+        return _json_text_response(
+            {
+                "results": [],
+                "code": "semantic_search_failed",
+                "query": query,
+                "semantic_requested": True,
+                "semantic_source": "semantic",
+                "semantic_profile_id": result.semantic_profile_id,
+                "semantic_collection_name": result.semantic_collection_name,
+                "semantic_fallback_status": "failed_runtime",
+                "semantic_readiness": semantic_readiness,
+                "message": result.message,
+            }
+        )
+
+    if result.results:
         results_data = []
-        for r in results:
-            file_path = _translate_path(
-                r.get("file", "") if isinstance(r, dict) else getattr(r, "file", "")
-            )
-            line = r.get("line") if isinstance(r, dict) else getattr(r, "line", None)
+        for item in result.results:
+            file_path = _translate_path(item.file)
+            line = item.line
             result_item = {
                 "file": file_path,
                 "line": line,
-                "line_end": (
-                    r.get("line_end") if isinstance(r, dict) else getattr(r, "line_end", None)
-                ),
-                "symbol": r.get("symbol") if isinstance(r, dict) else getattr(r, "symbol", None),
-                "snippet": r.get("snippet") if isinstance(r, dict) else getattr(r, "snippet", None),
-                "last_indexed": (
-                    r.get("last_modified")
-                    if isinstance(r, dict)
-                    else getattr(r, "last_modified", None)
-                ),
+                "line_end": item.line_end,
+                "symbol": item.symbol,
+                "snippet": item.snippet,
+                "last_indexed": item.last_indexed,
             }
+            if item.source_metadata is not None:
+                result_item["source_metadata"] = item.source_metadata
+            if semantic:
+                result_item["semantic_source"] = item.semantic_source
+                result_item["semantic_profile_id"] = item.semantic_profile_id
+                result_item["semantic_collection_name"] = item.semantic_collection_name
             if line and file_path:
                 offset = line - 1
                 result_item["_usage_hint"] = (
@@ -459,15 +604,48 @@ async def handle_search_code(
 
         # Lazy summarization enqueue
         if lazy_summarizer and lazy_summarizer.can_summarize() and sqlite_store:
-            for r in results[:5]:
-                raw_file = r.get("file", "") if isinstance(r, dict) else getattr(r, "file", "")
-                raw_line = r.get("line", 1) if isinstance(r, dict) else getattr(r, "line", 1)
+            for item in result.results[:5]:
+                raw_file = item.file
+                raw_line = item.line or 1
                 if raw_file and raw_line:
                     chunk_info = sqlite_store.find_chunk_at_line(raw_file, int(raw_line))
                     if chunk_info:
                         lazy_summarizer.enqueue(chunk_info)
 
-        if _indexing_active:
+        filtered_or_enriched = bool(
+            source_type
+            or friction_categories
+            or history_labels
+            or history_repos
+            or include_source_metadata
+        )
+        if semantic or filtered_or_enriched:
+            search_response = {
+                "results": results_data,
+                "query": query,
+            }
+            if semantic:
+                search_response["semantic_requested"] = True
+                search_response["semantic_source"] = "semantic"
+                search_response["semantic_profile_id"] = semantic_profile_id
+                search_response["semantic_collection_name"] = semantic_collection_name
+                search_response["semantic_fallback_status"] = "not_attempted"
+            if source_type:
+                search_response["source_type"] = source_type
+            if friction_categories:
+                search_response["friction_categories"] = friction_categories
+            if history_labels:
+                search_response["history_labels"] = history_labels
+            if history_repos:
+                search_response["history_repos"] = history_repos
+            if include_source_metadata:
+                search_response["include_source_metadata"] = True
+            if _indexing_active:
+                search_response["indexing_in_progress"] = True
+                search_response["note"] = (
+                    "Initial index is still building — results may be incomplete"
+                )
+        elif _indexing_active:
             search_response = {
                 "results": results_data,
                 "indexing_in_progress": True,
@@ -483,11 +661,33 @@ async def handle_search_code(
             "message": (
                 "No results yet — initial index is still building"
                 if _indexing_active
-                else "No results found in index"
+                else (result.message or "No results found in index")
             ),
         }
+        if semantic:
+            response_data["semantic_requested"] = True
+            response_data["semantic_source"] = "semantic"
+            response_data["semantic_profile_id"] = (
+                result.semantic_profile_id
+            )
+            response_data["semantic_collection_name"] = (
+                result.semantic_collection_name
+            )
+            response_data["semantic_fallback_status"] = "not_attempted"
+        if source_type:
+            response_data["source_type"] = source_type
+        if friction_categories:
+            response_data["friction_categories"] = friction_categories
+        if history_labels:
+            response_data["history_labels"] = history_labels
+        if history_repos:
+            response_data["history_repos"] = history_repos
+        if include_source_metadata:
+            response_data["include_source_metadata"] = True
         if readiness is not None:
-            response_data["readiness"] = readiness.to_dict()
+            response_data["readiness"] = (
+                readiness if isinstance(readiness, dict) else readiness.to_dict()
+            )
         if _indexing_active:
             response_data["indexing_in_progress"] = True
         return [types.TextContent(type="text", text=_ensure_response(response_data))]
@@ -509,14 +709,25 @@ def _build_repositories(repo_resolver: Any, dispatcher: Any = None) -> list:
     rows = []
     for info in all_repos.values():
         features = None
+        semantic_readiness = None
         if dispatcher is not None and hasattr(dispatcher, "get_runtime_feature_status"):
             try:
                 ctx = repo_resolver.resolve(info.path)
                 if ctx is not None:
                     features = dispatcher.get_runtime_feature_status(ctx)
+                    semantic_readiness = ReadinessClassifier.classify_semantic_registered(
+                        ctx.registry_entry,
+                        ctx.sqlite_store,
+                    )
             except Exception:
                 features = None
-        rows.append(build_health_row(info, features=features))
+        rows.append(
+            build_health_row(
+                info,
+                features=features,
+                semantic_readiness=semantic_readiness,
+            )
+        )
     return rows
 
 
@@ -707,7 +918,9 @@ async def handle_reindex(
     dispatcher: DispatcherProtocol,
     repo_resolver: RepoResolver,
     sqlite_store: Any = None,
-) -> Sequence[types.TextContent]:
+    request_experimental: Any = None,
+    task_registry: Any = None,
+) -> Sequence[types.TextContent] | types.CreateTaskResult:
     path = (arguments or {}).get("path")
     repository = (arguments or {}).get("repository")
 
@@ -739,20 +952,15 @@ async def handle_reindex(
             and ctx_from_repo is not None
             and ctx_from_path.repo_id != ctx_from_repo.repo_id
         ):
-            return [
-                types.TextContent(
-                    type="text",
-                    text=_ensure_response(
-                        {
-                            "error": "Conflicting scope",
-                            "code": "conflicting_path_and_repository",
-                            "path": str(path),
-                            "repository": repository,
-                            "hint": "Provide only one, or ensure both resolve to the same repo.",
-                        }
-                    ),
-                )
-            ]
+            return _json_text_response(
+                {
+                    "error": "Conflicting scope",
+                    "code": "conflicting_path_and_repository",
+                    "path": str(path),
+                    "repository": repository,
+                    "hint": "Provide only one, or ensure both resolve to the same repo.",
+                }
+            )
 
     scope_arg = repository or (str(path) if path else None)
     readiness = _classify_ctx(repo_resolver, scope_arg)
@@ -773,45 +981,95 @@ async def handle_reindex(
         target_path = allowed[0]
 
     if not target_path.exists():
-        return [
-            types.TextContent(
-                type="text",
-                text=_ensure_response({"error": "Path not found", "path": str(target_path)}),
-            )
-        ]
+        return _json_text_response({"error": "Path not found", "path": str(target_path)})
 
     if not _path_within_allowed(target_path, allowed):
-        return [
-            types.TextContent(
-                type="text",
-                text=_ensure_response(
-                    {
-                        "error": "Path outside allowed roots",
-                        "path": str(target_path.resolve()),
-                        "allowed_roots": [str(r) for r in allowed],
-                        "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
-                    }
-                ),
-            )
-        ]
+        return _json_text_response(
+            {
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(target_path.resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+            }
+        )
 
     if path and target_path.is_file():
+        if request_experimental is not None and request_experimental.is_task:
+            return await request_experimental.run_task(
+                lambda task: run_reindex_task(
+                    task=task,
+                    registry=task_registry,
+                    dispatcher=dispatcher,
+                    ctx=ctx,
+                    active_store=active_store,
+                    target_path=target_path,
+                    requested_path=path,
+                ),
+                model_immediate_response="Reindex task created; poll tasks/get or tasks/result for progress.",
+            )
         try:
             if ctx is not None:
                 dispatcher.index_file(ctx, target_path)  # type: ignore[call-arg]
             else:
                 dispatcher.index_file(target_path)  # type: ignore[call-arg]
-            if ctx is not None and active_store is not None:
+            durable_files = (
                 _record_reindexed_files(active_store, ctx.workspace_root, target_path)
-            return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
+                if ctx is not None and active_store is not None
+                else 0
+            )
+            return _json_text_response(
+                {
+                    "path": str(target_path),
+                    "mode": "file",
+                    "indexed_files": 1,
+                    "durable_files": durable_files,
+                    "mutation_performed": True,
+                    "message": f"Reindexed file: {path}",
+                }
+            )
         except TypeError:
             dispatcher.index_file(target_path)  # type: ignore[call-arg]
-            if ctx is not None and active_store is not None:
+            durable_files = (
                 _record_reindexed_files(active_store, ctx.workspace_root, target_path)
-            return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
+                if ctx is not None and active_store is not None
+                else 0
+            )
+            return _json_text_response(
+                {
+                    "path": str(target_path),
+                    "mode": "file",
+                    "indexed_files": 1,
+                    "durable_files": durable_files,
+                    "mutation_performed": True,
+                    "message": f"Reindexed file: {path}",
+                }
+            )
         except Exception as e:
-            return [types.TextContent(type="text", text=f"Error reindexing {path}: {str(e)}")]
+            return _json_text_response(
+                {
+                    "error": "Reindex failed",
+                    "code": "reindex_failed",
+                    "path": str(target_path),
+                    "message": f"Error reindexing {path}",
+                    "details": str(e),
+                    "mutation_performed": False,
+                }
+            )
     else:
+        if request_experimental is not None and request_experimental.is_task:
+            return await request_experimental.run_task(
+                lambda task: run_reindex_task(
+                    task=task,
+                    registry=task_registry,
+                    dispatcher=dispatcher,
+                    ctx=ctx,
+                    active_store=active_store,
+                    target_path=target_path,
+                    requested_path=path,
+                ),
+                model_immediate_response="Reindex task created; poll tasks/get or tasks/result for progress.",
+            )
         try:
             if ctx is not None:
                 stats = dispatcher.index_directory(ctx, target_path, recursive=True)  # type: ignore[call-arg]
@@ -830,6 +1088,7 @@ async def handle_reindex(
         response_data = {
             "path": str(target_path),
             "mode": "merge",
+            "mutation_performed": True,
             "indexed_files": stats.get("indexed_files"),
             "ignored_files": stats.get("ignored_files"),
             "failed_files": stats.get("failed_files"),
@@ -840,8 +1099,14 @@ async def handle_reindex(
             "semantic_indexed": stats.get("semantic_indexed"),
             "semantic_failed": stats.get("semantic_failed"),
             "semantic_skipped": stats.get("semantic_skipped"),
+            "semantic_blocked": stats.get("semantic_blocked"),
+            "semantic_stage": stats.get("semantic_stage"),
+            "summaries_written": stats.get("summaries_written"),
+            "summary_chunks_attempted": stats.get("summary_chunks_attempted"),
+            "summary_missing_chunks": stats.get("summary_missing_chunks"),
             "total_embedding_units": stats.get("total_embedding_units"),
             "semantic_error": stats.get("semantic_error"),
+            "semantic_blocker": stats.get("semantic_blocker"),
             "semantic_paths_queued": stats.get("semantic_paths_queued"),
             "semantic_indexer_present": stats.get("semantic_indexer_present"),
             "merge_note": (
@@ -849,7 +1114,7 @@ async def handle_reindex(
                 "FileWatcher handles those on next change, or reindex again after deletions."
             ),
         }
-        return [types.TextContent(type="text", text=_ensure_response(response_data))]
+        return _json_text_response(response_data)
 
 
 async def handle_write_summaries(
@@ -861,7 +1126,9 @@ async def handle_write_summaries(
     lazy_summarizer: Any = None,
     current_session: Any = None,
     client_name: Optional[str] = None,
-) -> Sequence[types.TextContent]:
+    request_experimental: Any = None,
+    task_registry: Any = None,
+) -> Sequence[types.TextContent] | types.CreateTaskResult:
     from mcp_server.config.settings import Settings
     from mcp_server.indexing.summarization import ComprehensiveChunkWriter
 
@@ -921,27 +1188,47 @@ async def handle_write_summaries(
     limit_arg = int((arguments or {}).get("limit", 500))
     model_used = lazy_summarizer._get_model_name()
 
+    if request_experimental is not None and request_experimental.is_task:
+        return await request_experimental.run_task(
+            lambda task: run_write_summaries_task(
+                task=task,
+                registry=task_registry,
+                active_store=active_store,
+                current_session=current_session,
+                client_name=client_name,
+                limit_arg=limit_arg,
+                model_used=model_used,
+            ),
+            model_immediate_response=(
+                "Summary task created; use tasks/get and tasks/result to observe bounded progress."
+            ),
+        )
+
     _settings = Settings.from_environment()
     writer = ComprehensiveChunkWriter(
         db_path=db_path,
         qdrant_client=None,
         session=current_session,
         client_name=client_name,
-        summarization_config=_settings.get_profile_summarization_config(
-            _settings.semantic_default_profile
-        ),
+        summarization_config={
+            **_settings.get_profile_summarization_config(_settings.semantic_default_profile),
+            "profile_id": _settings.semantic_default_profile,
+        },
     )
-    chunks_written = await writer.process_all(limit=limit_arg)
+    summary_result = await writer.process_scope(limit=limit_arg)
 
     return [
         types.TextContent(
             type="text",
             text=_ensure_response(
                 {
-                    "chunks_summarized": chunks_written,
+                    "chunks_summarized": summary_result.summaries_written,
                     "limit": limit_arg,
                     "model_used": model_used,
                     "persisted": True,
+                    "semantic_vectors_written": False,
+                    "summary_chunks_attempted": summary_result.chunks_attempted,
+                    "summary_missing_chunks": len(summary_result.missing_chunk_ids),
                 }
             ),
         )

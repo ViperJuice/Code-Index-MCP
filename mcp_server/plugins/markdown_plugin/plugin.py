@@ -27,6 +27,45 @@ from .section_extractor import SectionExtractor
 logger = logging.getLogger(__name__)
 
 _LIGHTWEIGHT_MARKDOWN_BYTES = 250_000
+_BOUNDED_MARKDOWN_NAME_RE = re.compile(
+    r"^(?:changelog|release[-_ ]?notes?)$", re.IGNORECASE
+)
+_ROADMAP_MARKDOWN_NAME_RE = re.compile(
+    r"^(?:roadmap|phase[-_ ]?plan(?:s)?(?:[-_ ].+)?)$", re.IGNORECASE
+)
+_ANALYSIS_REPORT_MARKDOWN_NAME_RE = re.compile(
+    r"^(?:final[-_ ]?comprehensive[-_ ]?mcp[-_ ]?analysis|.+[-_ ]analysis|.+[-_ ]report)$",
+    re.IGNORECASE,
+)
+_AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE = re.compile(r"^(?:agents)$", re.IGNORECASE)
+_README_MARKDOWN_NAME_RE = re.compile(r"^(?:readme)$", re.IGNORECASE)
+_EXACT_BOUNDED_MARKDOWN_PATHS = {
+    ".claude/commands/execute-lane.md": "claude_execute_lane_path",
+    ".claude/commands/plan-phase.md": "claude_plan_phase_path",
+    "ai_docs/prometheus_overview.md": "ai_docs_prometheus_overview_path",
+    "ai_docs/readme.md": "ai_docs_readme_path",
+    "ai_docs/jedi.md": "ai_docs_jedi_path",
+    "docs/architecture/p2b-known-limits.md": "architecture_p2b_known_limits_path",
+    "docs/api/api-reference.md": "api_reference_path",
+    "docs/validation/ga-closeout-decision.md": "validation_ga_closeout_path",
+    "docs/validation/mre2e-evidence.md": "validation_mre2e_path",
+    "docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md": "benchmark_fullrepo_rerun_path",
+    "docs/benchmarks/production_benchmark.md": "production_benchmark_path",
+    "docs/markdown-table-of-contents.md": "docs_markdown_index_path",
+    "docs/support_matrix.md": "docs_support_matrix_path",
+    "plans/phase-plan-v7-SEMPHASETAIL.md": "mixed_semphasetail_phase_plan_path",
+    "plans/phase-plan-v5-gagov.md": "mixed_gagov_phase_plan_path",
+    "plans/phase-plan-v7-SEMJEDI.md": "mixed_semjedi_phase_plan_path",
+    "plans/phase-plan-v1-p4.md": "mixed_p4_phase_plan_path",
+    "plans/phase-plan-v6-WATCH.md": "historical_watch_phase_plan_path",
+    "plans/phase-plan-v1-p19.md": "historical_p19_phase_plan_path",
+    "plans/phase-plan-v1-p13.md": "historical_p13_phase_plan_path",
+    "plans/phase-plan-v1-p3.md": "historical_p3_phase_plan_path",
+}
+_EXACT_FENCED_CODE_HEADING_GUARD_REASONS = {
+    "ai_docs_prometheus_overview_path",
+    "ai_docs_readme_path",
+}
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -53,6 +92,146 @@ class MarkdownPlugin(BaseDocumentPlugin):
     def _get_supported_extensions(self) -> List[str]:
         """Get list of supported file extensions."""
         return [".md", ".markdown", ".mdown", ".mkd", ".mdx"]
+
+    def _resolve_lightweight_reason(self, path: Path, content: str) -> Optional[str]:
+        """Return the bounded indexing reason when Markdown should skip the heavy path."""
+        normalized_path = path.as_posix().lower()
+
+        if os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true":
+            return "forced_env"
+
+        if len(content.encode("utf-8", errors="ignore")) > _LIGHTWEIGHT_MARKDOWN_BYTES:
+            return "large_document"
+
+        if _BOUNDED_MARKDOWN_NAME_RE.match(path.stem):
+            return "changelog_path"
+
+        for relative_path, exact_reason in _EXACT_BOUNDED_MARKDOWN_PATHS.items():
+            if normalized_path.endswith(relative_path.lower()):
+                return exact_reason
+
+        if _ROADMAP_MARKDOWN_NAME_RE.match(path.stem):
+            return "roadmap_path"
+
+        if _ANALYSIS_REPORT_MARKDOWN_NAME_RE.match(path.stem):
+            return "analysis_report_path"
+
+        if _AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE.match(path.stem):
+            return "agent_instructions_path"
+
+        if _README_MARKDOWN_NAME_RE.match(path.stem):
+            return "readme_path"
+
+        if path.parent.name.lower() == "ai_docs" and path.stem.lower().endswith("_overview"):
+            return "ai_docs_overview_path"
+
+        return None
+
+    def _extract_lightweight_title(self, content: str, path: Path) -> str:
+        """Extract a document title without invoking the full Markdown AST path."""
+        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(content)
+        title = frontmatter.get("title")
+        if isinstance(title, str) and title.strip():
+            return title.strip()
+
+        for line in content_without_frontmatter.splitlines():
+            match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+            if match:
+                return match.group(1).strip()
+
+        return path.stem
+
+    def _extract_lightweight_heading_symbols(
+        self, content: str, path: Path, reason: str
+    ) -> List[Dict[str, Any]]:
+        """Extract heading/document symbols with a bounded line-based scan."""
+        symbols: List[Dict[str, Any]] = []
+        lines = content.splitlines()
+        frontmatter_open = False
+        frontmatter_closed = False
+        in_fenced_code_block = False
+        guard_fenced_code_headings = reason in _EXACT_FENCED_CODE_HEADING_GUARD_REASONS
+        parent_by_level: Dict[int, str] = {}
+
+        for line_number, line in enumerate(lines, start=1):
+            stripped = line.strip()
+            if line_number == 1 and stripped == "---":
+                frontmatter_open = True
+                continue
+            if frontmatter_open and not frontmatter_closed:
+                if stripped == "---":
+                    frontmatter_closed = True
+                continue
+
+            if guard_fenced_code_headings and re.match(r"^(```|~~~)", stripped):
+                in_fenced_code_block = not in_fenced_code_block
+                continue
+            if in_fenced_code_block:
+                continue
+
+            match = re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$", line)
+            if not match:
+                continue
+
+            level = len(match.group(1))
+            heading_text = match.group(2).strip()
+            parent = None
+            for parent_level in range(level - 1, 0, -1):
+                parent = parent_by_level.get(parent_level)
+                if parent:
+                    break
+
+            symbols.append(
+                {
+                    "symbol": heading_text,
+                    "kind": "heading",
+                    "line": line_number,
+                    "span": [line_number, line_number],
+                    "metadata": {"level": level, "parent": parent},
+                }
+            )
+            parent_by_level[level] = heading_text
+            for stale_level in tuple(parent_by_level):
+                if stale_level > level:
+                    del parent_by_level[stale_level]
+
+        return symbols
+
+    def _build_lightweight_index_shard(
+        self, path: Path, content: str, reason: str
+    ) -> IndexShard:
+        """Return a bounded lexical shard that preserves document discoverability."""
+        title = self._extract_lightweight_title(content, path)
+        metadata = {
+            "title": title,
+            "author": None,
+            "created_date": None,
+            "modified_date": None,
+            "document_type": "markdown",
+            "language": "en",
+            "tags": [],
+            "custom": {},
+            "lightweight_index": True,
+            "lightweight_reason": reason,
+        }
+        symbols = [
+            {
+                "symbol": title,
+                "kind": "document",
+                "signature": f"Document: {title or path.name}",
+                "line": 1,
+                "span": [1, max(len(content.splitlines()), 1)],
+                "metadata": metadata,
+            }
+        ]
+        symbols.extend(self._extract_lightweight_heading_symbols(content, path, reason))
+        return {
+            "file": str(path),
+            "symbols": symbols,
+            "language": self.lang,
+            "chunks": [],
+            "metadata": metadata,
+        }
 
     def chunk_document(self, content: str, file_path: Path) -> List[DocumentChunk]:
         """Override to use Markdown-specific chunking."""
@@ -84,33 +263,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
         if content is None:
             content = path.read_text(encoding="utf-8", errors="replace")
 
-        lightweight_mode = (
-            os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true"
-            or len(content.encode("utf-8", errors="ignore")) > _LIGHTWEIGHT_MARKDOWN_BYTES
-        )
-
-        if lightweight_mode:
-            metadata = self.extract_metadata(content, path)
-            symbols = [
-                {
-                    "symbol": metadata.title or path.stem,
-                    "kind": "document",
-                    "signature": f"Document: {metadata.title or path.name}",
-                    "line": 1,
-                    "span": [1, len(content.splitlines())],
-                    "metadata": {
-                        **metadata.__dict__,
-                        "lightweight_index": True,
-                    },
-                }
-            ]
-            return {
-                "file": str(path),
-                "symbols": symbols,
-                "language": self.lang,
-                "chunks": [],
-                "metadata": metadata.__dict__,
-            }
+        lightweight_reason = self._resolve_lightweight_reason(path, content)
+        if lightweight_reason is not None:
+            return self._build_lightweight_index_shard(path, content, lightweight_reason)
 
         # Extract metadata
         metadata = self.extract_metadata(content, path)

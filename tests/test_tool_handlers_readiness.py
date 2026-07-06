@@ -6,11 +6,14 @@ import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from mcp_server.health.repository_readiness import (
     RepositoryReadiness,
     RepositoryReadinessState,
+    SemanticReadiness,
+    SemanticReadinessState,
 )
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
@@ -45,6 +48,14 @@ class FakeResolver:
     def resolve(self, path: Path):
         self.resolve_called = True
         return None
+
+
+def _semantic_not_ready() -> SemanticReadiness:
+    return SemanticReadiness(
+        state=SemanticReadinessState.SUMMARIES_MISSING,
+        profile_id="oss_high",
+        remediation="Run semantic summary/vector generation for the current profile before semantic queries.",
+    )
 
 
 def test_search_code_exposes_unsupported_worktree_without_dispatch(tmp_path, monkeypatch):
@@ -158,3 +169,549 @@ def test_get_status_repository_rows_include_readiness(tmp_path):
     assert repos[0]["readiness"] == "index_empty"
     assert repos[0]["ready"] is False
     assert repos[0]["readiness_code"] == "index_empty"
+    assert repos[0]["semantic_readiness"] == "enrichment_unavailable"
+    assert repos[0]["semantic_ready"] is False
+
+
+def test_search_code_semantic_not_ready_returns_semantic_metadata(tmp_path, monkeypatch):
+    import mcp_server.health.repository_readiness as readiness_module
+    from mcp_server.cli.tool_handlers import handle_search_code
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    dispatcher = MagicMock()
+    ctx = MagicMock()
+    ctx.registry_entry = SimpleNamespace(path=worktree)
+    ctx.sqlite_store = MagicMock()
+    ctx.sqlite_store.get_semantic_readiness_evidence.return_value = {
+        "profile_id": "oss_high",
+        "collection": "code_index__oss_high__v1",
+        "total_chunks": 1,
+        "summary_count": 0,
+        "missing_summaries": 1,
+        "vector_link_count": 0,
+        "missing_vectors": 1,
+        "matching_collection_links": 0,
+        "collection_mismatches": 0,
+    }
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+    monkeypatch.setattr(
+        readiness_module,
+        "_current_semantic_profile",
+        lambda: MagicMock(
+            profile_id="oss_high",
+            compatibility_fingerprint="fingerprint-1",
+            vector_dimension=4096,
+            build_metadata={"collection_name": "code_index__oss_high__v1"},
+        ),
+    )
+
+    result = _run(
+        handle_search_code(
+            arguments={"query": "semantic intent", "repository": str(worktree), "semantic": True},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "semantic_not_ready"
+    assert data["semantic_requested"] is True
+    assert data["semantic_source"] == "semantic"
+    assert data["semantic_profile_id"] == "oss_high"
+    assert data["semantic_collection_name"] == "code_index__oss_high__v1"
+    assert data["semantic_fallback_status"] == "refused_not_ready"
+    assert data["semantic_readiness"]["state"] == "summaries_missing"
+    dispatcher.search.assert_not_called()
+
+
+def test_search_code_semantic_not_ready_preserves_state_specific_metadata(
+    tmp_path, monkeypatch
+):
+    import mcp_server.health.repository_readiness as readiness_module
+    from mcp_server.cli.tool_handlers import handle_search_code
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+
+    states = {
+        "vectors_missing": {
+            "state": "vectors_missing",
+            "vector_link_count": 0,
+            "missing_vectors": 1,
+            "collection_mismatches": 0,
+        },
+        "profile_mismatch": {
+            "state": "profile_mismatch",
+            "vector_link_count": 1,
+            "missing_vectors": 0,
+            "collection_mismatches": 1,
+        },
+        "vector_dimension_mismatch": {
+            "state": "vector_dimension_mismatch",
+            "vector_link_count": 1,
+            "missing_vectors": 0,
+            "collection_mismatches": 0,
+            "discovered_dimension": 1024,
+        },
+    }
+
+    monkeypatch.setattr(
+        readiness_module,
+        "_current_semantic_profile",
+        lambda: MagicMock(
+            profile_id="oss_high",
+            compatibility_fingerprint="fingerprint-1",
+            vector_dimension=4096,
+            build_metadata={"collection_name": "code_index__oss_high__v1"},
+        ),
+    )
+
+    for expected_state, evidence_overrides in states.items():
+        dispatcher = MagicMock()
+        ctx = MagicMock()
+        ctx.registry_entry = SimpleNamespace(path=worktree)
+        ctx.sqlite_store = MagicMock()
+        ctx.sqlite_store.get_semantic_readiness_evidence.return_value = {
+            "profile_id": "oss_high",
+            "collection": "code_index__oss_high__v1",
+            "total_chunks": 1,
+            "summary_count": 1,
+            "missing_summaries": 0,
+            "vector_link_count": evidence_overrides.get("vector_link_count", 1),
+            "missing_vectors": evidence_overrides.get("missing_vectors", 0),
+            "matching_collection_links": 1,
+            "collection_mismatches": evidence_overrides.get("collection_mismatches", 0),
+        }
+        resolver = FakeResolver(
+            RepositoryReadiness(
+                state=RepositoryReadinessState.READY,
+                repository_id="repo-1",
+                repository_name="repo",
+                requested_path=str(worktree),
+            )
+        )
+        resolver.resolve = lambda _path, ctx=ctx: ctx
+
+        metadata = {
+            "semantic_profile": "oss_high",
+            "semantic_profiles": {
+                "oss_high": {
+                    "compatibility_fingerprint": "fingerprint-1",
+                    "collection_name": "code_index__oss_high__v1",
+                    "model_dimension": evidence_overrides.get("discovered_dimension", 4096),
+                }
+            },
+        }
+        (worktree / ".index_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+        result = _run(
+            handle_search_code(
+                arguments={
+                    "query": "semantic intent",
+                    "repository": str(worktree),
+                    "semantic": True,
+                },
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        data = _parsed(result)
+        assert data["code"] == "semantic_not_ready"
+        assert data["semantic_readiness"]["state"] == expected_state
+        assert data["semantic_profile_id"] == "oss_high"
+        assert data["semantic_collection_name"] == "code_index__oss_high__v1"
+        dispatcher.search.assert_not_called()
+
+
+def test_search_code_semantic_ready_returns_metadata_envelope(tmp_path, monkeypatch):
+    import mcp_server.health.repository_readiness as readiness_module
+    from mcp_server.cli.tool_handlers import handle_search_code
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    dispatcher = MagicMock()
+    dispatcher.search.return_value = [
+        {
+            "file": "mcp_server/utils/semantic_indexer.py",
+            "line": 42,
+            "snippet": "class SemanticIndexer:",
+            "semantic_source": "semantic",
+            "semantic_profile_id": "oss_high",
+            "semantic_collection_name": "code_index__oss_high__v1",
+        }
+    ]
+    ctx = MagicMock()
+    ctx.registry_entry = SimpleNamespace(path=worktree)
+    ctx.sqlite_store = MagicMock()
+    ctx.sqlite_store.get_semantic_readiness_evidence.return_value = {
+        "profile_id": "oss_high",
+        "collection": "code_index__oss_high__v1",
+        "total_chunks": 1,
+        "summary_count": 1,
+        "missing_summaries": 0,
+        "vector_link_count": 1,
+        "missing_vectors": 0,
+        "matching_collection_links": 1,
+        "collection_mismatches": 0,
+    }
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+    monkeypatch.setattr(
+        readiness_module,
+        "_current_semantic_profile",
+        lambda: MagicMock(
+            profile_id="oss_high",
+            compatibility_fingerprint="fingerprint-1",
+            vector_dimension=4096,
+            build_metadata={"collection_name": "code_index__oss_high__v1"},
+        ),
+    )
+    (worktree / ".index_metadata.json").write_text(
+        json.dumps(
+            {
+                "semantic_profile": "oss_high",
+                "semantic_profiles": {
+                    "oss_high": {
+                        "compatibility_fingerprint": "fingerprint-1",
+                        "collection_name": "code_index__oss_high__v1",
+                        "model_dimension": 4096,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run(
+        handle_search_code(
+            arguments={"query": "class SemanticIndexer", "repository": str(worktree), "semantic": True},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["semantic_requested"] is True
+    assert data["semantic_source"] == "semantic"
+    assert data["semantic_profile_id"] == "oss_high"
+    assert data["semantic_collection_name"] == "code_index__oss_high__v1"
+    assert data["semantic_fallback_status"] == "not_attempted"
+    assert data["results"][0]["semantic_source"] == "semantic"
+
+
+def test_search_code_semantic_runtime_failure_returns_explicit_failure(tmp_path, monkeypatch):
+    import mcp_server.health.repository_readiness as readiness_module
+    from mcp_server.cli.tool_handlers import handle_search_code
+    from mcp_server.dispatcher.dispatcher_enhanced import SemanticSearchFailure
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    dispatcher = MagicMock()
+    dispatcher.search.side_effect = SemanticSearchFailure(
+        "semantic runtime boom",
+        profile_id="oss_high",
+        collection_name="code_index__oss_high__v1",
+    )
+    ctx = MagicMock()
+    ctx.registry_entry = SimpleNamespace(path=worktree)
+    ctx.sqlite_store = MagicMock()
+    ctx.sqlite_store.get_semantic_readiness_evidence.return_value = {
+        "profile_id": "oss_high",
+        "collection": "code_index__oss_high__v1",
+        "total_chunks": 1,
+        "summary_count": 1,
+        "missing_summaries": 0,
+        "vector_link_count": 1,
+        "missing_vectors": 0,
+        "matching_collection_links": 1,
+        "collection_mismatches": 0,
+    }
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+    monkeypatch.setattr(
+        readiness_module,
+        "_current_semantic_profile",
+        lambda: MagicMock(
+            profile_id="oss_high",
+            compatibility_fingerprint="fingerprint-1",
+            vector_dimension=4096,
+            build_metadata={"collection_name": "code_index__oss_high__v1"},
+        ),
+    )
+    (worktree / ".index_metadata.json").write_text(
+        json.dumps(
+            {
+                "semantic_profile": "oss_high",
+                "semantic_profiles": {
+                    "oss_high": {
+                        "compatibility_fingerprint": "fingerprint-1",
+                        "collection_name": "code_index__oss_high__v1",
+                        "model_dimension": 4096,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run(
+        handle_search_code(
+            arguments={"query": "class SemanticIndexer", "repository": str(worktree), "semantic": True},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "semantic_search_failed"
+    assert data["semantic_requested"] is True
+    assert data["semantic_fallback_status"] == "failed_runtime"
+    assert data["semantic_profile_id"] == "oss_high"
+    assert data["semantic_collection_name"] == "code_index__oss_high__v1"
+
+
+def test_search_code_explicit_lexical_request_keeps_legacy_shape(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_search_code
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    dispatcher = MagicMock()
+    dispatcher.search.return_value = [
+        {
+            "file": "mcp_server/utils/semantic_indexer.py",
+            "line": 42,
+            "snippet": "class SemanticIndexer:",
+        }
+    ]
+    ctx = MagicMock()
+    ctx.registry_entry = SimpleNamespace(path=worktree)
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_search_code(
+            arguments={"query": "SemanticIndexer", "repository": str(worktree), "semantic": False},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert isinstance(data, list)
+    assert "semantic_requested" not in data[0]
+
+
+def test_reindex_reports_additive_semantic_stage_metadata(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_reindex
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 1,
+        "ignored_files": 0,
+        "failed_files": 0,
+        "total_files": 1,
+        "by_language": {"python": 1},
+        "summaries_written": 1,
+        "summary_chunks_attempted": 2,
+        "summary_missing_chunks": 1,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 1,
+        "semantic_stage": "blocked_missing_summaries",
+        "semantic_error": "Missing authoritative summaries blocked strict semantic indexing",
+    }
+    ctx = MagicMock()
+    ctx.workspace_root = worktree
+    ctx.sqlite_store = MagicMock()
+    ctx.sqlite_store.db_path = str(tmp_path / "index.db")
+    ctx.sqlite_store.rebuild_fts_code.return_value = 1
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(worktree)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["summaries_written"] == 1
+    assert data["summary_chunks_attempted"] == 2
+    assert data["summary_missing_chunks"] == 1
+    assert data["semantic_blocked"] == 1
+    assert data["semantic_stage"] == "blocked_missing_summaries"
+
+
+def test_reindex_single_file_success_returns_object_payload(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_reindex
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    source_file = worktree / "demo.py"
+    source_file.write_text("def demo():\n    return 1\n", encoding="utf-8")
+
+    dispatcher = MagicMock()
+    ctx = MagicMock()
+    ctx.workspace_root = worktree
+    ctx.sqlite_store = MagicMock()
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(source_file)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["path"] == str(source_file)
+    assert data["mode"] == "file"
+    assert data["indexed_files"] == 1
+    assert data["mutation_performed"] is True
+    assert "Reindexed file:" in data["message"]
+
+
+def test_reindex_single_file_failure_returns_structured_error(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_reindex
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    source_file = worktree / "broken.py"
+    source_file.write_text("def broken():\n    return 1\n", encoding="utf-8")
+
+    dispatcher = MagicMock()
+    dispatcher.index_file.side_effect = RuntimeError("boom")
+    ctx = MagicMock()
+    ctx.workspace_root = worktree
+    ctx.sqlite_store = MagicMock()
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(source_file)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["error"] == "Reindex failed"
+    assert data["code"] == "reindex_failed"
+    assert data["path"] == str(source_file)
+    assert data["mutation_performed"] is False
+    assert data["details"] == "boom"
+
+
+def test_write_summaries_remains_summary_only(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_write_summaries
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    ctx = MagicMock()
+    ctx.sqlite_store = MagicMock(db_path=str(tmp_path / "index.db"))
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    class FakeWriter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def process_scope(self, limit=500):
+            del limit
+            return SimpleNamespace(summaries_written=3, chunks_attempted=4, missing_chunk_ids=["c4"])
+
+    monkeypatch.setattr("mcp_server.indexing.summarization.ComprehensiveChunkWriter", FakeWriter)
+    lazy_summarizer = MagicMock()
+    lazy_summarizer.can_summarize.return_value = True
+    lazy_summarizer._get_model_name.return_value = "chat"
+
+    result = _run(
+        handle_write_summaries(
+            arguments={"repository": str(worktree), "limit": 4},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            lazy_summarizer=lazy_summarizer,
+            current_session=None,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["chunks_summarized"] == 3
+    assert data["semantic_vectors_written"] is False
+    assert data["summary_missing_chunks"] == 1

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
+ACTIVE_STABLE_TAG = "v1.3.0"
 
 GA_CHECKLIST = REPO / "docs" / "validation" / "ga-readiness-checklist.md"
 GA_GOVERNANCE = REPO / "docs" / "validation" / "ga-governance-evidence.md"
@@ -50,7 +51,7 @@ def test_rc8_contract_surfaces_are_frozen():
         assert "1.2.0-rc8" in text or "v1.2.0-rc8" in text, path
 
     workflow = _read(RELEASE_WORKFLOW)
-    assert "default: 'v1.2.0'" in workflow
+    assert f"default: '{ACTIVE_STABLE_TAG}'" in workflow
     assert "release_type=custom" in "\n".join(
         [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
     )

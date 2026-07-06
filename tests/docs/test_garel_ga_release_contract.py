@@ -105,7 +105,7 @@ def test_ship_decision_defers_release_evidence_to_gadisp_and_keeps_public_surfac
         assert expected in combined
     for path in (README, GETTING_STARTED, MCP_CONFIGURATION, DOCKER_GUIDE, SUPPORT_MATRIX):
         text = _read(path)
-        assert "1.2.0" in text, f"{path.relative_to(REPO)} missing stable surface version"
+        assert "1.3.0" in text, f"{path.relative_to(REPO)} missing stable surface version"
 
 
 def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
