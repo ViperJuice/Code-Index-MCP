@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.errors import TransientArtifactError
 from ..core.path_resolver import PathResolver
+from ..indexing.friction import extract_friction_markers
 from ..indexing.github_issues import issue_history_dedupe_key
 from ..indexing.source_metadata import (
     HISTORY_SOURCE_TYPE,
@@ -23,7 +24,6 @@ from ..indexing.source_metadata import (
     extract_matching_source_metadata,
     merge_source_metadata,
 )
-from ..indexing.friction import extract_friction_markers
 from .connection_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
@@ -1403,11 +1403,9 @@ class SQLiteStore:
                           COALESCE(f.path, f.relative_path, CAST(c.file_id AS TEXT)) AS file_path
                    FROM code_chunks c
                    JOIN files f ON c.file_id = f.id
-                   WHERE c.metadata IS NOT NULL
-                     AND c.metadata != ''
+                   WHERE c.metadata LIKE '%"source_metadata"%'
                    ORDER BY f.path, c.line_start
-                   LIMIT ?""",
-                (max(limit * 10, limit),),
+                   """,
             )
             rows = cursor.fetchall()
 
@@ -1525,7 +1523,9 @@ class SQLiteStore:
                 if isinstance(row["content"], str) and row["content"].strip()
             )
             conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
-            conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id))
+            conn.execute(
+                "INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id)
+            )
 
     # Reference operations
     def store_reference(
@@ -2657,7 +2657,9 @@ class SQLiteStore:
             vector_chunk_ids: List[str] = list(source_chunk_ids)
             if profile_id:
                 if source_chunk_ids:
-                    like_clauses = " OR ".join(["chunk_id = ? OR chunk_id LIKE ?"] * len(source_chunk_ids))
+                    like_clauses = " OR ".join(
+                        ["chunk_id = ? OR chunk_id LIKE ?"] * len(source_chunk_ids)
+                    )
                     params: List[Any] = [profile_id]
                     for chunk_id in source_chunk_ids:
                         params.extend([chunk_id, f"{chunk_id}:part:%"])
@@ -2687,8 +2689,7 @@ class SQLiteStore:
             row_profile_id = row[2]
             row_prompt_fingerprint = row[3]
             matches_profile = (
-                expected_summary_profile_id is None
-                or row_profile_id == expected_summary_profile_id
+                expected_summary_profile_id is None or row_profile_id == expected_summary_profile_id
             )
             matches_prompt = (
                 expected_prompt_fingerprint is None
@@ -2752,14 +2753,10 @@ class SQLiteStore:
             summary_count = int(
                 conn.execute("SELECT COUNT(DISTINCT chunk_hash) FROM chunk_summaries").fetchone()[0]
             )
-            missing_summaries = int(
-                conn.execute(
-                    """SELECT COUNT(*)
+            missing_summaries = int(conn.execute("""SELECT COUNT(*)
                        FROM code_chunks c
                        LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
-                       WHERE cs.chunk_hash IS NULL"""
-                ).fetchone()[0]
-            )
+                       WHERE cs.chunk_hash IS NULL""").fetchone()[0])
 
             vector_link_count = int(
                 conn.execute(

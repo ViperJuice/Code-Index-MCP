@@ -1,7 +1,7 @@
 # Code-Index-MCP Support Matrix
 
 This matrix is the canonical GASUPPORT support statement for the prepared
-stable surface `1.2.0`. MCP STDIO is the primary LLM surface, FastAPI is a
+stable surface `1.3.0`. MCP STDIO is the primary LLM surface, FastAPI is a
 secondary admin surface, and the GA-hardening roadmap remains responsible for
 separating stable release prep from the downstream `GADISP` dispatch evidence.
 
@@ -37,7 +37,7 @@ The client/transport compatibility reducer for the current MCP surface is
 
 ## Claim tiers
 
-- **Stable prep**: `v1.2.0` is the prepared stable package and container
+- **Stable prep**: `v1.3.0` is the prepared stable package and container
   contract. It is the repo-owned surface that downstream `GADISP` dispatches
   and verifies.
 - **Beta**: Multi-repo support, STDIO, and secondary tool readiness remain beta
@@ -132,8 +132,8 @@ topology, or install-surface support expansion.
 | Python client (`mcp_server.client`, `IndexItClient`) | beta | Supported local programmatic API | `mcp_server/client.py`, `mcp_server/client_types.py`, PYCLIENT tests/docs | Local-only API for `search_code`, `symbol_lookup`, `reindex`, and `get_status`; it shares readiness-aware search behavior with MCP `search_code` and returns typed `index_unavailable` results instead of dispatching stale indexes |
 | FastAPI admin and diagnostics surface | beta | Secondary/admin surface | `README.md`, `docs/GETTING_STARTED.md`, `docs/MCP_CONFIGURATION.md` | Do not treat FastAPI as the primary LLM interface |
 | Native source install via `uv sync --locked` | beta | Canonical local development and operator path | `pyproject.toml`, `uv.lock`, install docs | This is the preferred local install path while the release remains pre-GA |
-| Python distribution name on PyPI (`index-it-mcp`) | beta | Canonical distribution name; live install parity currently deferred to the identity note | package naming note, install docs, `docs/status/public-package-identity.md` | Use source install or a locally built wheel until live PyPI parity is re-proven for the prepared `1.2.0` surface |
-| Docker image `ghcr.io/viperjuice/code-index-mcp:v1.2.0` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
+| Python distribution name on PyPI (`index-it-mcp`) | beta | Canonical distribution name; live install parity currently deferred to the identity note | package naming note, install docs, `docs/status/public-package-identity.md` | Use source install or a locally built wheel until live PyPI parity is re-proven for the prepared `1.3.0` surface |
+| Docker image `ghcr.io/viperjuice/code-index-mcp:v1.3.0` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
 | Semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental | Optional extra and provider-dependent | extras docs, config env vars, support-fact notes | Requires semantic readiness `ready` for the active profile; ready `semantic: true` responses expose semantic source/profile/collection metadata, while `summaries_missing`, `vectors_missing`, `profile_mismatch`, or `semantic_stale` return explicit semantic refusal or failure instead of lexical fallback |
 | Reranking (`uv sync --locked --extra rerank` plus provider/model config) | experimental | Optional extra and provider-dependent | extras docs and support-fact notes | Treat as opt-in ranking improvement, not baseline query behavior |
 | Default sandboxed plugin execution | beta | Default security posture | `sandbox_supported`, `activation_mode`, sandbox docs | Coverage varies by language and is authoritative through `plugin_availability` |

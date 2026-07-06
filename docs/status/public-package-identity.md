@@ -5,7 +5,7 @@ Check date: 2026-07-06 UTC
 ## Scope
 
 This note freezes the repo-owned public identity contract for PUBNAME.
-It is metadata-only evidence for the prepared `1.2.0` surface. It does not
+It is metadata-only evidence for the prepared `1.3.0` surface. It does not
 claim a new package or container publication.
 
 ## Metadata Probes
@@ -41,7 +41,7 @@ Observed live facts:
 
 | Package | Normalized name | Latest visible version on 2026-07-06 | Project/source URLs | Decision input |
 | --- | --- | --- | --- | --- |
-| `index-it-mcp` | `index-it-mcp` | `2.14.9` | `Homepage`, `Repository`, and `Documentation` point to `https://github.com/ViperJuice/Code-Index-MCP` | The canonical distribution name matches this repo, but live PyPI parity for the repo-owned `1.2.0` surface is not proven. |
+| `index-it-mcp` | `index-it-mcp` | `2.14.9` | `Homepage`, `Repository`, and `Documentation` point to `https://github.com/ViperJuice/Code-Index-MCP` | The canonical distribution name matches this repo, but live PyPI parity for the repo-owned `1.3.0` surface is not proven. |
 | `code-index-mcp` | `code-index-mcp` | `2.17.0` | `Homepage` points to `https://github.com/johnhuang316/code-index-mcp` | Treat as an external or colliding package name, not this repo's install target. |
 
 ## Proof Status
@@ -49,7 +49,7 @@ Observed live facts:
 - Owner/source URL proof for `index-it-mcp`: partial. The live project URLs
   point at this repository and the author metadata is `Jenner Torrence`, but
   the latest visible live version is `2.14.9` rather than this repo's prepared
-  `1.2.0` surface.
+  `1.3.0` surface.
 - Version parity proof for `index-it-mcp`: not proven. PUBNAME therefore keeps
   public install docs on source and local-wheel proof.
 - Owner/source proof for `code-index-mcp`: negative for this repo. The live
@@ -91,7 +91,7 @@ Removed legacy alias:
 ## Public Docs Posture
 
 Until a later release-evidence phase re-proves live parity for the prepared
-`1.2.0` surface, public docs should:
+`1.3.0` surface, public docs should:
 
 - use `index-it-mcp` as the canonical Python distribution name;
 - avoid `pip install code-index-mcp` or any other `code-index-mcp` package

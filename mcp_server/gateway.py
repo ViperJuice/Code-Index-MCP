@@ -15,14 +15,14 @@ from .cache import (
     QueryResultCache,
     QueryType,
 )
+from .cli.index_management import _get_profile_collection_name
+from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .client import (
     ClientValidationError,
     build_search_options,
     execute_search_service,
     search_result_for_gateway,
 )
-from .cli.index_management import _get_profile_collection_name
-from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .config.environment import is_production as _is_production
 from .config.settings import get_settings
 from .config.validation import (
@@ -35,10 +35,10 @@ from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
+from .indexing.source_metadata import normalize_friction_category
 from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
-from .indexing.source_metadata import normalize_friction_category
 from .plugin_base import SearchResult, SymbolDef
 from .plugin_system import PluginManager
 from .security import (
@@ -1438,19 +1438,25 @@ async def search(
         if file_filter:
             filters["file_filter"] = file_filter
 
-        # Try cache first if query cache is available
-        cache_key_parts = [q, effective_mode, str(limit)]
-        if filters:
-            cache_key_parts.extend([f"{k}:{v}" for k, v in sorted(filters.items())])
+        cache_params = {
+            "q": q,
+            "semantic": effective_mode == "semantic",
+            "limit": limit,
+            "language": language,
+            "file_filter": file_filter,
+            "source_type": options.source_type.value if options.source_type else None,
+            "friction_categories": options.friction_categories,
+            "history_labels": options.history_labels,
+            "history_repos": options.history_repos,
+            "include_source_metadata": options.include_source_metadata,
+        }
 
         cached_results = None
         if query_cache and query_cache.config.enabled:
             query_type = (
                 QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             )
-            cached_results = await query_cache.get_cached_result(
-                query_type, q=q, semantic=(effective_mode == "semantic"), limit=limit
-            )
+            cached_results = await query_cache.get_cached_result(query_type, **cache_params)
 
         if cached_results is not None:
             cached_results = [
@@ -1624,9 +1630,7 @@ async def search(
             await query_cache.cache_result(
                 query_type,
                 results,
-                q=q,
-                semantic=(effective_mode == "semantic"),
-                limit=limit,
+                **cache_params,
             )
 
         # Record business metrics

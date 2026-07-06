@@ -289,9 +289,7 @@ class TestSearchEndpoint:
                 ),
             ),
         ):
-            response = test_client_with_dispatcher.get(
-                "/search?q=test&semantic=true&mode=semantic"
-            )
+            response = test_client_with_dispatcher.get("/search?q=test&semantic=true&mode=semantic")
 
         assert response.status_code == 200
         payload = response.json()
@@ -348,6 +346,57 @@ class TestSearchEndpoint:
         assert options.source_type is not None and options.source_type.value == "friction"
         assert options.friction_categories == ("todo",)
         assert options.include_source_metadata is True
+
+    def test_search_cache_key_includes_source_filters(
+        self, test_client_with_dispatcher, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+
+        class FakeConfig:
+            enabled = True
+
+        class FakeQueryCache:
+            config = FakeConfig()
+
+            def __init__(self):
+                self.get_calls = []
+                self.cache_calls = []
+
+            async def get_cached_result(self, query_type, **params):
+                self.get_calls.append((query_type, params))
+                return None
+
+            async def cache_result(self, query_type, result, **params):
+                self.cache_calls.append((query_type, params))
+                return True
+
+        fake_cache = FakeQueryCache()
+        monkeypatch.setattr(gateway, "query_cache", fake_cache)
+
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(
+                query="test",
+                results=(
+                    ClientSearchMatch(
+                        file="/repo/file.py",
+                        line=2,
+                        snippet="TODO",
+                    ),
+                ),
+            ),
+        ):
+            response = test_client_with_dispatcher.get(
+                "/search?q=test&source_type=friction&friction_categories=todo&include_source_metadata=true"
+            )
+
+        assert response.status_code == 200
+        for _, params in fake_cache.get_calls + fake_cache.cache_calls:
+            assert params["source_type"] == "friction"
+            assert params["friction_categories"] == ("todo",)
+            assert params["history_labels"] == ()
+            assert params["history_repos"] == ()
+            assert params["include_source_metadata"] is True
 
     def test_search_accepts_history_query_params(self, test_client_with_dispatcher):
         with patch(

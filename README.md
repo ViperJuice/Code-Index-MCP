@@ -2,14 +2,14 @@
 
 Modular, extensible local-first code indexer designed to enhance Claude Code and other LLMs with deep code understanding capabilities. Built on the Model Context Protocol (MCP) for seamless integration with AI assistants.
 
-> **Stable-surface prep status**: This guide targets the repo-owned `1.2.0`
+> **Stable-surface prep status**: This guide targets the repo-owned `1.3.0`
 > identity freeze. MCP STDIO remains the primary LLM surface and FastAPI
 > remains a secondary admin surface, but the July 6, 2026 PyPI check recorded
 > live `index-it-mcp` at `2.14.9`, so this guide uses source and local-wheel
-> proof instead of claiming live PyPI parity for the prepared `1.2.0` surface.
+> proof instead of claiming live PyPI parity for the prepared `1.3.0` surface.
 
 ## Project Status
-**Version**: 1.2.0 (repo-owned prepared surface; live PyPI parity not re-proven on July 6, 2026)
+**Version**: 1.3.0 (repo-owned prepared surface; live PyPI parity not re-proven on July 6, 2026)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -154,7 +154,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.0
 ```
 
 #### Option 2: AI-Powered Search
@@ -163,7 +163,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.3.0
 ```
 
 ### 💻 Environment-Specific Setup
@@ -174,7 +174,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.0
 ```
 
 #### 🍎 macOS
@@ -251,7 +251,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
       ]
     }
   }
@@ -414,12 +414,12 @@ uv run mcp-index --version
 ```bash
 # From the repo root
 uv run --extra dev python -m build --wheel
-python -m pip install dist/index_it_mcp-1.2.0-py3-none-any.whl
+python -m pip install dist/index_it_mcp-1.3.0-py3-none-any.whl
 index-it-mcp --version
 ```
 
 The canonical Python distribution name remains `index-it-mcp`, but the live
-PyPI package currently does not prove this repo's prepared `1.2.0` surface.
+PyPI package currently does not prove this repo's prepared `1.3.0` surface.
 Use the local wheel or source install above until a later release-evidence
 phase re-proves live package parity.
 
@@ -1288,10 +1288,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0
+python scripts/create-release.py --version 1.3.0
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0 --publish
+python scripts/create-release.py --version 1.3.0 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1361,7 +1361,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0 stable surface prepared; downstream GADISP dispatch still pending
+**Current Status**: 1.3.0 stable surface prepared; downstream GADISP dispatch still pending
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Verified official Python SDK compatibility over STDIO; see `docs/status/MCP_COMPATIBILITY_EVALUATION.md` for named client posture

@@ -43,7 +43,9 @@ def _get_present_set() -> set[str]:
     present = set()
     for d in SWEEP_DIRS:
         for f in d.glob("*.md"):
-            present.add(str(f.relative_to(REPO_ROOT)))
+            lines = f.read_text(encoding="utf-8").splitlines()
+            if lines and BANNER_REGEX.match(lines[0]):
+                present.add(str(f.relative_to(REPO_ROOT)))
     return present
 
 

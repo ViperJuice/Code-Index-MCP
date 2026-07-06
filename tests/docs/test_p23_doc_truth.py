@@ -118,7 +118,7 @@ def test_docker_docs_use_current_image_package_only():
 def test_active_release_docs_name_stable_surface_and_support_status():
     for path in RELEASE_SURFACE_DOCS:
         text = _read(path).lower()
-        assert "1.2.0" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0"
+        assert "1.3.0" in text, f"{path.relative_to(REPO_ROOT)} missing 1.3.0"
         assert ("stable" in text) or (
             "ga" in text
         ), f"{path.relative_to(REPO_ROOT)} missing stable/ga status language"
