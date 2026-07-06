@@ -52,6 +52,12 @@ python -m pip install dist/index_it_mcp-1.2.0-py3-none-any.whl
 index-it-mcp --version
 ```
 
+If a Windows checkout still hits path-length limits after you use the cleaned
+source tree, note that tracked repo paths are capped by the 160-character tracked-path
+limit and the release audit also checks wheel member depth. Use
+`git config --global core.longpaths true` only as a fallback for unusually deep
+clone locations or third-party tooling.
+
 ## Quick Start
 
 ### 1. Pull Your Project Baseline Index

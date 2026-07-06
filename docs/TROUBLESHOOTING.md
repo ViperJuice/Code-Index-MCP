@@ -221,6 +221,17 @@ export MCP_DEBUG=1
 mcp-index index
 ```
 
+### 9. Windows Path-Length Fallback
+
+The tracked repository tree is constrained to the 160-character tracked-path limit,
+and the release audit also checks wheel member depth so install paths do not
+regress silently.
+
+If a Windows clone still fails because your checkout root or another tool adds
+extra path depth, shorten the clone location first. Use
+`git config --global core.longpaths true` only as a fallback after the repo
+tree is clean.
+
 ## Environment Variables Reference
 
 | Variable | Default | Description |

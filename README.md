@@ -111,10 +111,8 @@ Key directories:
 - `docs/` - Documentation and guides
 - `architecture/` - System design and diagrams
 - `docker/` - Docker configurations and compose files
-- `data/` - Database files and indexes
-- `logs/` - Application and test logs
-- `reports/` - Generated performance reports and analysis
-- `analysis_archive/` - Historical analysis and archived research
+- `mcp-index-kit/` - Shared MCP indexing toolkit and examples
+- `docs/status/` - Durable evidence notes kept under version control
 
 ## 🛠️ Language Support
 
@@ -217,6 +215,15 @@ cp .mcp.json.templates/native.json .mcp.json
 docker-compose -f docker/compose/development/docker-compose.mcp-sidecar.yml up -d
 cp .mcp.json.templates/docker-sidecar.json .mcp.json
 ```
+
+### Windows Path-Length Fallback
+
+Tracked repository paths are kept at or below the 160-character tracked-path
+limit, and the REPOCLEAN audit also checks wheel-content path depth for
+installed `site-packages` members. If a Windows checkout still hits a
+path-length edge because of a deeply nested clone location or third-party
+tooling, use `git config --global core.longpaths true` as a fallback rather
+than as the primary mitigation.
 
 ### 📋 MCP.json Configuration Examples
 
