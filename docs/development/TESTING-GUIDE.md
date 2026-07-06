@@ -1,5 +1,25 @@
 # Code-Index-MCP Testing Guide
 
+## LOCALCI Command Contract
+
+Use the repo-local `make agent-*` surface as the default validation interface:
+
+- `make agent-doctor` reports local prerequisites plus whether Dagger or
+  `AGENT_REMOTE_HOST` offload is configured.
+- `make agent-fast` is the cheap and offline by default gate: lock sanity,
+  static checks, and focused docs/package truth.
+- `make agent-gate` is the pre-PR gate and matches the substantive suite the
+  protected GitHub Actions posture consumes.
+- `make agent-full` extends `agent-gate` with heavier validation such as
+  container smoke.
+- `make agent-fix` runs deterministic local formatting fixes only.
+- `make agent-affected` routes docs-only changes to `agent-fast` and routes
+  source, workflow, package, lockfile, or unknown changes to `agent-gate`.
+
+Hosted GitHub Actions are minimal orchestration or protected evidence. Heavy
+validation should stay local, use Dagger explicitly, or run on an owned
+`AGENT_REMOTE_HOST`; silent hosted fallback is not allowed.
+
 This guide provides comprehensive instructions for testing the Code-Index-MCP project, covering unit tests, integration tests, plugin testing, performance testing, and test coverage.
 
 ## Table of Contents
@@ -64,7 +84,7 @@ tests/
 
 ```bash
 # Install test dependencies
-uv sync --locked dev extra
+uv sync --locked --extra dev
 
 # Or install with development extras
 pip install -e ".[test]"

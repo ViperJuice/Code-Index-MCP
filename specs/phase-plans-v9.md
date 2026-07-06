@@ -362,6 +362,10 @@ baseline.
 This phase owns #43. It should not spend hosted CI minutes merely to discover
 that coverage is below threshold. It must reconcile existing coverage config
 before adding a new 80 percent gate.
+`docs/status/localci-validation-contract.md` is the frozen LOCALCI evidence
+input: COVERAGE may extend `agent-full` or manual protected evidence, but it
+must not re-introduce retired/manual-only workflow families as pull-request
+gates or recreate a second hosted validation vocabulary beside `make agent-*`.
 
 **Non-goals**
 

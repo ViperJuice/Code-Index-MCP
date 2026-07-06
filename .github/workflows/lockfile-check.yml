@@ -1,21 +1,15 @@
+# localci-workflow-classification: retired
 name: lockfile-check
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  alpha-dependency-sync:
-    name: Alpha Gate - Dependency Sync
+  retired-lockfile-check:
+    name: Retired - Lockfile Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Verify dependency lock and sync
-        run: make alpha-dependency-sync
+      - name: Explain retirement
+        run: |
+          echo "This workflow was retired by LOCALCI."
+          echo "Use make agent-fast or make agent-gate instead of a separate hosted lockfile gate."

@@ -1,3 +1,4 @@
+# localci-workflow-classification: manual-only
 name: Release Automation
 
 on:
@@ -88,8 +89,8 @@ jobs:
 
       - name: Run alpha release gates
         run: |
-          # Covers P34 docs truth, P33 matrix, and wheel/stdio smoke.
-          make alpha-release-gates
+          # Covers the LOCALCI contract plus wheel/stdio smoke on a protected manual run.
+          make agent-gate
           # Container smoke is the final preflight before release mutation jobs.
           make release-smoke-container
 

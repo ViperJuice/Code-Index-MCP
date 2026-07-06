@@ -1,3 +1,4 @@
+# localci-workflow-classification: manual-only
 name: Index Artifact Management
 
 on:
