@@ -49,8 +49,8 @@ def test_python_distribution_identity_is_frozen():
 
     assert data["project"]["name"] == "index-it-mcp"
     assert data["project"]["scripts"]["mcp-index"] == "mcp_server.cli:cli"
-    assert data["project"]["scripts"]["code-index-mcp"] == "mcp_server.cli:cli"
     assert data["project"]["scripts"]["index-it-mcp"] == "mcp_server.cli:cli"
+    assert "code-index-mcp" not in data["project"]["scripts"]
 
 
 def test_readme_distribution_identity_remains_stable():
@@ -58,6 +58,7 @@ def test_readme_distribution_identity_remains_stable():
 
     assert "**Python distribution**: `index-it-mcp`" in readme
     assert "**Container image**: `ghcr.io/viperjuice/code-index-mcp`" in readme
+    assert "docs/status/public-package-identity.md" in readme
 
 
 def test_changelog_has_stable_contract_section():

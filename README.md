@@ -2,14 +2,14 @@
 
 Modular, extensible local-first code indexer designed to enhance Claude Code and other LLMs with deep code understanding capabilities. Built on the Model Context Protocol (MCP) for seamless integration with AI assistants.
 
-> **Stable-surface prep status**: This guide targets `1.2.0` and reflects the
-> repo-owned stable install surface prepared by GAREL. MCP STDIO remains the
-> primary LLM surface, FastAPI remains a secondary admin surface, and final
-> release publication plus GA release evidence remain downstream-only in
-> `GADISP`.
+> **Stable-surface prep status**: This guide targets the repo-owned `1.2.0`
+> identity freeze. MCP STDIO remains the primary LLM surface and FastAPI
+> remains a secondary admin surface, but the July 6, 2026 PyPI check recorded
+> live `index-it-mcp` at `2.14.9`, so this guide uses source and local-wheel
+> proof instead of claiming live PyPI parity for the prepared `1.2.0` surface.
 
 ## Project Status
-**Version**: 1.2.0 (stable surface prepared; dispatch pending)
+**Version**: 1.2.0 (repo-owned prepared surface; live PyPI parity not re-proven on July 6, 2026)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -17,7 +17,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
-**GA decision**: see [docs/validation/ga-final-decision.md](docs/validation/ga-final-decision.md); the current decision is `ship GA`, but stable release mutation and release evidence remain downstream-only in `GADISP`.
+**GA decision**: see [docs/validation/ga-final-decision.md](docs/validation/ga-final-decision.md); the current product decision is `ship GA`, while install-surface claims remain bounded by [docs/status/public-package-identity.md](docs/status/public-package-identity.md).
 **GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
 **Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
@@ -127,7 +127,8 @@ quality or default sandbox behavior.
 ## 🚀 Quick Start
 
 Supported stable install paths are native Python/STDIO with
-`uv sync --locked` and the `ghcr.io/viperjuice/code-index-mcp` container image.
+`uv sync --locked`, a locally built `index-it-mcp` wheel, and the documented
+`ghcr.io/viperjuice/code-index-mcp` container image.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
 [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md),
@@ -326,6 +327,9 @@ docker run -p 8000:8000 vllm/vllm-openai --model Qwen/Qwen3-Embedding-8B
 
 Both profiles and their collection names are defined in `code-index-mcp.profiles.yaml` and can be customized.
 
+`code-index-mcp.profiles.yaml` is a repo-shipped profile filename, not a pip
+install target.
+
 ### Costs & Optional Features
 
 The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
@@ -342,16 +346,7 @@ for language/runtime support details.
 
 ### Installation
 
-#### Option 1: Install via pip (Recommended)
-```bash
-# Install the prepared stable package surface
-pip install index-it-mcp==1.2.0
-
-# Or install with dev tools for testing
-pip install "index-it-mcp[dev]==1.2.0"
-```
-
-#### Option 2: Install from Source
+#### Option 1: Use the repo-owned source install (Recommended)
 ```bash
 # Clone the repository
 git clone https://github.com/ViperJuice/Code-Index-MCP.git
@@ -359,7 +354,23 @@ cd Code-Index-MCP
 
 # Install locked project dependencies
 uv sync --locked
+
+# Verify the canonical CLI entrypoint
+uv run mcp-index --version
 ```
+
+#### Option 2: Build the local wheel
+```bash
+# From the repo root
+uv run --extra dev python -m build --wheel
+python -m pip install dist/index_it_mcp-1.2.0-py3-none-any.whl
+index-it-mcp --version
+```
+
+The canonical Python distribution name remains `index-it-mcp`, but the live
+PyPI package currently does not prove this repo's prepared `1.2.0` surface.
+Use the local wheel or source install above until a later release-evidence
+phase re-proves live package parity.
 
 ### Quick Start After Installation
 
@@ -797,6 +808,9 @@ Create or edit `.mcp.json` in your project root:
   }
 }
 ```
+
+The server label `code-index-mcp` in these examples is a client-local MCP
+server ID, not the Python distribution name.
 
 **Method 2: Claude Code CLI**
 

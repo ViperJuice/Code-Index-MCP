@@ -5,6 +5,8 @@ This guide provides comprehensive information on configuring the Code-Index-MCP 
 > **Stable-surface prep status**: This guide targets `1.2.0`. MCP STDIO is the primary
 > LLM surface. FastAPI remains a secondary admin surface. Docker examples use
 > `ghcr.io/viperjuice/code-index-mcp`.
+> That container image name is a container identity surface, not the canonical
+> Python distribution name.
 > Language behavior is defined in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md), and
 > the pre-GA release boundary is frozen in
 > [validation/ga-readiness-checklist.md](validation/ga-readiness-checklist.md).

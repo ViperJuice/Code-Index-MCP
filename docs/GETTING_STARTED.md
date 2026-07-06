@@ -7,6 +7,9 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 > documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md), and the pre-GA release
 > boundary is frozen in
 > [ga-readiness-checklist.md](validation/ga-readiness-checklist.md).
+> The July 6, 2026 PyPI check recorded live `index-it-mcp` at `2.14.9`, so
+> this guide keeps public install instructions on source and local-wheel proof
+> instead of claiming live `1.2.0` package parity.
 > Install-surface and language/runtime support tiers are defined in
 > [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md); do not treat every install path or
 > language row as equivalent support.
@@ -26,17 +29,7 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 
 ## Installation
 
-### Option 1: Install via pip (Recommended)
-
-```bash
-# Install the prepared stable package surface
-pip install index-it-mcp==1.2.0
-
-# Verify installation
-mcp-index --version
-```
-
-### Option 2: Install from Source
+### Option 1: Install from source (Recommended)
 
 ```bash
 # Clone the repository
@@ -46,8 +39,17 @@ cd Code-Index-MCP
 # Install locked project dependencies
 uv sync --locked
 
-# Verify the console script
+# Verify the canonical CLI entrypoint
 uv run mcp-index --version
+```
+
+### Option 2: Build and install the local wheel
+
+```bash
+# From the repo root
+uv run --extra dev python -m build --wheel
+python -m pip install dist/index_it_mcp-1.2.0-py3-none-any.whl
+index-it-mcp --version
 ```
 
 ## Quick Start

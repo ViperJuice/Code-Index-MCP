@@ -148,7 +148,6 @@ all = [
 
 [project.scripts]
 mcp-index = "mcp_server.cli:cli"
-code-index-mcp = "mcp_server.cli:cli"
 index-it-mcp = "mcp_server.cli:cli"
 
 [project.urls]

@@ -225,7 +225,11 @@ tests, and durable evidence.
 **Scope notes**
 
 This phase owns #66 and the accepted #67 duplicate criteria. It should be
-reviewed carefully because it removes many tracked files.
+reviewed carefully because it removes many tracked files. Preserve
+`docs/status/public-package-identity.md` as durable PUBNAME evidence, and do
+not delete or rename deferred identity surfaces such as
+`code-index-mcp.profiles.yaml`, client-label examples, or `mcp-index-kit/`
+unless a later phase explicitly re-decides those public names.
 
 **Non-goals**
 
