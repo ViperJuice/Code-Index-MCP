@@ -341,6 +341,55 @@ class TestSearchEndpoint:
             include_source_metadata=True,
         )
 
+    def test_search_accepts_history_query_params(self, test_client_with_dispatcher):
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
+            return_value=[
+                {
+                    "file": "/repo/.mcp-index/history/owner/repo/issues/1.md",
+                    "line": 1,
+                    "snippet": "Reflection issue",
+                    "source_metadata": {
+                        "schema_version": "search_source_metadata.v1",
+                        "records": [
+                            {
+                                "source_type": "history",
+                                "type": "reflection",
+                                "repo": "owner/repo",
+                                "number": 1,
+                                "title": "Reflection issue",
+                                "labels": ["reflection"],
+                                "state": "closed",
+                                "created_at": "2026-07-01T00:00:00Z",
+                                "updated_at": "2026-07-02T00:00:00Z",
+                                "url": "https://github.com/owner/repo/issues/1",
+                                "summary": "Reflection issue",
+                                "learnings": [],
+                            }
+                        ],
+                    },
+                }
+            ]
+        )
+
+        response = test_client_with_dispatcher.get(
+            "/search?q=test&source_type=history&history_labels=reflection&history_repos=owner/repo&include_source_metadata=true"
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload[0]["source_metadata"]["records"][0]["repo"] == "owner/repo"
+        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
+            ANY,
+            "test",
+            semantic=False,
+            limit=20,
+            source_type="history",
+            friction_categories=[],
+            history_labels=["reflection"],
+            history_repos=["owner/repo"],
+            include_source_metadata=True,
+        )
+
     def test_search_rejects_unknown_friction_category(self, test_client_with_dispatcher):
         response = test_client_with_dispatcher.get("/search?q=test&friction_categories=bad")
 

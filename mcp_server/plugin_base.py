@@ -80,6 +80,8 @@ class SearchOpts(TypedDict, total=False):
     limit: int
     source_type: str
     friction_categories: list[str]
+    history_labels: list[str]
+    history_repos: list[str]
     include_source_metadata: bool
 
 

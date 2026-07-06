@@ -28,7 +28,10 @@ from mcp_server.health.repository_readiness import (
     RepositoryReadiness,
     RepositoryReadinessState,
 )
-from mcp_server.indexing.source_metadata import FRICTION_CATEGORIES, normalize_friction_category
+from mcp_server.indexing.source_metadata import (
+    FRICTION_CATEGORIES,
+    normalize_friction_category,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +108,19 @@ def _normalize_friction_categories_argument(value: Any) -> list[str]:
     else:
         raise ValueError("friction_categories must be a string or array of strings")
     return [normalize_friction_category(category) for category in raw_categories]
+
+
+def _normalize_string_list_argument(value: Any, name: str) -> list[str]:
+    if value in (None, "", []):
+        return []
+    raw_items: list[str]
+    if isinstance(value, str):
+        raw_items = [item.strip() for item in value.split(",") if item.strip()]
+    elif isinstance(value, list):
+        raw_items = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        raise ValueError(f"{name} must be a string or array of strings")
+    return sorted(set(raw_items), key=str.lower)
 
 
 def _resolve_ctx(
@@ -428,11 +444,28 @@ async def handle_search_code(
             }
         )
 
-    if source_type not in (None, "friction"):
+    try:
+        history_labels = _normalize_string_list_argument(
+            (arguments or {}).get("history_labels"),
+            "history_labels",
+        )
+        history_repos = _normalize_string_list_argument(
+            (arguments or {}).get("history_repos"),
+            "history_repos",
+        )
+    except ValueError as exc:
+        return _json_text_response(
+            {
+                "error": "Invalid search source filters",
+                "details": str(exc),
+            }
+        )
+
+    if source_type not in (None, "friction", "history"):
         return _json_text_response(
             {
                 "error": "Invalid source type",
-                "details": "source_type must be 'friction' when provided",
+                "details": "source_type must be 'friction' or 'history' when provided",
             }
         )
 
@@ -476,9 +509,19 @@ async def handle_search_code(
                 "fuzzy": fuzzy,
                 "limit": limit,
             }
-            if source_type or friction_categories or include_source_metadata:
+            if (
+                source_type
+                or friction_categories
+                or history_labels
+                or history_repos
+                or include_source_metadata
+            ):
                 search_kwargs["source_type"] = source_type
                 search_kwargs["friction_categories"] = friction_categories
+                if history_labels:
+                    search_kwargs["history_labels"] = history_labels
+                if history_repos:
+                    search_kwargs["history_repos"] = history_repos
                 search_kwargs["include_source_metadata"] = include_source_metadata
             results_iter = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
@@ -494,9 +537,19 @@ async def handle_search_code(
                 "fuzzy": fuzzy,
                 "limit": limit,
             }
-            if source_type or friction_categories or include_source_metadata:
+            if (
+                source_type
+                or friction_categories
+                or history_labels
+                or history_repos
+                or include_source_metadata
+            ):
                 search_kwargs["source_type"] = source_type
                 search_kwargs["friction_categories"] = friction_categories
+                if history_labels:
+                    search_kwargs["history_labels"] = history_labels
+                if history_repos:
+                    search_kwargs["history_repos"] = history_repos
                 search_kwargs["include_source_metadata"] = include_source_metadata
             results_iter = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
@@ -606,7 +659,13 @@ async def handle_search_code(
                     if chunk_info:
                         lazy_summarizer.enqueue(chunk_info)
 
-        filtered_or_enriched = bool(source_type or friction_categories or include_source_metadata)
+        filtered_or_enriched = bool(
+            source_type
+            or friction_categories
+            or history_labels
+            or history_repos
+            or include_source_metadata
+        )
         if semantic or filtered_or_enriched:
             search_response = {
                 "results": results_data,
@@ -626,6 +685,10 @@ async def handle_search_code(
                 search_response["source_type"] = source_type
             if friction_categories:
                 search_response["friction_categories"] = friction_categories
+            if history_labels:
+                search_response["history_labels"] = history_labels
+            if history_repos:
+                search_response["history_repos"] = history_repos
             if include_source_metadata:
                 search_response["include_source_metadata"] = True
             if _indexing_active:
@@ -666,6 +729,10 @@ async def handle_search_code(
             response_data["source_type"] = source_type
         if friction_categories:
             response_data["friction_categories"] = friction_categories
+        if history_labels:
+            response_data["history_labels"] = history_labels
+        if history_repos:
+            response_data["history_repos"] = history_repos
         if include_source_metadata:
             response_data["include_source_metadata"] = True
         if readiness is not None:

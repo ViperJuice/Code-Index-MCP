@@ -1469,6 +1469,8 @@ class EnhancedDispatcher:
         limit: int = 20,
         source_type: Optional[str] = None,
         friction_categories: Optional[List[str]] = None,
+        history_labels: Optional[List[str]] = None,
+        history_repos: Optional[List[str]] = None,
         include_source_metadata: bool = False,
     ) -> Iterable[SearchResult]:
         """Search for code and documentation scoped to ctx.repo_id."""
@@ -1480,10 +1482,21 @@ class EnhancedDispatcher:
         repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
         try:
-            if sqlite_store and (source_type or friction_categories):
+            effective_source_type = source_type
+            if effective_source_type is None:
+                if history_labels or history_repos:
+                    effective_source_type = "history"
+                elif friction_categories:
+                    effective_source_type = "friction"
+
+            if sqlite_store and (
+                effective_source_type or friction_categories or history_labels or history_repos
+            ):
                 filtered_results = sqlite_store.search_chunks_by_source_metadata(
-                    source_type=source_type or "friction",
+                    source_type=effective_source_type or "friction",
                     friction_categories=friction_categories,
+                    history_labels=history_labels,
+                    history_repos=history_repos,
                     limit=limit,
                 )
                 for item in filtered_results:

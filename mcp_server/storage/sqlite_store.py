@@ -16,7 +16,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.errors import TransientArtifactError
 from ..core.path_resolver import PathResolver
-from ..indexing.source_metadata import extract_matching_source_metadata, merge_source_metadata
+from ..indexing.github_issues import issue_history_dedupe_key
+from ..indexing.source_metadata import (
+    HISTORY_SOURCE_TYPE,
+    HistoryIssueRecord,
+    extract_matching_source_metadata,
+    merge_source_metadata,
+)
 from ..indexing.friction import extract_friction_markers
 from .connection_pool import ConnectionPool
 
@@ -49,7 +55,32 @@ def _merge_chunk_source_metadata(
         adjusted = dict(marker)
         adjusted["line"] = int(marker["line"]) + max(int(line_start) - 1, 0)
         records.append(adjusted)
+    if not records:
+        return dict(metadata or {})
     return merge_source_metadata(metadata, records)
+
+
+def _history_issue_document_content(record: HistoryIssueRecord) -> str:
+    labels = ", ".join(record["labels"]) if record["labels"] else "(none)"
+    lines = [
+        f"# Issue #{record['number']}: {record['title']}",
+        f"Repository: {record['repo']}",
+        f"Type: {record['type']}",
+        f"State: {record['state']}",
+        f"Labels: {labels}",
+        f"Created: {record['created_at']}",
+        f"Updated: {record['updated_at']}",
+        f"URL: {record['url']}",
+        "",
+        f"Summary: {record['summary']}",
+    ]
+    closed_at = record.get("closed_at")
+    if closed_at:
+        lines.insert(7, f"Closed: {closed_at}")
+    if record["learnings"]:
+        lines.extend(["", "Learnings:"])
+        lines.extend(f"- {learning}" for learning in record["learnings"])
+    return "\n".join(lines)
 
 
 def _normalized_query_terms(query: str) -> List[str]:
@@ -1361,6 +1392,8 @@ class SQLiteStore:
         *,
         source_type: str = "friction",
         friction_categories: Optional[List[str]] = None,
+        history_labels: Optional[List[str]] = None,
+        history_repos: Optional[List[str]] = None,
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """Return chunks whose stored source metadata matches the requested filters."""
@@ -1391,6 +1424,8 @@ class SQLiteStore:
                 metadata,
                 source_type=source_type,
                 friction_categories=friction_categories,
+                history_labels=history_labels,
+                history_repos=history_repos,
             )
             if source_metadata is None:
                 continue
@@ -1406,6 +1441,91 @@ class SQLiteStore:
             if len(results) >= limit:
                 break
         return results
+
+    def upsert_history_issue_documents(
+        self,
+        repository_id: int,
+        records: List[HistoryIssueRecord],
+    ) -> Dict[str, int]:
+        """Persist metadata-only GitHub issue history documents for a repository."""
+        self._require_writable()
+        if not records:
+            return {"stored": 0, "skipped": 0}
+
+        grouped_records: Dict[str, List[HistoryIssueRecord]] = {}
+        for record in records:
+            repo_parts = record["repo"].split("/", 1)
+            owner = repo_parts[0]
+            repo_name = repo_parts[1] if len(repo_parts) == 2 else repo_parts[0]
+            relative_path = f".mcp-index/history/{owner}/{repo_name}/issues/{record['number']}.md"
+            grouped_records.setdefault(relative_path, []).append(record)
+
+        stored = 0
+        skipped = 0
+        repository_root = self._repository_root_path(repository_id)
+        for relative_path, file_records in grouped_records.items():
+            absolute_path = str((repository_root / relative_path).resolve())
+            file_id = self.store_file(
+                repository_id,
+                path=absolute_path,
+                relative_path=relative_path,
+                language="history",
+                metadata={"source_type": HISTORY_SOURCE_TYPE},
+            )
+            for index, record in enumerate(
+                sorted(file_records, key=lambda item: (item["type"], item["updated_at"]))
+            ):
+                chunk_id = f"history:{record['type']}"
+                chunk_metadata = merge_source_metadata(
+                    {
+                        "history_dedupe_key": issue_history_dedupe_key(record),
+                        "source_type": HISTORY_SOURCE_TYPE,
+                    },
+                    [record],
+                )
+                self.store_chunk(
+                    file_id=file_id,
+                    content=_history_issue_document_content(record),
+                    content_start=0,
+                    content_end=len(record["summary"]),
+                    line_start=1,
+                    line_end=max(1, len(record["learnings"]) + 10),
+                    chunk_id=chunk_id,
+                    node_id=chunk_id,
+                    treesitter_file_id=relative_path,
+                    chunk_type="document",
+                    language="history",
+                    chunk_index=index,
+                    metadata=chunk_metadata,
+                )
+                stored += 1
+            self._refresh_fts_code_for_file(file_id)
+        return {"stored": stored, "skipped": skipped}
+
+    def _repository_root_path(self, repository_id: int) -> Path:
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT path FROM repositories WHERE id = ?", (repository_id,))
+            row = cursor.fetchone()
+        if row is None or not row[0]:
+            return Path.cwd()
+        return Path(str(row[0]))
+
+    def _refresh_fts_code_for_file(self, file_id: int) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT content
+                   FROM code_chunks
+                   WHERE file_id = ?
+                   ORDER BY line_start, chunk_index, id""",
+                (file_id,),
+            )
+            content = "\n\n".join(
+                row["content"]
+                for row in cursor.fetchall()
+                if isinstance(row["content"], str) and row["content"].strip()
+            )
+            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
+            conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id))
 
     # Reference operations
     def store_reference(

@@ -404,13 +404,23 @@ def _build_tool_list() -> list[types.Tool]:
                     },
                     "source_type": {
                         "type": "string",
-                        "enum": ["friction"],
+                        "enum": ["friction", "history"],
                         "description": "Filter results to a specific source metadata type",
                     },
                     "friction_categories": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Optional friction categories: hack, todo, fixme, workaround, wish, extraction_hint",
+                    },
+                    "history_labels": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional history labels to match on history issue documents",
+                    },
+                    "history_repos": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional owner/repo filters for history issue documents",
                     },
                     "include_source_metadata": {
                         "type": "boolean",
@@ -440,6 +450,7 @@ def _build_tool_list() -> list[types.Tool]:
                                     "Search timeout",
                                     "Search failed",
                                     "Invalid friction categories",
+                                    "Invalid search source filters",
                                     "Invalid source type",
                                 ]
                             },
@@ -487,6 +498,8 @@ def _build_tool_list() -> list[types.Tool]:
                             "semantic_fallback_status": {"type": "string"},
                             "source_type": {"type": "string"},
                             "friction_categories": {"type": "array"},
+                            "history_labels": {"type": "array"},
+                            "history_repos": {"type": "array"},
                             "include_source_metadata": {"type": "boolean"},
                         },
                         required=("results",),

@@ -254,14 +254,20 @@ Search for code patterns, symbols, or text across indexed files.
 - `symbol_type` (string, optional): Filter by symbol type (function, class, variable, etc.)
 - `limit` (integer, optional): Maximum results (default: 20, max: 100)
 - `offset` (integer, optional): Result offset for pagination (default: 0)
-- `source_type` (string, optional): `friction` to search stored friction markers
+- `source_type` (string, optional): `friction` for stored friction markers or
+  `history` for metadata-only issue history documents
 - `friction_categories` (string, optional): comma-separated subset of
   `todo,fixme,hack,workaround,wish,extraction_hint`
+- `history_labels` (string, optional): comma-separated history labels
+- `history_repos` (string, optional): comma-separated owner/repo filters for
+  history issue documents
 - `include_source_metadata` (boolean, optional): include
   `search_source_metadata.v1` on returned results
 
 Unfiltered lexical searches keep the legacy result shape. Unknown friction
 categories return a metadata-only validation error rather than an empty result.
+History ingestion is explicit through `mcp-index history ingest`, is
+fixture-backed in tests, and does not persist raw issue bodies by default.
 
 **Example:**
 ```bash

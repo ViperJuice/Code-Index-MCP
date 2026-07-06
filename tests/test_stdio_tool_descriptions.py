@@ -212,7 +212,9 @@ def test_tool_input_schemas_are_explicit_about_additional_properties_and_default
     assert search_schema["fuzzy"]["default"] is False
     assert search_schema["limit"]["default"] == 20
     assert search_schema["include_source_metadata"]["default"] is False
-    assert search_schema["source_type"]["enum"] == ["friction"]
+    assert search_schema["source_type"]["enum"] == ["friction", "history"]
+    assert "history_labels" in search_schema
+    assert "history_repos" in search_schema
 
     write_schema = tools["write_summaries"].inputSchema["properties"]
     assert write_schema["limit"]["default"] == 500

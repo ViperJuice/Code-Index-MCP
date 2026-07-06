@@ -259,6 +259,12 @@ def _normalize_source_metadata_categories(value: Optional[str]) -> list[str]:
     return [normalize_friction_category(item) for item in value.split(",") if item.strip()]
 
 
+def _normalize_csv_filters(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    return sorted({item.strip() for item in value.split(",") if item.strip()}, key=str.lower)
+
+
 language_detection_status: Dict[str, Any] | None = None
 
 _FALLBACK_REPO_ID = "default"
@@ -1346,6 +1352,8 @@ async def search(
     file_filter: Optional[str] = None,
     source_type: Optional[str] = None,
     friction_categories: Optional[str] = None,
+    history_labels: Optional[str] = None,
+    history_repos: Optional[str] = None,
     include_source_metadata: bool = False,
     current_user: User = Depends(require_permission(Permission.READ)),
 ):
@@ -1364,12 +1372,12 @@ async def search(
         logger.error("Search attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
 
-    if source_type not in (None, "friction"):
+    if source_type not in (None, "friction", "history"):
         raise HTTPException(
             400,
             {
                 "error": "Invalid source type",
-                "details": "source_type must be 'friction' when provided",
+                "details": "source_type must be 'friction' or 'history' when provided",
             },
         )
     try:
@@ -1383,6 +1391,8 @@ async def search(
                 "allowed_categories": list(FRICTION_CATEGORIES),
             },
         ) from exc
+    normalized_history_labels = _normalize_csv_filters(history_labels)
+    normalized_history_repos = _normalize_csv_filters(history_repos)
 
     ctx = get_repo_ctx(request)
     start_time = time.time()
@@ -1477,9 +1487,19 @@ async def search(
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
                     search_kwargs = {"semantic": True, "limit": limit}
-                    if source_type or normalized_friction_categories or include_source_metadata:
+                    if (
+                        source_type
+                        or normalized_friction_categories
+                        or normalized_history_labels
+                        or normalized_history_repos
+                        or include_source_metadata
+                    ):
                         search_kwargs["source_type"] = source_type
                         search_kwargs["friction_categories"] = normalized_friction_categories
+                        if normalized_history_labels:
+                            search_kwargs["history_labels"] = normalized_history_labels
+                        if normalized_history_repos:
+                            search_kwargs["history_repos"] = normalized_history_repos
                         search_kwargs["include_source_metadata"] = include_source_metadata
                     results = list(dispatcher.search(ctx, q, **search_kwargs))
                     results = [
@@ -1534,9 +1554,19 @@ async def search(
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
                     search_kwargs = {"semantic": False, "limit": limit}
-                    if source_type or normalized_friction_categories or include_source_metadata:
+                    if (
+                        source_type
+                        or normalized_friction_categories
+                        or normalized_history_labels
+                        or normalized_history_repos
+                        or include_source_metadata
+                    ):
                         search_kwargs["source_type"] = source_type
                         search_kwargs["friction_categories"] = normalized_friction_categories
+                        if normalized_history_labels:
+                            search_kwargs["history_labels"] = normalized_history_labels
+                        if normalized_history_repos:
+                            search_kwargs["history_repos"] = normalized_history_repos
                         search_kwargs["include_source_metadata"] = include_source_metadata
                     results = list(dispatcher.search(ctx, q, **search_kwargs))
                     results = [

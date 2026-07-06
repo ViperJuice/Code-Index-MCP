@@ -1,0 +1,14 @@
+{
+  "number": 12,
+  "title": "Reflection: ingestion follow-up",
+  "labels": [
+    {"name": "reflection"},
+    {"name": "history"}
+  ],
+  "state": "CLOSED",
+  "createdAt": "2026-07-01T10:00:00Z",
+  "updatedAt": "2026-07-04T10:00:00Z",
+  "closedAt": "2026-07-04T10:00:00Z",
+  "url": "https://github.com/owner/repo/issues/12",
+  "body": "Learning: Keep gh access mocked in tests"
+}

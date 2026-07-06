@@ -25,12 +25,14 @@ cli.add_command(stdio)
 def _register_heavy_commands():
     """Lazy-register commands with heavy import chains (avoids circular imports on module load)."""
     from .artifact_commands import artifact
+    from .history_commands import history
     from .index_management import index
     from .preflight_commands import preflight
     from .repository_commands import repository
     from .setup_commands import setup
 
     cli.add_command(index)
+    cli.add_command(history)
     cli.add_command(artifact)
     cli.add_command(preflight)
     cli.add_command(repository)

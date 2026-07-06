@@ -1,4 +1,5 @@
 from mcp_server.indexing.source_metadata import (
+    HISTORY_SOURCE_TYPE,
     SEARCH_SOURCE_METADATA_VERSION,
     build_source_metadata,
     extract_matching_source_metadata,
@@ -111,3 +112,38 @@ def test_extract_matching_source_metadata_filters_categories():
             }
         ],
     }
+
+
+def test_extract_matching_source_metadata_without_source_type_matches_all_records():
+    metadata = {
+        "source_metadata": {
+            "schema_version": SEARCH_SOURCE_METADATA_VERSION,
+            "records": [
+                {
+                    "source_type": "friction",
+                    "category": "todo",
+                    "line": 1,
+                    "description": "todo item",
+                    "pattern": "TODO",
+                },
+                {
+                    "source_type": HISTORY_SOURCE_TYPE,
+                    "type": "reflection",
+                    "repo": "owner/repo",
+                    "number": 12,
+                    "title": "Reflection issue",
+                    "labels": ["reflection"],
+                    "state": "closed",
+                    "created_at": "2026-07-01T00:00:00Z",
+                    "updated_at": "2026-07-02T00:00:00Z",
+                    "url": "https://github.com/owner/repo/issues/12",
+                    "summary": "Reflection issue",
+                    "learnings": [],
+                },
+            ],
+        }
+    }
+
+    filtered = extract_matching_source_metadata(metadata)
+
+    assert filtered == metadata["source_metadata"]

@@ -306,6 +306,14 @@ Use `source_type="friction"` with optional `friction_categories=["todo",
 lexical calls keep the legacy result shape; invalid friction categories return
 a metadata-only validation error instead of a silent empty result.
 
+Historical GitHub issue context uses the same metadata envelope and search
+surface. Run `mcp-index history ingest --repo owner/repo` to ingest
+metadata-only issue documents, then filter them with `source_type="history"`
+plus optional `history_labels=["reflection"]` or
+`history_repos=["owner/repo"]`. The HISTORY contract is fixture-backed in
+tests, requires no live GitHub credentials, and does not persist raw issue
+bodies by default.
+
 **Index tracking**: each repo's tracked/default branch is followed by
 `MultiRepositoryWatcher` (`RefPoller` every 30 s). Same-repo multiple worktrees
 and non-default branch queries are unsupported in v3 routing: they return
@@ -1110,8 +1118,11 @@ GET /search?query=async+def.*parse&file_extensions=.py,.js
 Query parameters:
 - `query` (required): Search pattern (regex supported)
 - `file_extensions` (optional): Comma-separated list of extensions
-- `source_type` (optional): `friction`
+- `source_type` (optional): `friction` or `history`
 - `friction_categories` (optional): comma-separated friction categories
+- `history_labels` (optional): comma-separated history issue labels
+- `history_repos` (optional): comma-separated owner/repo filters for history
+  issue documents
 - `include_source_metadata` (optional): include `search_source_metadata.v1`
   records on matching results
 
