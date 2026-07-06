@@ -254,6 +254,14 @@ Search for code patterns, symbols, or text across indexed files.
 - `symbol_type` (string, optional): Filter by symbol type (function, class, variable, etc.)
 - `limit` (integer, optional): Maximum results (default: 20, max: 100)
 - `offset` (integer, optional): Result offset for pagination (default: 0)
+- `source_type` (string, optional): `friction` to search stored friction markers
+- `friction_categories` (string, optional): comma-separated subset of
+  `todo,fixme,hack,workaround,wish,extraction_hint`
+- `include_source_metadata` (boolean, optional): include
+  `search_source_metadata.v1` on returned results
+
+Unfiltered lexical searches keep the legacy result shape. Unknown friction
+categories return a metadata-only validation error rather than an empty result.
 
 **Example:**
 ```bash

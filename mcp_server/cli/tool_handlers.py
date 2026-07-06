@@ -28,6 +28,7 @@ from mcp_server.health.repository_readiness import (
     RepositoryReadiness,
     RepositoryReadinessState,
 )
+from mcp_server.indexing.source_metadata import FRICTION_CATEGORIES, normalize_friction_category
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,19 @@ def _translate_path(path: str) -> str:
         if full_path.exists():
             return str(full_path)
     return path
+
+
+def _normalize_friction_categories_argument(value: Any) -> list[str]:
+    if value in (None, "", []):
+        return []
+    raw_categories: list[str]
+    if isinstance(value, str):
+        raw_categories = [item.strip() for item in value.split(",") if item.strip()]
+    elif isinstance(value, list):
+        raw_categories = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        raise ValueError("friction_categories must be a string or array of strings")
+    return [normalize_friction_category(category) for category in raw_categories]
 
 
 def _resolve_ctx(
@@ -398,6 +412,29 @@ async def handle_search_code(
     fuzzy = (arguments or {}).get("fuzzy", False)
     limit = (arguments or {}).get("limit", 20)
     repository = (arguments or {}).get("repository")
+    source_type = (arguments or {}).get("source_type")
+    include_source_metadata = bool((arguments or {}).get("include_source_metadata", False))
+
+    try:
+        friction_categories = _normalize_friction_categories_argument(
+            (arguments or {}).get("friction_categories")
+        )
+    except ValueError as exc:
+        return _json_text_response(
+            {
+                "error": "Invalid friction categories",
+                "details": str(exc),
+                "allowed_categories": list(FRICTION_CATEGORIES),
+            }
+        )
+
+    if source_type not in (None, "friction"):
+        return _json_text_response(
+            {
+                "error": "Invalid source type",
+                "details": "source_type must be 'friction' when provided",
+            }
+        )
 
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
@@ -434,19 +471,37 @@ async def handle_search_code(
 
     try:
         if ctx is not None:
+            search_kwargs = {
+                "semantic": semantic,
+                "fuzzy": fuzzy,
+                "limit": limit,
+            }
+            if source_type or friction_categories or include_source_metadata:
+                search_kwargs["source_type"] = source_type
+                search_kwargs["friction_categories"] = friction_categories
+                search_kwargs["include_source_metadata"] = include_source_metadata
             results_iter = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: list(dispatcher.search(ctx, query, semantic=semantic, fuzzy=fuzzy, limit=limit)),  # type: ignore[call-arg]
+                    lambda: list(dispatcher.search(ctx, query, **search_kwargs)),  # type: ignore[call-arg]
                 ),
                 timeout=10.0,
             )
         else:
             # Pre-SL-1 fallback — search without ctx
+            search_kwargs = {
+                "semantic": semantic,
+                "fuzzy": fuzzy,
+                "limit": limit,
+            }
+            if source_type or friction_categories or include_source_metadata:
+                search_kwargs["source_type"] = source_type
+                search_kwargs["friction_categories"] = friction_categories
+                search_kwargs["include_source_metadata"] = include_source_metadata
             results_iter = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: list(dispatcher.search(query, semantic=semantic, fuzzy=fuzzy, limit=limit)),  # type: ignore[call-arg]
+                    lambda: list(dispatcher.search(query, **search_kwargs)),  # type: ignore[call-arg]
                 ),
                 timeout=10.0,
             )
@@ -511,6 +566,13 @@ async def handle_search_code(
                     else getattr(r, "last_modified", None)
                 ),
             }
+            source_metadata = (
+                r.get("source_metadata")
+                if isinstance(r, dict)
+                else getattr(r, "source_metadata", None)
+            )
+            if source_metadata is not None:
+                result_item["source_metadata"] = source_metadata
             if semantic:
                 result_item["semantic_source"] = (
                     r.get("semantic_source")
@@ -544,20 +606,28 @@ async def handle_search_code(
                     if chunk_info:
                         lazy_summarizer.enqueue(chunk_info)
 
-        if semantic:
+        filtered_or_enriched = bool(source_type or friction_categories or include_source_metadata)
+        if semantic or filtered_or_enriched:
             search_response = {
                 "results": results_data,
                 "query": query,
-                "semantic_requested": True,
-                "semantic_source": "semantic",
-                "semantic_profile_id": (
-                    semantic_readiness.profile_id if semantic_readiness is not None else None
-                ),
-                "semantic_collection_name": (
-                    semantic_readiness.collection_name if semantic_readiness is not None else None
-                ),
-                "semantic_fallback_status": "not_attempted",
             }
+            if semantic:
+                search_response["semantic_requested"] = True
+                search_response["semantic_source"] = "semantic"
+                search_response["semantic_profile_id"] = (
+                    semantic_readiness.profile_id if semantic_readiness is not None else None
+                )
+                search_response["semantic_collection_name"] = (
+                    semantic_readiness.collection_name if semantic_readiness is not None else None
+                )
+                search_response["semantic_fallback_status"] = "not_attempted"
+            if source_type:
+                search_response["source_type"] = source_type
+            if friction_categories:
+                search_response["friction_categories"] = friction_categories
+            if include_source_metadata:
+                search_response["include_source_metadata"] = True
             if _indexing_active:
                 search_response["indexing_in_progress"] = True
                 search_response["note"] = (
@@ -592,6 +662,12 @@ async def handle_search_code(
                 semantic_readiness.collection_name if semantic_readiness is not None else None
             )
             response_data["semantic_fallback_status"] = "not_attempted"
+        if source_type:
+            response_data["source_type"] = source_type
+        if friction_categories:
+            response_data["friction_categories"] = friction_categories
+        if include_source_metadata:
+            response_data["include_source_metadata"] = True
         if readiness is not None:
             response_data["readiness"] = readiness.to_dict()
         if _indexing_active:

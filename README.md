@@ -298,6 +298,14 @@ search_code(query="def parse", repository="my-repo")
 symbol_lookup(symbol="Parser", repository="my-repo")
 ```
 
+Friction pattern metadata is available as an additive filter on `search_code`.
+Use `source_type="friction"` with optional `friction_categories=["todo",
+"fixme", "hack", "workaround", "wish", "extraction_hint"]`. Set
+`include_source_metadata=true` to attach the stored
+`search_source_metadata.v1` envelope to returned results. Ordinary unfiltered
+lexical calls keep the legacy result shape; invalid friction categories return
+a metadata-only validation error instead of a silent empty result.
+
 **Index tracking**: each repo's tracked/default branch is followed by
 `MultiRepositoryWatcher` (`RefPoller` every 30 s). Same-repo multiple worktrees
 and non-default branch queries are unsupported in v3 routing: they return
@@ -1102,6 +1110,10 @@ GET /search?query=async+def.*parse&file_extensions=.py,.js
 Query parameters:
 - `query` (required): Search pattern (regex supported)
 - `file_extensions` (optional): Comma-separated list of extensions
+- `source_type` (optional): `friction`
+- `friction_categories` (optional): comma-separated friction categories
+- `include_source_metadata` (optional): include `search_source_metadata.v1`
+  records on matching results
 
 ### Response Format
 

@@ -38,7 +38,11 @@ from ..plugins.language_registry import get_all_extensions, get_language_by_exte
 from ..plugins.plugin_factory import PluginFactory, PluginUnavailableError
 from ..plugins.plugin_set_registry import PluginSetRegistry
 from ..storage.multi_repo_manager import MultiRepositoryManager
-from ..storage.sqlite_store import SQLiteStore, classify_sqlite_storage_failure
+from ..storage.sqlite_store import (
+    SQLiteStore,
+    _merge_chunk_source_metadata,
+    classify_sqlite_storage_failure,
+)
 from ..storage.two_phase import TwoPhaseCommitError, two_phase_commit
 from ..utils.semantic_indexer import SemanticIndexer
 from ..utils.semantic_indexer_registry import SemanticIndexerRegistry
@@ -55,6 +59,7 @@ from .result_aggregator import (
     RankingCriteria,
     ResultAggregator,
 )
+from ..indexing.source_metadata import extract_matching_source_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -1462,6 +1467,9 @@ class EnhancedDispatcher:
         semantic: bool = False,
         fuzzy: bool = False,
         limit: int = 20,
+        source_type: Optional[str] = None,
+        friction_categories: Optional[List[str]] = None,
+        include_source_metadata: bool = False,
     ) -> Iterable[SearchResult]:
         """Search for code and documentation scoped to ctx.repo_id."""
         _hp_t0 = time.perf_counter()
@@ -1472,6 +1480,18 @@ class EnhancedDispatcher:
         repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
         try:
+            if sqlite_store and (source_type or friction_categories):
+                filtered_results = sqlite_store.search_chunks_by_source_metadata(
+                    source_type=source_type or "friction",
+                    friction_categories=friction_categories,
+                    limit=limit,
+                )
+                for item in filtered_results:
+                    yield item
+                self._operation_stats["searches"] += 1
+                self._operation_stats["total_time"] += time.time() - start_time
+                return
+
             # Fuzzy (trigram) path for misspelled queries
             if fuzzy and sqlite_store:
                 logger.info(f"Using fuzzy trigram search for query: {query}")
@@ -1605,6 +1625,17 @@ class EnhancedDispatcher:
                                     sqlite_store, query, bm25_candidates, limit
                                 )
                                 for item in bm25_candidates:
+                                    if include_source_metadata:
+                                        chunk_info = sqlite_store.find_chunk_at_line(
+                                            item["file"],
+                                            int(item.get("line", 1) or 1),
+                                        )
+                                        if chunk_info:
+                                            source_metadata = extract_matching_source_metadata(
+                                                chunk_info.get("metadata")
+                                            )
+                                            if source_metadata is not None:
+                                                item = {**item, "source_metadata": source_metadata}
                                     yield {k: v for k, v in item.items() if k != "_rerank_doc"}
                                 self._operation_stats["searches"] += 1
                                 self._operation_stats["total_time"] += time.time() - start_time
@@ -2998,7 +3029,13 @@ class EnhancedDispatcher:
                         chunk.get("parent_chunk_id"),
                         int(chunk.get("depth") or 0),
                         int(chunk.get("chunk_index") or index),
-                        json.dumps(chunk.get("metadata") or {}),
+                        json.dumps(
+                            _merge_chunk_source_metadata(
+                                chunk.get("metadata"),
+                                chunk_content,
+                                line_start,
+                            )
+                        ),
                     ),
                 )
 

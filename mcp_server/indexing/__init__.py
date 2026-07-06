@@ -1,8 +1,36 @@
 from .lock_registry import IndexingLockRegistry, lock_registry
+from .friction import FRICTION_PATTERN_CONFIGS, FrictionPatternConfig, extract_friction_markers
+from .source_metadata import (
+    FRICTION_CATEGORIES,
+    FRICTION_SOURCE_TYPE,
+    SEARCH_SOURCE_METADATA_VERSION,
+    FrictionCategory,
+    FrictionMarker,
+    SearchSourceMetadataEnvelope,
+    SourceType,
+    build_source_metadata,
+    extract_matching_source_metadata,
+    merge_source_metadata,
+    normalize_friction_category,
+)
 
 __all__ = [
+    "FRICTION_CATEGORIES",
+    "FRICTION_PATTERN_CONFIGS",
+    "FRICTION_SOURCE_TYPE",
     "IndexingLockRegistry",
+    "FrictionCategory",
+    "FrictionMarker",
+    "FrictionPatternConfig",
+    "SEARCH_SOURCE_METADATA_VERSION",
+    "SearchSourceMetadataEnvelope",
+    "SourceType",
+    "build_source_metadata",
+    "extract_friction_markers",
+    "extract_matching_source_metadata",
     "lock_registry",
+    "merge_source_metadata",
+    "normalize_friction_category",
     "ReindexCheckpoint",
     "save",
     "load",

@@ -32,6 +32,7 @@ from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
+from .indexing.source_metadata import FRICTION_CATEGORIES, normalize_friction_category
 from .plugin_base import SearchResult, SymbolDef
 from .plugin_system import PluginManager
 from .security import (
@@ -126,7 +127,7 @@ def _get_path_guard() -> Optional[PathTraversalGuard]:
     return PathTraversalGuard(roots)
 
 
-def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
+def _normalize_search_result(raw_result: Any) -> Optional[dict[str, Any]]:
     """Normalize internal search payloads to the public SearchResult schema.
 
     Returns None if the result's file path fails the path traversal guard.
@@ -194,12 +195,15 @@ def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
             f"{start_line + i}: {line}" for i, line in enumerate(snippet_lines)
         )
 
-        return SearchResult(
-            file=str(file_value),
-            start_line=start_line,
-            end_line=end_line,
-            snippet=numbered_snippet,
-        )
+        normalized: dict[str, Any] = {
+            "file": str(file_value),
+            "start_line": start_line,
+            "end_line": end_line,
+            "snippet": numbered_snippet,
+        }
+        if raw_result.get("source_metadata") is not None:
+            normalized["source_metadata"] = raw_result.get("source_metadata")
+        return normalized
 
     file_value = _prefer_path(
         getattr(raw_result, "file", None)
@@ -237,12 +241,22 @@ def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
         f"{start_line + i}: {line}" for i, line in enumerate(snippet_lines)
     )
 
-    return SearchResult(
-        file=str(file_value),
-        start_line=start_line,
-        end_line=end_line,
-        snippet=numbered_snippet,
-    )
+    normalized = {
+        "file": str(file_value),
+        "start_line": start_line,
+        "end_line": end_line,
+        "snippet": numbered_snippet,
+    }
+    source_metadata = getattr(raw_result, "source_metadata", None)
+    if source_metadata is not None:
+        normalized["source_metadata"] = source_metadata
+    return normalized
+
+
+def _normalize_source_metadata_categories(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    return [normalize_friction_category(item) for item in value.split(",") if item.strip()]
 
 
 language_detection_status: Dict[str, Any] | None = None
@@ -1321,7 +1335,7 @@ async def symbol(
         raise HTTPException(500, f"Internal error during symbol lookup: {str(e)}")
 
 
-@app.get("/search", response_model=list[SearchResult])
+@app.get("/search", response_model=list[dict[str, Any]])
 async def search(
     request: Request,
     q: str,
@@ -1330,6 +1344,9 @@ async def search(
     mode: str = "auto",  # "auto", "hybrid", "bm25", "semantic", "fuzzy", "classic"
     language: Optional[str] = None,
     file_filter: Optional[str] = None,
+    source_type: Optional[str] = None,
+    friction_categories: Optional[str] = None,
+    include_source_metadata: bool = False,
     current_user: User = Depends(require_permission(Permission.READ)),
 ):
     """Search with support for multiple modes including hybrid search.
@@ -1346,6 +1363,26 @@ async def search(
     if dispatcher is None and mode == "classic":
         logger.error("Search attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
+
+    if source_type not in (None, "friction"):
+        raise HTTPException(
+            400,
+            {
+                "error": "Invalid source type",
+                "details": "source_type must be 'friction' when provided",
+            },
+        )
+    try:
+        normalized_friction_categories = _normalize_source_metadata_categories(friction_categories)
+    except ValueError as exc:
+        raise HTTPException(
+            400,
+            {
+                "error": "Invalid friction categories",
+                "details": str(exc),
+                "allowed_categories": list(FRICTION_CATEGORIES),
+            },
+        ) from exc
 
     ctx = get_repo_ctx(request)
     start_time = time.time()
@@ -1439,7 +1476,12 @@ async def search(
             # Use classic dispatcher with semantic=True
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
-                    results = list(dispatcher.search(ctx, q, semantic=True, limit=limit))
+                    search_kwargs = {"semantic": True, "limit": limit}
+                    if source_type or normalized_friction_categories or include_source_metadata:
+                        search_kwargs["source_type"] = source_type
+                        search_kwargs["friction_categories"] = normalized_friction_categories
+                        search_kwargs["include_source_metadata"] = include_source_metadata
+                    results = list(dispatcher.search(ctx, q, **search_kwargs))
                     results = [
                         r for r in (_normalize_search_result(x) for x in results) if r is not None
                     ]
@@ -1491,7 +1533,12 @@ async def search(
             # Classic search through dispatcher
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
-                    results = list(dispatcher.search(ctx, q, semantic=False, limit=limit))
+                    search_kwargs = {"semantic": False, "limit": limit}
+                    if source_type or normalized_friction_categories or include_source_metadata:
+                        search_kwargs["source_type"] = source_type
+                        search_kwargs["friction_categories"] = normalized_friction_categories
+                        search_kwargs["include_source_metadata"] = include_source_metadata
+                    results = list(dispatcher.search(ctx, q, **search_kwargs))
                     results = [
                         r for r in (_normalize_search_result(x) for x in results) if r is not None
                     ]

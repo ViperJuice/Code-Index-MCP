@@ -402,6 +402,21 @@ def _build_tool_list() -> list[types.Tool]:
                         "description": "Maximum number of results",
                         "default": 20,
                     },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["friction"],
+                        "description": "Filter results to a specific source metadata type",
+                    },
+                    "friction_categories": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional friction categories: hack, todo, fixme, workaround, wish, extraction_hint",
+                    },
+                    "include_source_metadata": {
+                        "type": "boolean",
+                        "description": "Include source metadata on returned results",
+                        "default": False,
+                    },
                 },
                 required=("query",),
             ),
@@ -420,12 +435,20 @@ def _build_tool_list() -> list[types.Tool]:
                     _SEMANTIC_REFUSAL_SCHEMA,
                     _object_schema(
                         {
-                            "error": {"enum": ["Search timeout", "Search failed"]},
+                            "error": {
+                                "enum": [
+                                    "Search timeout",
+                                    "Search failed",
+                                    "Invalid friction categories",
+                                    "Invalid source type",
+                                ]
+                            },
                             "details": {"type": "string"},
                             "query": {"type": "string"},
+                            "allowed_categories": {"type": "array"},
                             "suggestion": {"type": "string"},
                         },
-                        required=("error", "details", "query"),
+                        required=("error", "details"),
                         additional_properties=True,
                     ),
                     _object_schema(
@@ -445,6 +468,7 @@ def _build_tool_list() -> list[types.Tool]:
                                         "semantic_collection_name": {
                                             "type": ["string", "null"]
                                         },
+                                        "source_metadata": {"type": ["object", "null"]},
                                         "_usage_hint": {"type": "string"},
                                     },
                                     required=("file",),
@@ -461,6 +485,9 @@ def _build_tool_list() -> list[types.Tool]:
                             "semantic_profile_id": {"type": ["string", "null"]},
                             "semantic_collection_name": {"type": ["string", "null"]},
                             "semantic_fallback_status": {"type": "string"},
+                            "source_type": {"type": "string"},
+                            "friction_categories": {"type": "array"},
+                            "include_source_metadata": {"type": "boolean"},
                         },
                         required=("results",),
                         additional_properties=True,

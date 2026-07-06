@@ -301,6 +301,52 @@ class TestSearchEndpoint:
             ANY, "test", semantic=False, limit=50
         )
 
+    def test_search_accepts_friction_query_params(self, test_client_with_dispatcher):
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
+            return_value=[
+                {
+                    "file": "/repo/file.py",
+                    "line": 2,
+                    "snippet": "TODO",
+                    "source_metadata": {
+                        "schema_version": "search_source_metadata.v1",
+                        "records": [
+                            {
+                                "source_type": "friction",
+                                "category": "todo",
+                                "line": 2,
+                                "description": "todo",
+                                "pattern": "TODO",
+                            }
+                        ],
+                    },
+                }
+            ]
+        )
+
+        response = test_client_with_dispatcher.get(
+            "/search?q=test&source_type=friction&friction_categories=todo&include_source_metadata=true"
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload[0]["source_metadata"]["records"][0]["category"] == "todo"
+        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
+            ANY,
+            "test",
+            semantic=False,
+            limit=20,
+            source_type="friction",
+            friction_categories=["todo"],
+            include_source_metadata=True,
+        )
+
+    def test_search_rejects_unknown_friction_category(self, test_client_with_dispatcher):
+        response = test_client_with_dispatcher.get("/search?q=test&friction_categories=bad")
+
+        assert response.status_code == 400
+        assert response.json()["detail"]["error"] == "Invalid friction categories"
+
     def test_search_empty_query(self, test_client_with_dispatcher):
         """Test search with empty query."""
         test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])

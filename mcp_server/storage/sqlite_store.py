@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.errors import TransientArtifactError
 from ..core.path_resolver import PathResolver
+from ..indexing.source_metadata import extract_matching_source_metadata, merge_source_metadata
+from ..indexing.friction import extract_friction_markers
 from .connection_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,19 @@ _SQLITE_STORAGE_FAILURE_PATTERNS = (
     ("disk I/O error", "disk_io_error"),
     ("database or disk is full", "disk_full"),
 )
+
+
+def _merge_chunk_source_metadata(
+    metadata: Optional[Dict[str, Any]],
+    content: str,
+    line_start: int,
+) -> Dict[str, Any]:
+    records = []
+    for marker in extract_friction_markers(content):
+        adjusted = dict(marker)
+        adjusted["line"] = int(marker["line"]) + max(int(line_start) - 1, 0)
+        records.append(adjusted)
+    return merge_source_metadata(metadata, records)
 
 
 def _normalized_query_terms(query: str) -> List[str]:
@@ -1056,6 +1071,7 @@ class SQLiteStore:
         metadata: Optional[Dict] = None,
     ) -> int:
         """Store a code chunk with stable IDs and token counting."""
+        serialized_metadata = _merge_chunk_source_metadata(metadata, content, line_start)
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """INSERT INTO code_chunks
@@ -1107,7 +1123,7 @@ class SQLiteStore:
                     parent_chunk_id,
                     depth,
                     chunk_index,
-                    json.dumps(metadata or {}),
+                    json.dumps(serialized_metadata),
                 ),
             )
             if cursor.lastrowid:
@@ -1271,6 +1287,11 @@ class SQLiteStore:
             count = 0
             for chunk in chunks:
                 try:
+                    serialized_metadata = _merge_chunk_source_metadata(
+                        chunk.get("metadata"),
+                        chunk["content"],
+                        int(chunk["line_start"]),
+                    )
                     conn.execute(
                         """INSERT INTO code_chunks
                            (file_id, symbol_id, content, content_start, content_end,
@@ -1325,7 +1346,7 @@ class SQLiteStore:
                             chunk.get("parent_chunk_id"),
                             chunk.get("depth", 0),
                             chunk.get("chunk_index", 0),
-                            json.dumps(chunk.get("metadata") or {}),
+                            json.dumps(serialized_metadata),
                         ),
                     )
                     count += 1
@@ -1334,6 +1355,57 @@ class SQLiteStore:
                     continue
 
             return count
+
+    def search_chunks_by_source_metadata(
+        self,
+        *,
+        source_type: str = "friction",
+        friction_categories: Optional[List[str]] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Return chunks whose stored source metadata matches the requested filters."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT c.content, c.line_start, c.line_end, c.metadata,
+                          COALESCE(f.path, f.relative_path, CAST(c.file_id AS TEXT)) AS file_path
+                   FROM code_chunks c
+                   JOIN files f ON c.file_id = f.id
+                   WHERE c.metadata IS NOT NULL
+                     AND c.metadata != ''
+                   ORDER BY f.path, c.line_start
+                   LIMIT ?""",
+                (max(limit * 10, limit),),
+            )
+            rows = cursor.fetchall()
+
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            metadata_raw = row["metadata"]
+            if not metadata_raw:
+                continue
+            try:
+                metadata = json.loads(metadata_raw)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            source_metadata = extract_matching_source_metadata(
+                metadata,
+                source_type=source_type,
+                friction_categories=friction_categories,
+            )
+            if source_metadata is None:
+                continue
+            results.append(
+                {
+                    "file": row["file_path"],
+                    "line": row["line_start"],
+                    "line_end": row["line_end"],
+                    "snippet": row["content"],
+                    "source_metadata": source_metadata,
+                }
+            )
+            if len(results) >= limit:
+                break
+        return results
 
     # Reference operations
     def store_reference(
@@ -2634,7 +2706,7 @@ class SQLiteStore:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
-                          c.content, s.name AS symbol
+                          c.content, s.name AS symbol, c.metadata
                    FROM code_chunks c
                    JOIN files f ON c.file_id = f.id
                    LEFT JOIN symbols s ON c.symbol_id = s.id
@@ -2648,6 +2720,12 @@ class SQLiteStore:
             row = cursor.fetchone()
             if row is None:
                 return None
+            metadata: Dict[str, Any] = {}
+            if row[6]:
+                try:
+                    metadata = json.loads(row[6])
+                except (TypeError, json.JSONDecodeError):
+                    metadata = {}
             return {
                 "chunk_hash": row[0],
                 "file_id": row[1],
@@ -2655,4 +2733,5 @@ class SQLiteStore:
                 "chunk_end": row[3] or line,
                 "symbol": row[5] or "unknown",
                 "content": row[4] or "",
+                "metadata": metadata,
             }

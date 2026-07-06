@@ -127,7 +127,7 @@ topology, or install-surface support expansion.
 
 | Surface | Support tier | Default posture | Evidence basis | Notes |
 | --- | --- | --- | --- | --- |
-| STDIO query tools (`search_code`, `symbol_lookup`, `get_status`, `list_plugins`) | beta | Primary LLM surface | `stdio_runner._build_tool_list()`, readiness-gated tool descriptions, `plugin_availability` facts | Indexed query results are authoritative only when readiness is `ready` |
+| STDIO query tools (`search_code`, `symbol_lookup`, `get_status`, `list_plugins`) | beta | Primary LLM surface | `stdio_runner._build_tool_list()`, readiness-gated tool descriptions, `plugin_availability` facts | Indexed query results are authoritative only when readiness is `ready`; `search_code` also supports additive `source_type="friction"`, `friction_categories`, and `include_source_metadata` filters |
 | STDIO mutation and summarization tools (`reindex`, `write_summaries`, `summarize_sample`) | beta | Secondary tool surfaces behind readiness gates | `tool_handlers.py`, TOOLRDY evidence, readiness-refusal tests | Non-ready repos fail closed; the artifact is readiness evidence, not support expansion |
 | FastAPI admin and diagnostics surface | beta | Secondary/admin surface | `README.md`, `docs/GETTING_STARTED.md`, `docs/MCP_CONFIGURATION.md` | Do not treat FastAPI as the primary LLM interface |
 | Native source install via `uv sync --locked` | beta | Canonical local development and operator path | `pyproject.toml`, `uv.lock`, install docs | This is the preferred local install path while the release remains pre-GA |

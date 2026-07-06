@@ -78,6 +78,9 @@ class SearchResult(TypedDict):
 class SearchOpts(TypedDict, total=False):
     semantic: bool
     limit: int
+    source_type: str
+    friction_categories: list[str]
+    include_source_metadata: bool
 
 
 class IPlugin(ABC):
