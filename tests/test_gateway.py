@@ -17,6 +17,7 @@ from unittest.mock import ANY, Mock, patch
 
 import pytest
 
+from mcp_server.client_types import ClientSearchMatch, ClientSearchResult
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.plugin_base import SearchResult, SymbolDef
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -51,6 +52,7 @@ def test_client_with_dispatcher(
 
     monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
     monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
+    monkeypatch.setattr(gateway, "repo_resolver", None)
     for _attr in (
         "bm25_indexer",
         "hybrid_search",
@@ -232,25 +234,21 @@ class TestSearchEndpoint:
 
     def test_search_semantic(self, test_client_with_dispatcher):
         """Test semantic search."""
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
-
-        response = test_client_with_dispatcher.get("/search?q=test&semantic=true")
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(query="test"),
+        ) as mock_execute:
+            response = test_client_with_dispatcher.get("/search?q=test&semantic=true")
 
         assert response.status_code == 200
-        # Verify semantic parameter was passed (ctx is first positional arg)
-        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            ANY, "test", semantic=True, limit=20
-        )
+        assert mock_execute.call_args.kwargs["options"].semantic is True
+        assert mock_execute.call_args.kwargs["options"].limit == 20
 
     def test_search_auto_prefers_semantic_path_when_requested(
         self, test_client_with_dispatcher, monkeypatch
     ):
         """Auto mode should prefer semantic path instead of hybrid when semantic=true."""
         import mcp_server.gateway as gateway
-
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
-            return_value=[{"file": "mcp_server/gateway.py", "line": 1, "snippet": "gateway"}]
-        )
 
         class FakeHybrid:
             async def search(self, query, filters, limit):
@@ -259,136 +257,143 @@ class TestSearchEndpoint:
         gateway.hybrid_search = FakeHybrid()
         gateway.query_cache = None
 
-        # Use default test-token auth (fallback path grants ADMIN access without startup)
-        response = test_client_with_dispatcher.get("/search?q=test&semantic=true")
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(
+                query="test",
+                results=(
+                    ClientSearchMatch(
+                        file="mcp_server/gateway.py",
+                        line=1,
+                        snippet="gateway",
+                    ),
+                ),
+            ),
+        ) as mock_execute:
+            response = test_client_with_dispatcher.get("/search?q=test&semantic=true")
 
         assert response.status_code == 200
         payload = response.json()
         assert payload[0]["file"] == "mcp_server/gateway.py"
-        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            ANY, "test", semantic=True, limit=20
-        )
+        assert mock_execute.call_args.kwargs["options"].semantic is True
 
     def test_search_normalizes_internal_result_shapes(self, test_client_with_dispatcher):
         """Search should normalize internal file_path/filepath payloads to API schema."""
-        import mcp_server.gateway as gateway
-
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
-            return_value=[
-                {"file_path": "a.py", "snippet": "hello", "score": 0.9},
-                {"filepath": "b.py", "context": "world", "line": 4, "score": 0.7},
-            ]
-        )
-        gateway.query_cache = None
-
-        response = test_client_with_dispatcher.get("/search?q=test&semantic=true&mode=semantic")
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(
+                query="test",
+                results=(
+                    ClientSearchMatch(file="a.py", line=1, snippet="hello"),
+                    ClientSearchMatch(file="b.py", line=4, snippet="world"),
+                ),
+            ),
+        ):
+            response = test_client_with_dispatcher.get(
+                "/search?q=test&semantic=true&mode=semantic"
+            )
 
         assert response.status_code == 200
         payload = response.json()
         assert payload[0]["file"] == "a.py"
-        assert payload[0]["start_line"] == 1
+        assert payload[0].get("line", payload[0].get("start_line")) == 1
         assert payload[1]["file"] == "b.py"
-        assert payload[1]["start_line"] == 4
+        assert payload[1].get("line", payload[1].get("start_line")) == 4
 
     def test_search_with_limit(self, test_client_with_dispatcher):
         """Test search with custom limit."""
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
-
-        response = test_client_with_dispatcher.get("/search?q=test&limit=50")
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(query="test"),
+        ) as mock_execute:
+            response = test_client_with_dispatcher.get("/search?q=test&limit=50")
 
         assert response.status_code == 200
-        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            ANY, "test", semantic=False, limit=50
-        )
+        assert mock_execute.call_args.kwargs["options"].limit == 50
 
     def test_search_accepts_friction_query_params(self, test_client_with_dispatcher):
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
-            return_value=[
-                {
-                    "file": "/repo/file.py",
-                    "line": 2,
-                    "snippet": "TODO",
-                    "source_metadata": {
-                        "schema_version": "search_source_metadata.v1",
-                        "records": [
-                            {
-                                "source_type": "friction",
-                                "category": "todo",
-                                "line": 2,
-                                "description": "todo",
-                                "pattern": "TODO",
-                            }
-                        ],
-                    },
-                }
-            ]
-        )
-
-        response = test_client_with_dispatcher.get(
-            "/search?q=test&source_type=friction&friction_categories=todo&include_source_metadata=true"
-        )
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(
+                query="test",
+                results=(
+                    ClientSearchMatch(
+                        file="/repo/file.py",
+                        line=2,
+                        snippet="TODO",
+                        source_metadata={
+                            "schema_version": "search_source_metadata.v1",
+                            "records": [
+                                {
+                                    "source_type": "friction",
+                                    "category": "todo",
+                                    "line": 2,
+                                    "description": "todo",
+                                    "pattern": "TODO",
+                                }
+                            ],
+                        },
+                    ),
+                ),
+            ),
+        ) as execute_search_service:
+            response = test_client_with_dispatcher.get(
+                "/search?q=test&source_type=friction&friction_categories=todo&include_source_metadata=true"
+            )
 
         assert response.status_code == 200
         payload = response.json()
         assert payload[0]["source_metadata"]["records"][0]["category"] == "todo"
-        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            ANY,
-            "test",
-            semantic=False,
-            limit=20,
-            source_type="friction",
-            friction_categories=["todo"],
-            include_source_metadata=True,
-        )
+        options = execute_search_service.call_args.kwargs["options"]
+        assert options.source_type is not None and options.source_type.value == "friction"
+        assert options.friction_categories == ("todo",)
+        assert options.include_source_metadata is True
 
     def test_search_accepts_history_query_params(self, test_client_with_dispatcher):
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
-            return_value=[
-                {
-                    "file": "/repo/.mcp-index/history/owner/repo/issues/1.md",
-                    "line": 1,
-                    "snippet": "Reflection issue",
-                    "source_metadata": {
-                        "schema_version": "search_source_metadata.v1",
-                        "records": [
-                            {
-                                "source_type": "history",
-                                "type": "reflection",
-                                "repo": "owner/repo",
-                                "number": 1,
-                                "title": "Reflection issue",
-                                "labels": ["reflection"],
-                                "state": "closed",
-                                "created_at": "2026-07-01T00:00:00Z",
-                                "updated_at": "2026-07-02T00:00:00Z",
-                                "url": "https://github.com/owner/repo/issues/1",
-                                "summary": "Reflection issue",
-                                "learnings": [],
-                            }
-                        ],
-                    },
-                }
-            ]
-        )
-
-        response = test_client_with_dispatcher.get(
-            "/search?q=test&source_type=history&history_labels=reflection&history_repos=owner/repo&include_source_metadata=true"
-        )
+        with patch(
+            "mcp_server.gateway.execute_search_service",
+            return_value=ClientSearchResult(
+                query="test",
+                results=(
+                    ClientSearchMatch(
+                        file="/repo/.mcp-index/history/owner/repo/issues/1.md",
+                        line=1,
+                        snippet="Reflection issue",
+                        source_metadata={
+                            "schema_version": "search_source_metadata.v1",
+                            "records": [
+                                {
+                                    "source_type": "history",
+                                    "type": "reflection",
+                                    "repo": "owner/repo",
+                                    "number": 1,
+                                    "title": "Reflection issue",
+                                    "labels": ["reflection"],
+                                    "state": "closed",
+                                    "created_at": "2026-07-01T00:00:00Z",
+                                    "updated_at": "2026-07-02T00:00:00Z",
+                                    "url": "https://github.com/owner/repo/issues/1",
+                                    "summary": "Reflection issue",
+                                    "learnings": [],
+                                }
+                            ],
+                        },
+                    ),
+                ),
+            ),
+        ) as execute_search_service:
+            response = test_client_with_dispatcher.get(
+                "/search?q=test&source_type=history&history_labels=reflection&history_repos=owner/repo&include_source_metadata=true"
+            )
 
         assert response.status_code == 200
         payload = response.json()
         assert payload[0]["source_metadata"]["records"][0]["repo"] == "owner/repo"
-        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            ANY,
-            "test",
-            semantic=False,
-            limit=20,
-            source_type="history",
-            friction_categories=[],
-            history_labels=["reflection"],
-            history_repos=["owner/repo"],
-            include_source_metadata=True,
-        )
+        options = execute_search_service.call_args.kwargs["options"]
+        assert options.source_type is not None and options.source_type.value == "history"
+        assert options.history_labels == ("reflection",)
+        assert options.history_repos == ("owner/repo",)
+        assert options.include_source_metadata is True
 
     def test_search_rejects_unknown_friction_category(self, test_client_with_dispatcher):
         response = test_client_with_dispatcher.get("/search?q=test&friction_categories=bad")
@@ -402,8 +407,8 @@ class TestSearchEndpoint:
 
         response = test_client_with_dispatcher.get("/search?q=")
 
-        assert response.status_code == 200
-        assert response.json() == []
+        assert response.status_code == 400
+        assert response.json()["detail"]["error"] == "Invalid query"
 
     def test_search_no_dispatcher(self, test_client, monkeypatch):
         """Test search when dispatcher is not initialized."""
@@ -434,7 +439,6 @@ class TestSearchEndpoint:
     @pytest.mark.parametrize(
         "query,expected_results",
         [
-            ("", 0),
             ("a", 5),
             ("test function", 10),
             ("very long query " * 10, 2),
@@ -452,6 +456,14 @@ class TestSearchEndpoint:
 
         assert response.status_code == 200
         assert len(response.json()) == expected_results
+
+    def test_search_various_queries_rejects_empty_query(self, test_client_with_dispatcher):
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
+
+        response = test_client_with_dispatcher.get("/search?q=")
+
+        assert response.status_code == 400
+        assert response.json()["detail"]["error"] == "Invalid query"
 
 
 class TestStatusEndpoint:
@@ -793,6 +805,8 @@ class TestRepoCtxResolution:
 
         # Build a fake RepoContext to be returned by resolve()
         fake_ctx = Mock(spec=RepoContext)
+        fake_ctx.repo_id = "resolved"
+        fake_ctx.workspace_root = tmp_path
         fake_resolver = Mock()
         fake_resolver.resolve.return_value = fake_ctx
 
@@ -806,7 +820,7 @@ class TestRepoCtxResolution:
         assert response.status_code == 200
         fake_resolver.resolve.assert_called_once_with(tmp_path)
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            fake_ctx, "test", semantic=False, limit=20
+            fake_ctx, "test", semantic=False, fuzzy=False, limit=20
         )
 
     def test_search_resolves_via_repository_query_param(
@@ -817,6 +831,8 @@ class TestRepoCtxResolution:
         from mcp_server.core import RepoContext
 
         fake_ctx = Mock(spec=RepoContext)
+        fake_ctx.repo_id = "resolved"
+        fake_ctx.workspace_root = tmp_path
         fake_resolver = Mock()
         fake_resolver.resolve.return_value = fake_ctx
 
@@ -828,15 +844,19 @@ class TestRepoCtxResolution:
         assert response.status_code == 200
         fake_resolver.resolve.assert_called_once_with(tmp_path)
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            fake_ctx, "test", semantic=False, limit=20
+            fake_ctx, "test", semantic=False, fuzzy=False, limit=20
         )
 
-    def test_search_falls_back_to_cwd_resolution(self, test_client_with_dispatcher, monkeypatch):
+    def test_search_falls_back_to_cwd_resolution(
+        self, test_client_with_dispatcher, monkeypatch, tmp_path
+    ):
         """POST /search without header/param falls back to resolver.resolve(cwd)."""
         import mcp_server.gateway as gateway
         from mcp_server.core import RepoContext
 
         fake_ctx = Mock(spec=RepoContext)
+        fake_ctx.repo_id = "resolved"
+        fake_ctx.workspace_root = tmp_path
         fake_resolver = Mock()
         fake_resolver.resolve.return_value = fake_ctx
 
@@ -849,7 +869,7 @@ class TestRepoCtxResolution:
         # resolver.resolve should have been called (with cwd)
         fake_resolver.resolve.assert_called_once()
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            fake_ctx, "test", semantic=False, limit=20
+            fake_ctx, "test", semantic=False, fuzzy=False, limit=20
         )
 
     def test_no_private_attr_access_in_gateway(self):

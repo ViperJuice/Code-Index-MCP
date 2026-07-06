@@ -1,8 +1,9 @@
 import asyncio
 import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from mcp_server.client_types import ClientSearchMatch, ClientSearchResult
 from mcp_server.health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
 
 
@@ -34,47 +35,53 @@ def test_handle_search_code_passes_source_filters():
     from mcp_server.cli.tool_handlers import handle_search_code
 
     dispatcher = MagicMock()
-    dispatcher.search.return_value = [
-        {
-            "file": "/repo/file.py",
-            "line": 3,
-            "snippet": "TODO",
-            "source_metadata": {
-                "schema_version": "search_source_metadata.v1",
-                "records": [
-                    {
-                        "source_type": "friction",
-                        "category": "todo",
-                        "line": 3,
-                        "description": "todo",
-                        "pattern": "TODO",
-                    }
-                ],
-            },
-        }
-    ]
     ctx = SimpleNamespace(registry_entry=None, sqlite_store=MagicMock())
 
-    result = _run(
-        handle_search_code(
-            arguments={
-                "query": "todo",
-                "source_type": "friction",
-                "friction_categories": ["todo"],
-                "include_source_metadata": True,
-            },
-            dispatcher=dispatcher,
-            repo_resolver=_Resolver(ctx),
+    with patch(
+        "mcp_server.cli.tool_handlers.execute_search_service",
+        return_value=ClientSearchResult(
+            query="todo",
+            results=(
+                ClientSearchMatch(
+                    file="/repo/file.py",
+                    line=3,
+                    snippet="TODO",
+                    source_metadata={
+                        "schema_version": "search_source_metadata.v1",
+                        "records": [
+                            {
+                                "source_type": "friction",
+                                "category": "todo",
+                                "line": 3,
+                                "description": "todo",
+                                "pattern": "TODO",
+                            }
+                        ],
+                    },
+                ),
+            ),
+            include_source_metadata=True,
+        ),
+    ) as execute_search_service:
+        result = _run(
+            handle_search_code(
+                arguments={
+                    "query": "todo",
+                    "source_type": "friction",
+                    "friction_categories": ["todo"],
+                    "include_source_metadata": True,
+                },
+                dispatcher=dispatcher,
+                repo_resolver=_Resolver(ctx),
+            )
         )
-    )
 
     data = _parsed(result)
     assert data["results"][0]["source_metadata"]["records"][0]["category"] == "todo"
-    dispatcher.search.assert_called_once()
-    _, kwargs = dispatcher.search.call_args
-    assert kwargs["source_type"] == "friction"
-    assert kwargs["friction_categories"] == ["todo"]
-    assert kwargs["include_source_metadata"] is True
+    options = execute_search_service.call_args.kwargs["options"]
+    assert options.source_type is not None and options.source_type.value == "friction"
+    assert options.friction_categories == ("todo",)
+    assert options.include_source_metadata is True
 
 
 def test_handle_search_code_rejects_unknown_friction_category():

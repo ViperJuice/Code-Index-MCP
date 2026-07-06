@@ -16,6 +16,7 @@ from typing import Any, Optional, Sequence
 
 import mcp.types as types
 
+from mcp_server.client import ClientValidationError, build_search_options, execute_search_service
 from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, validate_index
 from mcp_server.cli.task_reindex import run_reindex_task
 from mcp_server.cli.task_write_summaries import run_write_summaries_task
@@ -424,50 +425,7 @@ async def handle_search_code(
             )
         ]
 
-    semantic = (arguments or {}).get("semantic", False)
-    fuzzy = (arguments or {}).get("fuzzy", False)
-    limit = (arguments or {}).get("limit", 20)
     repository = (arguments or {}).get("repository")
-    source_type = (arguments or {}).get("source_type")
-    include_source_metadata = bool((arguments or {}).get("include_source_metadata", False))
-
-    try:
-        friction_categories = _normalize_friction_categories_argument(
-            (arguments or {}).get("friction_categories")
-        )
-    except ValueError as exc:
-        return _json_text_response(
-            {
-                "error": "Invalid friction categories",
-                "details": str(exc),
-                "allowed_categories": list(FRICTION_CATEGORIES),
-            }
-        )
-
-    try:
-        history_labels = _normalize_string_list_argument(
-            (arguments or {}).get("history_labels"),
-            "history_labels",
-        )
-        history_repos = _normalize_string_list_argument(
-            (arguments or {}).get("history_repos"),
-            "history_repos",
-        )
-    except ValueError as exc:
-        return _json_text_response(
-            {
-                "error": "Invalid search source filters",
-                "details": str(exc),
-            }
-        )
-
-    if source_type not in (None, "friction", "history"):
-        return _json_text_response(
-            {
-                "error": "Invalid source type",
-                "details": "source_type must be 'friction' or 'history' when provided",
-            }
-        )
 
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
@@ -487,78 +445,41 @@ async def handle_search_code(
                 )
             ]
 
-    readiness = _classify_ctx(repo_resolver, repository)
-    if readiness is not None and not readiness.ready:
-        return _index_unavailable_response(readiness, "search_code", query=query)
-
-    # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
-    ctx = _resolve_ctx(repo_resolver, repository)
-    semantic_readiness = None
-    if semantic and ctx is not None:
-        semantic_readiness = ReadinessClassifier.classify_semantic_registered(
-            ctx.registry_entry,
-            ctx.sqlite_store,
+    try:
+        options = build_search_options(
+            query=query,
+            repository=repository,
+            semantic=(arguments or {}).get("semantic", False),
+            fuzzy=(arguments or {}).get("fuzzy", False),
+            limit=(arguments or {}).get("limit", 20),
+            source_type=(arguments or {}).get("source_type"),
+            friction_categories=(arguments or {}).get("friction_categories"),
+            history_labels=(arguments or {}).get("history_labels"),
+            history_repos=(arguments or {}).get("history_repos"),
+            include_source_metadata=bool(
+                (arguments or {}).get("include_source_metadata", False)
+            ),
         )
-        if not semantic_readiness.ready:
-            return _semantic_not_ready_response(semantic_readiness, query=query)
+    except ClientValidationError as exc:
+        payload = {"error": exc.error, "details": exc.details}
+        if exc.allowed_categories:
+            payload["allowed_categories"] = exc.allowed_categories
+        return _json_text_response(payload)
+    except ValueError as exc:
+        return _json_text_response({"error": "Invalid search source filters", "details": str(exc)})
 
     try:
-        if ctx is not None:
-            search_kwargs = {
-                "semantic": semantic,
-                "fuzzy": fuzzy,
-                "limit": limit,
-            }
-            if (
-                source_type
-                or friction_categories
-                or history_labels
-                or history_repos
-                or include_source_metadata
-            ):
-                search_kwargs["source_type"] = source_type
-                search_kwargs["friction_categories"] = friction_categories
-                if history_labels:
-                    search_kwargs["history_labels"] = history_labels
-                if history_repos:
-                    search_kwargs["history_repos"] = history_repos
-                search_kwargs["include_source_metadata"] = include_source_metadata
-            results_iter = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: list(dispatcher.search(ctx, query, **search_kwargs)),  # type: ignore[call-arg]
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: execute_search_service(
+                    dispatcher=dispatcher,
+                    repo_resolver=repo_resolver,
+                    options=options,
                 ),
-                timeout=10.0,
-            )
-        else:
-            # Pre-SL-1 fallback — search without ctx
-            search_kwargs = {
-                "semantic": semantic,
-                "fuzzy": fuzzy,
-                "limit": limit,
-            }
-            if (
-                source_type
-                or friction_categories
-                or history_labels
-                or history_repos
-                or include_source_metadata
-            ):
-                search_kwargs["source_type"] = source_type
-                search_kwargs["friction_categories"] = friction_categories
-                if history_labels:
-                    search_kwargs["history_labels"] = history_labels
-                if history_repos:
-                    search_kwargs["history_repos"] = history_repos
-                search_kwargs["include_source_metadata"] = include_source_metadata
-            results_iter = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: list(dispatcher.search(query, **search_kwargs)),  # type: ignore[call-arg]
-                ),
-                timeout=10.0,
-            )
-        results = list(results_iter)
+            ),
+            timeout=10.0,
+        )
     except asyncio.TimeoutError:
         return [
             types.TextContent(
@@ -575,12 +496,6 @@ async def handle_search_code(
         ]
     except Exception as e:
         logger.error(f"Search failed: {e}")
-        if semantic:
-            return _semantic_failure_response(
-                query=query,
-                semantic_readiness=semantic_readiness,
-                error=e,
-            )
         return [
             types.TextContent(
                 type="text",
@@ -594,54 +509,92 @@ async def handle_search_code(
             )
         ]
 
-    logger.info(f"Search completed with {len(results)} results")
+    logger.info(f"Search completed with {len(result.results)} results")
 
     _indexing_active = indexing_thread is not None and indexing_thread.is_alive()
+    semantic = result.semantic_requested
+    source_type = result.source_type.value if result.source_type is not None else None
+    friction_categories = list(result.friction_categories)
+    history_labels = list(result.history_labels)
+    history_repos = list(result.history_repos)
+    include_source_metadata = result.include_source_metadata
+    readiness = result.readiness
+    semantic_readiness = result.semantic_readiness
+    semantic_profile_id = (
+        semantic_readiness.get("profile_id")
+        if isinstance(semantic_readiness, dict)
+        else getattr(semantic_readiness, "profile_id", None)
+    )
+    semantic_collection_name = (
+        semantic_readiness.get("collection_name")
+        if isinstance(semantic_readiness, dict)
+        else getattr(semantic_readiness, "collection_name", None)
+    )
 
-    if results:
+    if result.index_unavailable is not None:
+        return _json_text_response(
+            {
+                "error": "Index unavailable",
+                "code": result.index_unavailable.code,
+                "tool": "search_code",
+                "safe_fallback": result.index_unavailable.safe_fallback,
+                "readiness": result.index_unavailable.readiness,
+                "message": result.index_unavailable.message,
+                "remediation": result.index_unavailable.remediation,
+                "query": query,
+            }
+        )
+    if result.code == "semantic_not_ready":
+        return _json_text_response(
+            {
+                "results": [],
+                "code": "semantic_not_ready",
+                "query": query,
+                "semantic_requested": True,
+                "semantic_source": "semantic",
+                "semantic_profile_id": result.semantic_profile_id,
+                "semantic_collection_name": result.semantic_collection_name,
+                "semantic_fallback_status": "refused_not_ready",
+                "semantic_readiness": semantic_readiness,
+                "message": result.message,
+                "remediation": semantic_readiness.get("remediation") if semantic_readiness else None,
+            }
+        )
+    if result.code == "semantic_search_failed":
+        return _json_text_response(
+            {
+                "results": [],
+                "code": "semantic_search_failed",
+                "query": query,
+                "semantic_requested": True,
+                "semantic_source": "semantic",
+                "semantic_profile_id": result.semantic_profile_id,
+                "semantic_collection_name": result.semantic_collection_name,
+                "semantic_fallback_status": "failed_runtime",
+                "semantic_readiness": semantic_readiness,
+                "message": result.message,
+            }
+        )
+
+    if result.results:
         results_data = []
-        for r in results:
-            file_path = _translate_path(
-                r.get("file", "") if isinstance(r, dict) else getattr(r, "file", "")
-            )
-            line = r.get("line") if isinstance(r, dict) else getattr(r, "line", None)
+        for item in result.results:
+            file_path = _translate_path(item.file)
+            line = item.line
             result_item = {
                 "file": file_path,
                 "line": line,
-                "line_end": (
-                    r.get("line_end") if isinstance(r, dict) else getattr(r, "line_end", None)
-                ),
-                "symbol": r.get("symbol") if isinstance(r, dict) else getattr(r, "symbol", None),
-                "snippet": r.get("snippet") if isinstance(r, dict) else getattr(r, "snippet", None),
-                "last_indexed": (
-                    r.get("last_modified")
-                    if isinstance(r, dict)
-                    else getattr(r, "last_modified", None)
-                ),
+                "line_end": item.line_end,
+                "symbol": item.symbol,
+                "snippet": item.snippet,
+                "last_indexed": item.last_indexed,
             }
-            source_metadata = (
-                r.get("source_metadata")
-                if isinstance(r, dict)
-                else getattr(r, "source_metadata", None)
-            )
-            if source_metadata is not None:
-                result_item["source_metadata"] = source_metadata
+            if item.source_metadata is not None:
+                result_item["source_metadata"] = item.source_metadata
             if semantic:
-                result_item["semantic_source"] = (
-                    r.get("semantic_source")
-                    if isinstance(r, dict)
-                    else getattr(r, "semantic_source", None)
-                )
-                result_item["semantic_profile_id"] = (
-                    r.get("semantic_profile_id")
-                    if isinstance(r, dict)
-                    else getattr(r, "semantic_profile_id", None)
-                )
-                result_item["semantic_collection_name"] = (
-                    r.get("semantic_collection_name")
-                    if isinstance(r, dict)
-                    else getattr(r, "semantic_collection_name", None)
-                )
+                result_item["semantic_source"] = item.semantic_source
+                result_item["semantic_profile_id"] = item.semantic_profile_id
+                result_item["semantic_collection_name"] = item.semantic_collection_name
             if line and file_path:
                 offset = line - 1
                 result_item["_usage_hint"] = (
@@ -651,9 +604,9 @@ async def handle_search_code(
 
         # Lazy summarization enqueue
         if lazy_summarizer and lazy_summarizer.can_summarize() and sqlite_store:
-            for r in results[:5]:
-                raw_file = r.get("file", "") if isinstance(r, dict) else getattr(r, "file", "")
-                raw_line = r.get("line", 1) if isinstance(r, dict) else getattr(r, "line", 1)
+            for item in result.results[:5]:
+                raw_file = item.file
+                raw_line = item.line or 1
                 if raw_file and raw_line:
                     chunk_info = sqlite_store.find_chunk_at_line(raw_file, int(raw_line))
                     if chunk_info:
@@ -674,12 +627,8 @@ async def handle_search_code(
             if semantic:
                 search_response["semantic_requested"] = True
                 search_response["semantic_source"] = "semantic"
-                search_response["semantic_profile_id"] = (
-                    semantic_readiness.profile_id if semantic_readiness is not None else None
-                )
-                search_response["semantic_collection_name"] = (
-                    semantic_readiness.collection_name if semantic_readiness is not None else None
-                )
+                search_response["semantic_profile_id"] = semantic_profile_id
+                search_response["semantic_collection_name"] = semantic_collection_name
                 search_response["semantic_fallback_status"] = "not_attempted"
             if source_type:
                 search_response["source_type"] = source_type
@@ -712,17 +661,17 @@ async def handle_search_code(
             "message": (
                 "No results yet — initial index is still building"
                 if _indexing_active
-                else "No results found in index"
+                else (result.message or "No results found in index")
             ),
         }
         if semantic:
             response_data["semantic_requested"] = True
             response_data["semantic_source"] = "semantic"
             response_data["semantic_profile_id"] = (
-                semantic_readiness.profile_id if semantic_readiness is not None else None
+                result.semantic_profile_id
             )
             response_data["semantic_collection_name"] = (
-                semantic_readiness.collection_name if semantic_readiness is not None else None
+                result.semantic_collection_name
             )
             response_data["semantic_fallback_status"] = "not_attempted"
         if source_type:
@@ -736,7 +685,9 @@ async def handle_search_code(
         if include_source_metadata:
             response_data["include_source_metadata"] = True
         if readiness is not None:
-            response_data["readiness"] = readiness.to_dict()
+            response_data["readiness"] = (
+                readiness if isinstance(readiness, dict) else readiness.to_dict()
+            )
         if _indexing_active:
             response_data["indexing_in_progress"] = True
         return [types.TextContent(type="text", text=_ensure_response(response_data))]

@@ -298,6 +298,34 @@ search_code(query="def parse", repository="my-repo")
 symbol_lookup(symbol="Parser", repository="my-repo")
 ```
 
+**Python client (beta local API)**: for local scripts and applications on the
+same machine as the registered repo, use `mcp_server.client` instead of
+starting STDIO or calling FastAPI. MCP tools remain the preferred LLM surface.
+
+```python
+from mcp_server.client import open_client
+from mcp_server.client_types import ClientSearchOptions
+
+with open_client(workspace_root="/path/to/repo") as client:
+    result = client.search_code(
+        ClientSearchOptions(
+            query="TODO",
+            source_type="friction",
+            friction_categories=("todo",),
+            include_source_metadata=True,
+        )
+    )
+    if result.index_unavailable:
+        print(result.index_unavailable.safe_fallback)
+    else:
+        print(result.results[0].file)
+```
+
+The supported Python client surface is local-only: `search_code`,
+`symbol_lookup`, `reindex`, and `get_status` share the same readiness-aware
+service as the MCP `search_code` tool. It is a local programmatic API, not a
+remote service client.
+
 Friction pattern metadata is available as an additive filter on `search_code`.
 Use `source_type="friction"` with optional `friction_categories=["todo",
 "fixme", "hack", "workaround", "wish", "extraction_hint"]`. Set
@@ -1125,6 +1153,27 @@ Query parameters:
   issue documents
 - `include_source_metadata` (optional): include `search_source_metadata.v1`
   records on matching results
+
+### Python Client API (beta local API)
+
+Use the Python client when you need local programmatic access from the same
+machine and registered checkout. Use MCP tools when an assistant needs the
+primary LLM tool surface.
+
+```python
+from mcp_server.client import open_client
+from mcp_server.client_types import ClientSearchOptions
+
+with open_client(workspace_root="/path/to/repo") as client:
+    search = client.search_code(ClientSearchOptions(query="Reflection issue"))
+    symbol = client.symbol_lookup("IndexItClient")
+    status = client.get_status()
+```
+
+Readiness remains fail-closed. Non-ready repositories return typed
+`index_unavailable` data with `safe_fallback="native_search"` instead of
+dispatching against a stale index. The beta Python client intentionally has no
+remote service client.
 
 ### Response Format
 

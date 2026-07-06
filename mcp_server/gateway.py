@@ -15,6 +15,12 @@ from .cache import (
     QueryResultCache,
     QueryType,
 )
+from .client import (
+    ClientValidationError,
+    build_search_options,
+    execute_search_service,
+    search_result_for_gateway,
+)
 from .cli.index_management import _get_profile_collection_name
 from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .config.environment import is_production as _is_production
@@ -32,7 +38,7 @@ from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
-from .indexing.source_metadata import FRICTION_CATEGORIES, normalize_friction_category
+from .indexing.source_metadata import normalize_friction_category
 from .plugin_base import SearchResult, SymbolDef
 from .plugin_system import PluginManager
 from .security import (
@@ -1372,36 +1378,48 @@ async def search(
         logger.error("Search attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
 
-    if source_type not in (None, "friction", "history"):
-        raise HTTPException(
-            400,
-            {
-                "error": "Invalid source type",
-                "details": "source_type must be 'friction' or 'history' when provided",
-            },
-        )
     try:
-        normalized_friction_categories = _normalize_source_metadata_categories(friction_categories)
+        options = build_search_options(
+            query=q,
+            repository=request.query_params.get("repository"),
+            semantic=semantic,
+            limit=limit,
+            source_type=source_type,
+            friction_categories=friction_categories,
+            history_labels=history_labels,
+            history_repos=history_repos,
+            include_source_metadata=include_source_metadata,
+        )
+    except ClientValidationError as exc:
+        detail: dict[str, Any] = {"error": exc.error, "details": exc.details}
+        if exc.allowed_categories:
+            detail["allowed_categories"] = exc.allowed_categories
+        raise HTTPException(400, detail) from exc
     except ValueError as exc:
         raise HTTPException(
-            400,
-            {
-                "error": "Invalid friction categories",
-                "details": str(exc),
-                "allowed_categories": list(FRICTION_CATEGORIES),
-            },
+            400, {"error": "Invalid search source filters", "details": str(exc)}
         ) from exc
-    normalized_history_labels = _normalize_csv_filters(history_labels)
-    normalized_history_repos = _normalize_csv_filters(history_repos)
 
     ctx = get_repo_ctx(request)
+    explicit_repository = request.query_params.get("repository")
+    service_repo_resolver = repo_resolver
+    if explicit_repository is None and ctx.repo_id == _FALLBACK_REPO_ID:
+        service_repo_resolver = None
     start_time = time.time()
     try:
         # Determine effective search mode
         effective_mode = mode
+        filtered_search_requested = bool(
+            options.source_type
+            or options.friction_categories
+            or options.history_labels
+            or options.history_repos
+            or options.include_source_metadata
+        )
         if mode == "auto":
-            # Auto mode: semantic requests prefer the dedicated semantic path.
-            if semantic and dispatcher and hasattr(dispatcher, "search"):
+            if filtered_search_requested and dispatcher and hasattr(dispatcher, "search"):
+                effective_mode = "semantic" if semantic else "classic"
+            elif semantic and dispatcher and hasattr(dispatcher, "search"):
                 effective_mode = "semantic"
             # Non-semantic requests use hybrid if available, otherwise fall back.
             elif hybrid_search is not None:
@@ -1486,25 +1504,46 @@ async def search(
             # Use classic dispatcher with semantic=True
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
-                    search_kwargs = {"semantic": True, "limit": limit}
-                    if (
-                        source_type
-                        or normalized_friction_categories
-                        or normalized_history_labels
-                        or normalized_history_repos
-                        or include_source_metadata
-                    ):
-                        search_kwargs["source_type"] = source_type
-                        search_kwargs["friction_categories"] = normalized_friction_categories
-                        if normalized_history_labels:
-                            search_kwargs["history_labels"] = normalized_history_labels
-                        if normalized_history_repos:
-                            search_kwargs["history_repos"] = normalized_history_repos
-                        search_kwargs["include_source_metadata"] = include_source_metadata
-                    results = list(dispatcher.search(ctx, q, **search_kwargs))
-                    results = [
-                        r for r in (_normalize_search_result(x) for x in results) if r is not None
-                    ]
+                    result = execute_search_service(
+                        dispatcher=dispatcher,
+                        repo_resolver=service_repo_resolver,
+                        options=options,
+                        workspace_root=ctx.workspace_root,
+                        ctx=ctx,
+                    )
+                    if result.index_unavailable is not None:
+                        raise HTTPException(
+                            503,
+                            detail={
+                                "error": "Index unavailable",
+                                "code": result.index_unavailable.code,
+                                "safe_fallback": result.index_unavailable.safe_fallback,
+                                "readiness": result.index_unavailable.readiness,
+                                "message": result.index_unavailable.message,
+                                "remediation": result.index_unavailable.remediation,
+                            },
+                        )
+                    if result.code == "semantic_not_ready":
+                        raise HTTPException(
+                            503,
+                            detail={
+                                "error": "Semantic search not ready",
+                                "code": result.code,
+                                "semantic_readiness": result.semantic_readiness,
+                                "message": result.message,
+                            },
+                        )
+                    if result.code == "semantic_search_failed":
+                        raise HTTPException(
+                            500,
+                            detail={
+                                "error": "Semantic search failed",
+                                "code": result.code,
+                                "semantic_readiness": result.semantic_readiness,
+                                "message": result.message,
+                            },
+                        )
+                    results = search_result_for_gateway(result)
             else:
                 raise HTTPException(
                     503,
@@ -1553,25 +1592,26 @@ async def search(
             # Classic search through dispatcher
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
-                    search_kwargs = {"semantic": False, "limit": limit}
-                    if (
-                        source_type
-                        or normalized_friction_categories
-                        or normalized_history_labels
-                        or normalized_history_repos
-                        or include_source_metadata
-                    ):
-                        search_kwargs["source_type"] = source_type
-                        search_kwargs["friction_categories"] = normalized_friction_categories
-                        if normalized_history_labels:
-                            search_kwargs["history_labels"] = normalized_history_labels
-                        if normalized_history_repos:
-                            search_kwargs["history_repos"] = normalized_history_repos
-                        search_kwargs["include_source_metadata"] = include_source_metadata
-                    results = list(dispatcher.search(ctx, q, **search_kwargs))
-                    results = [
-                        r for r in (_normalize_search_result(x) for x in results) if r is not None
-                    ]
+                    result = execute_search_service(
+                        dispatcher=dispatcher,
+                        repo_resolver=service_repo_resolver,
+                        options=options,
+                        workspace_root=ctx.workspace_root,
+                        ctx=ctx,
+                    )
+                    if result.index_unavailable is not None:
+                        raise HTTPException(
+                            503,
+                            detail={
+                                "error": "Index unavailable",
+                                "code": result.index_unavailable.code,
+                                "safe_fallback": result.index_unavailable.safe_fallback,
+                                "readiness": result.index_unavailable.readiness,
+                                "message": result.index_unavailable.message,
+                                "remediation": result.index_unavailable.remediation,
+                            },
+                        )
+                    results = search_result_for_gateway(result)
             else:
                 raise HTTPException(503, "Classic search not available")
 

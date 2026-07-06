@@ -269,6 +269,39 @@ categories return a metadata-only validation error rather than an empty result.
 History ingestion is explicit through `mcp-index history ingest`, is
 fixture-backed in tests, and does not persist raw issue bodies by default.
 
+#### Python client (beta local API)
+
+The supported programmatic import path is `mcp_server.client`. Use it for local
+scripts and applications that can access the same registered checkout and
+SQLite-backed index directly. MCP tools remain the preferred LLM surface.
+
+```python
+from mcp_server.client import open_client
+from mcp_server.client_types import ClientSearchOptions
+
+with open_client(workspace_root="/path/to/repo") as client:
+    search = client.search_code(
+        ClientSearchOptions(
+            query="TODO",
+            source_type="friction",
+            friction_categories=("todo",),
+            include_source_metadata=True,
+        )
+    )
+    status = client.get_status()
+```
+
+Supported local client calls:
+- `search_code(ClientSearchOptions(...))`
+- `symbol_lookup(symbol, repository=...)`
+- `reindex(repository=...)`
+- `get_status(repository=...)`
+
+The client shares readiness-aware search behavior with MCP `search_code`. A
+non-ready repo returns typed `index_unavailable` data with
+`safe_fallback="native_search"`. This beta client is intentionally local-only:
+no remote service client is supported here.
+
 **Example:**
 ```bash
 curl -H "Authorization: Bearer <token>" \
