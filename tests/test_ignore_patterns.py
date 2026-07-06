@@ -94,6 +94,14 @@ class TestCustomIgnoreFile:
         )
         assert manager.should_ignore(Path("tests/test_repository_commands.py")) is False
 
+    def test_repo_coverage_artifacts_are_ignored(self):
+        manager = IgnorePatternManager(root_path=REPO_ROOT)
+        assert manager.should_ignore(Path("coverage.xml")) is True
+        assert manager.should_ignore(Path("coverage.json")) is True
+        assert manager.should_ignore(Path(".coverage")) is True
+        assert manager.should_ignore(Path(".coverage.unit")) is True
+        assert manager.should_ignore(Path("htmlcov/index.html")) is True
+
 
 class TestGitignoreIntegration:
     """Patterns from .gitignore are also loaded and respected."""

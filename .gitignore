@@ -21,7 +21,10 @@ wheels/
 *.egg
 MANIFEST
 .pytest_cache/
-.coverage
+.coverage*
+coverage.xml
+coverage.json
+htmlcov/
 .tox/
 .mypy_cache/
 .dmypy.json
@@ -218,7 +221,6 @@ private-alpha-evidence/
 # 1Password op run env-file for MCP server (references only, but machine-local)
 .mcp.env
 index-archive.tar.gz
-coverage.xml
 .metadata/coverage.xml
 
 # execute-phase artifacts

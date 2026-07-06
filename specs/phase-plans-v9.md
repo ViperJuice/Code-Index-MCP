@@ -420,7 +420,11 @@ calls through it where PATH/tool discovery matters.
 This phase owns #29. Prefer a small local helper over importing from
 ai-dev-kit directly unless a stable shared package exists. This phase does not
 gate friction extraction, but it should gate historical issue fetching because
-that path shells out to `gh`.
+that path shells out to `gh`. COVERAGE measured the current local/offloaded
+validation-owned baseline at `17.31%` on 2026-07-06 while the repo still has
+an existing `--cov-fail-under=35` posture in `pytest.ini`, so downstream
+planning must keep the `--cov-fail-under=80` ramp deferred until a later phase
+explicitly re-measures and schedules the threshold change.
 
 **Non-goals**
 

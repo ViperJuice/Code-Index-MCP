@@ -1049,9 +1049,20 @@ pytest
 # Run specific test
 pytest test_python_plugin.py
 
-# Run with coverage
-pytest --cov=mcp_server --cov-report=html
+# Measure the current local/offloaded coverage baseline
+make coverage-baseline
+
+# Generate the local/offloaded coverage report
+make coverage
+
+# Reject tracked or staged generated coverage outputs
+make coverage-artifact-guard
 ```
+
+The COVERAGE contract is local/offloaded first: `make coverage` emits terminal
+missing-line output plus `coverage.xml`, and `make agent-full` owns routine
+coverage generation. The README badge remains deferred until a trusted event
+produces real uploaded evidence.
 
 ### Architecture Visualization
 
