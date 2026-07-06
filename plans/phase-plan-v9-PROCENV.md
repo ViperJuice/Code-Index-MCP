@@ -77,7 +77,7 @@ SL-2 — CLI, preflight, and validation subprocess adoption
   Blocks: SL-3, SL-4
   Parallel-safe: no
 SL-3 — PROCENV contract verification
-  Depends on: SL-1, SL-2
+  Depends on: SL-0, SL-1, SL-2
   Blocks: SL-4
   Parallel-safe: no
 SL-4 — PROCENV evidence and docs reducer

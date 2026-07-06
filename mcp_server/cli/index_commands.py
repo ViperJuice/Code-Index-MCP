@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from mcp_server.config.index_paths import IndexPathConfig
 from mcp_server.utils.index_discovery import IndexDiscovery
+from mcp_server.utils.subprocess_env import get_full_env
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class BaseIndexCommand:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=get_full_env(),
             )
             url = result.stdout.strip()
             return hashlib.sha256(url.encode()).hexdigest()[:12]
@@ -139,7 +141,10 @@ class CreateIndexCommand(BaseIndexCommand):
             # Run indexing
             logger.info(f"Creating index for {repo} at {index_path}")
             proc = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=get_full_env(),
             )
 
             stdout, stderr = await proc.communicate()
@@ -557,6 +562,7 @@ class SyncIndexCommand(BaseIndexCommand):
                         capture_output=True,
                         text=True,
                         check=True,
+                        env=get_full_env(),
                     )
                     changed_files = result.stdout.strip().split("\n") if result.stdout else []
 
@@ -586,7 +592,10 @@ class SyncIndexCommand(BaseIndexCommand):
 
             # Run sync command
             proc = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=get_full_env(),
             )
 
             stdout, stderr = await proc.communicate()

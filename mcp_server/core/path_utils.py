@@ -7,9 +7,12 @@ environments (Docker, native, CI/CD) without hardcoded paths.
 
 import logging
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
+
+from mcp_server.utils.subprocess_env import get_full_env
 
 logger = logging.getLogger(__name__)
 
@@ -165,12 +168,8 @@ class PathUtils:
         if env_path := os.environ.get(cls.ENV_PYTHON_PATH):
             return env_path
 
-        # Try common locations
-        import subprocess
-
         for python in ["python3", "python", "/usr/local/bin/python"]:
-            result = subprocess.run(["which", python], capture_output=True, check=False)
-            if result.returncode == 0:
+            if shutil.which(python, path=get_full_env().get("PATH")):
                 return python
 
         # Fall back to sys.executable

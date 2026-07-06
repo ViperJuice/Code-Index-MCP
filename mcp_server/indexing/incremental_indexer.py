@@ -16,6 +16,7 @@ from ..core.repo_context import RepoContext
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..storage.sqlite_store import SQLiteStore
 from ..storage.two_phase import two_phase_commit
+from ..utils.subprocess_env import get_full_env
 from .change_detector import FileChange
 from .checkpoint import (
     ReindexCheckpoint,
@@ -615,6 +616,7 @@ class IncrementalIndexer:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=get_full_env(),
             )
             remote_url = result.stdout.strip()
             return hashlib.sha256(remote_url.encode()).hexdigest()[:12]

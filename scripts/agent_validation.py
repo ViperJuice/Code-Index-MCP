@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
+
+from mcp_server.utils.subprocess_env import get_command_availability, get_full_env
 
 REPO = Path(__file__).resolve().parents[1]
 DOCS_ONLY_PREFIXES = ("docs/",)
@@ -38,7 +39,7 @@ class OffloadPlan:
 
 
 def _run(cmd: Sequence[str]) -> int:
-    return subprocess.run(list(cmd), cwd=REPO, check=False).returncode
+    return subprocess.run(list(cmd), cwd=REPO, check=False, env=get_full_env()).returncode
 
 
 def _is_docs_only(path: str) -> bool:
@@ -60,7 +61,7 @@ def classify_changed_paths(paths: Sequence[str]) -> str:
 
 
 def _command_available(name: str) -> bool:
-    return shutil.which(name) is not None
+    return get_command_availability(name).available
 
 
 def build_offload_plan(target: str) -> OffloadPlan:
@@ -99,6 +100,7 @@ def _changed_paths() -> list[str]:
             capture_output=True,
             text=True,
             check=False,
+            env=get_full_env(),
         )
         if result.returncode != 0:
             continue
@@ -129,7 +131,8 @@ def cmd_run(target: str) -> int:
     plan = build_offload_plan(target)
     print(f"selected_mode={plan.mode}")
     print(f"selected_target={target}")
-    print("command=" + " ".join(plan.command))
+    print(f"command_name={plan.command[0]}")
+    print("command_redacted=true")
     return _run(plan.command)
 
 

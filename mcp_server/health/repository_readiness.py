@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp_server.storage.repo_identity import compute_repo_id
+from mcp_server.utils.subprocess_env import get_full_env
 
 
 class RepositoryReadinessState(str, Enum):
@@ -416,6 +417,7 @@ def _run_git(args: list[str], cwd: Path) -> Optional[str]:
             capture_output=True,
             text=True,
             check=True,
+            env=get_full_env(),
         )
         value = result.stdout.strip()
         return value if value and value != "HEAD" else None

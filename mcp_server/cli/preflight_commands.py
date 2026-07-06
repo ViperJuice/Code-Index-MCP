@@ -19,6 +19,7 @@ from .artifact_commands import (
 )
 from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.storage.repository_registry import RepositoryRegistry
+from mcp_server.utils.subprocess_env import get_full_env
 
 
 @dataclass
@@ -41,6 +42,7 @@ def _get_upstream_ref() -> Optional[str]:
             capture_output=True,
             text=True,
             check=True,
+            env=get_full_env(),
         )
         return result.stdout.strip()
     except Exception:
@@ -54,6 +56,7 @@ def _get_ahead_behind(upstream_ref: str) -> tuple[int, int]:
             capture_output=True,
             text=True,
             check=True,
+            env=get_full_env(),
         )
         ahead_str, behind_str = result.stdout.strip().split()
         return int(ahead_str), int(behind_str)

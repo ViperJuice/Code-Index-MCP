@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional, Set
 
 from ..plugins.language_registry import get_all_extensions
+from ..utils.subprocess_env import get_full_env
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,12 @@ class ChangeDetector:
         try:
             cmd = ["git", "diff", "--name-status", "--find-renames", from_commit, to_commit]
             result = subprocess.run(
-                cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                env=get_full_env(),
             )
 
             for line in result.stdout.strip().splitlines():
@@ -73,7 +79,12 @@ class ChangeDetector:
             # Get staged changes
             cmd = ["git", "diff", "--cached", "--name-status", "--find-renames"]
             result = subprocess.run(
-                cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                env=get_full_env(),
             )
 
             for line in result.stdout.strip().splitlines():
@@ -84,7 +95,12 @@ class ChangeDetector:
             # Get unstaged changes
             cmd = ["git", "diff", "--name-status", "--find-renames"]
             result = subprocess.run(
-                cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                env=get_full_env(),
             )
 
             for line in result.stdout.strip().splitlines():
@@ -95,7 +111,12 @@ class ChangeDetector:
             # Get untracked files
             cmd = ["git", "ls-files", "--others", "--exclude-standard"]
             result = subprocess.run(
-                cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                env=get_full_env(),
             )
 
             for path in result.stdout.strip().splitlines():
