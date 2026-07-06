@@ -29,6 +29,36 @@
       "task_summary": null,
       "type": "phase",
       "updated_at": "2026-07-06T00:43:56Z"
+    },
+    {
+      "acceptance_criteria_count": null,
+      "created_at": "2026-07-06T01:09:02Z",
+      "file": "plans/phase-plan-v9-REPOCLEAN.md",
+      "handoff_ref": ".dev-skills/handoffs/codex-plan-phase/20260706T010902Z-repoclean-plan.md",
+      "if_gates_produced": [
+        "IF-0-REPOCLEAN-1"
+      ],
+      "lanes": [
+        "SL-0",
+        "SL-1",
+        "SL-2",
+        "SL-3"
+      ],
+      "lifecycle": [],
+      "owner_skill": "codex-plan-phase",
+      "phase_alias": "REPOCLEAN",
+      "reflection_ref": null,
+      "roadmap_ref": {
+        "file": "specs/phase-plans-v9.md",
+        "slug": "phase-plans-v9",
+        "status": "committed",
+        "type": "roadmap"
+      },
+      "slug": "phase-plan-v9-REPOCLEAN",
+      "status": "committed",
+      "task_summary": null,
+      "type": "phase",
+      "updated_at": "2026-07-06T01:09:02Z"
     }
   ],
   "schema_version": 1
