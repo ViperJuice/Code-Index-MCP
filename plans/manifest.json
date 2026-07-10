@@ -33,6 +33,47 @@
       "updated_at": "2026-07-10T05:58:00Z"
     },
     {
+      "acceptance_criteria_count": 5,
+      "created_at": "2026-07-10T09:52:06Z",
+      "file": "plans/phase-plan-v10-RELEASESAFE.md",
+      "handoff_ref": null,
+      "if_gates_produced": [
+        "IF-0-RELEASESAFE-1",
+        "IF-0-RELEASESAFE-2"
+      ],
+      "lanes": [
+        "SL-0",
+        "SL-1",
+        "SL-2",
+        "SL-3",
+        "SL-4"
+      ],
+      "lifecycle": [
+        {
+          "at": "2026-07-10T09:52:06Z",
+          "by": "codex-execute-phase",
+          "metadata": {
+            "run_id": "interactive-20260710-releasesafe"
+          },
+          "transition": "executing"
+        }
+      ],
+      "owner_skill": "codex-plan-phase",
+      "phase_alias": "RELEASESAFE",
+      "reflection_ref": null,
+      "roadmap_ref": {
+        "file": "specs/phase-plans-v10.md",
+        "slug": "phase-plans-v10",
+        "status": "committed",
+        "type": "roadmap"
+      },
+      "slug": "phase-plan-v10-RELEASESAFE",
+      "status": "executing",
+      "task_summary": null,
+      "type": "phase",
+      "updated_at": "2026-07-10T09:52:06Z"
+    },
+    {
       "acceptance_criteria_count": 6,
       "created_at": "2026-07-06T02:11:25Z",
       "file": "plans/phase-plan-v9-COVERAGE.md",

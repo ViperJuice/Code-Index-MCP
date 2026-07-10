@@ -105,7 +105,7 @@ def test_ship_decision_defers_release_evidence_to_gadisp_and_keeps_public_surfac
         assert expected in combined
     for path in (README, GETTING_STARTED, MCP_CONFIGURATION, DOCKER_GUIDE, SUPPORT_MATRIX):
         text = _read(path)
-        assert "1.3.0" in text, f"{path.relative_to(REPO)} missing stable surface version"
+        assert "1.3.1" in text, f"{path.relative_to(REPO)} missing stable surface version"
 
 
 def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
@@ -113,9 +113,9 @@ def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
     decision = _read(GA_FINAL)
     roadmap = _read(ROADMAP)
 
-    assert "peter-evans/create-pull-request@v8" in workflow
-    assert "peter-evans/create-pull-request@v7" not in workflow
-    assert "softprops/action-gh-release@v3" in workflow
+    assert "prepare-release-pr:" in workflow
+    assert "inputs.auto_merge == 'true'" in workflow
+    assert "softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b" in workflow
     assert "softprops/action-gh-release@v2" not in workflow
     assert "GitHub's latest published release is still" in decision
     assert "`v8.0.1`" in decision

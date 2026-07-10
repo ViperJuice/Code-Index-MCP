@@ -23,10 +23,14 @@ def test_rc8_contract_surfaces_and_workflow_path_are_frozen():
     release_metadata = _read(RELEASE_METADATA)
     evidence = _read(GA_RC)
 
-    for expected in ("v1.3.0", "1.3.0", "softprops/action-gh-release@v3"):
+    for expected in (
+        "v1.3.1",
+        "1.3.1",
+        "softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b",
+    ):
         assert expected in workflow
 
-    for expected in ("v1.3.0", "1.3.0", "release_type=custom"):
+    for expected in ("v1.3.1", "1.3.1", "protected-main"):
         assert expected in release_metadata
 
     for expected in ("v1.2.0-rc8", "1.2.0-rc8", "recut succeeded"):

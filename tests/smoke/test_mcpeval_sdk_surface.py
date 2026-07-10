@@ -136,7 +136,7 @@ async def test_official_sdk_proves_mcpeval_metadata_structured_fail_closed_and_t
             status = await session.call_tool("get_status", {})
             assert status.isError is False
             assert status.structuredContent is not None
-            assert status.structuredContent["version"] == "1.3.0"
+            assert status.structuredContent["version"] == "1.3.1"
             assert _json_text_payload(status) == status.structuredContent
 
             lookup = await session.call_tool(

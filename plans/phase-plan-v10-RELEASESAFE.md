@@ -77,7 +77,7 @@ SL-4 — Documentation sweep and release closeout
 
 ### SL-3 — Package and workflow reducer
 - **Scope**: Reconcile workflow, pin, version, and package outputs before documentation is updated, without dispatching external mutations.
-- **Owned files**: `tests/smoke/test_release_smoke_contract.py`
+- **Owned files**: `tests/smoke/test_release_smoke_contract.py`, `tests/test_p25_release_gates.py`
 - **Interfaces provided**: `IF-0-RELEASESAFE-2-PACKAGE`
 - **Interfaces consumed**: `IF-0-RELEASESAFE-1`, `IF-0-RELEASESAFE-2-ACTION-PINS`, `IF-0-RELEASESAFE-2-VERSION`
 - **Parallel-safe**: no

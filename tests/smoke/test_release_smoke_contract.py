@@ -88,13 +88,17 @@ def test_alpha_docs_truth_and_release_preflight_cover_p34_and_container_smoke():
     )[0]
     assert "tests/docs/test_p34_public_alpha_recut.py" in alpha_docs_truth
 
-    assert "make agent-gate" in release_automation
-    assert "make release-smoke-container" in release_automation
-    assert release_automation.index("make agent-gate") < release_automation.index(
-        "make release-smoke-container"
+    publish_preflight = release_automation.split("preflight-publish:", 1)[1].split(
+        "build-release:", 1
+    )[0]
+    assert "make agent-gate" in publish_preflight
+    assert "make release-smoke" in publish_preflight
+    assert "make release-smoke-container" in publish_preflight
+    assert publish_preflight.index("make agent-gate") < publish_preflight.index(
+        "make release-smoke"
     )
-    assert release_automation.index("make release-smoke-container") < release_automation.index(
-        "prepare-release:"
+    assert publish_preflight.index("make release-smoke") < publish_preflight.index(
+        "make release-smoke-container"
     )
 
 
