@@ -33,6 +33,58 @@
       "updated_at": "2026-07-10T05:58:00Z"
     },
     {
+      "acceptance_criteria_count": 6,
+      "created_at": "2026-07-10T10:28:51Z",
+      "file": "plans/phase-plan-v10-HARDVERIFY.md",
+      "handoff_ref": null,
+      "if_gates_produced": [
+        "IF-0-HARDVERIFY-1"
+      ],
+      "lanes": [
+        "SL-0",
+        "SL-1",
+        "SL-2"
+      ],
+      "lifecycle": [
+        {
+          "at": "2026-07-10T10:28:51Z",
+          "by": "codex-execute-phase",
+          "metadata": {
+            "run_id": "interactive-20260710-hardverify"
+          },
+          "transition": "executing"
+        },
+        {
+          "at": "2026-07-10T11:00:35Z",
+          "by": "codex-execute-phase",
+          "metadata": {
+            "closeout_commit": "20d086def1fcf97b8c720d0080bb52109cec8ec1",
+            "doc_delta_decision": "no_doc_delta",
+            "if_gates_produced": [
+              "IF-0-HARDVERIFY-1"
+            ],
+            "run_id": "interactive-20260710-hardverify",
+            "verification_status": "passed"
+          },
+          "transition": "completed"
+        }
+      ],
+      "owner_skill": "codex-plan-phase",
+      "phase_alias": "HARDVERIFY",
+      "reflection_ref": null,
+      "roadmap_ref": {
+        "file": "specs/phase-plans-v10.md",
+        "slug": "phase-plans-v10",
+        "status": "committed",
+        "type": "roadmap"
+      },
+      "slug": "phase-plan-v10-HARDVERIFY",
+      "status": "completed",
+      "task_summary": null,
+      "type": "phase",
+      "updated_at": "2026-07-10T11:00:35Z"
+    },
+    {
       "acceptance_criteria_count": 5,
       "created_at": "2026-07-10T09:52:06Z",
       "file": "plans/phase-plan-v10-RELEASESAFE.md",
