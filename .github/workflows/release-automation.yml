@@ -27,10 +27,7 @@ on:
           - 'true'
 
 permissions:
-  contents: write
-  packages: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 env:
   RELEASE_VERSION: ${{ inputs.version }}
@@ -62,10 +59,12 @@ jobs:
           fi
 
   prepare-release-pr:
-    name: Prepare release pull request
+    name: Validate release preparation
     needs: validate-dispatch
     if: inputs.mode == 'prepare'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check out prepared branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -96,6 +95,15 @@ jobs:
           make release-smoke
           make release-smoke-container
 
+  create-release-pr:
+    name: Create release pull request
+    needs: prepare-release-pr
+    if: inputs.mode == 'prepare'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
       - name: Create or update release pull request
         id: release_pr
         env:
@@ -134,6 +142,9 @@ jobs:
     needs: validate-dispatch
     if: inputs.mode == 'publish' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Check out exact protected-main commit
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -172,6 +183,10 @@ jobs:
     needs: preflight-publish
     if: inputs.mode == 'publish' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
       - name: Check out exact protected-main commit
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -246,6 +261,9 @@ jobs:
     needs: build-release
     if: inputs.mode == 'publish' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Check out exact protected-main commit
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6

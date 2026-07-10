@@ -344,14 +344,12 @@ DEFAULT_ACCESS_RULES = [
     ),
     AccessRule(
         path_pattern="/ready",
-        access_level=AccessLevel.PROTECTED,
-        required_permissions=[Permission.READ],
+        access_level=AccessLevel.PUBLIC,
         allowed_operations=[Permission.READ],
     ),
     AccessRule(
         path_pattern="/liveness",
-        access_level=AccessLevel.PROTECTED,
-        required_permissions=[Permission.READ],
+        access_level=AccessLevel.PUBLIC,
         allowed_operations=[Permission.READ],
     ),
     AccessRule(

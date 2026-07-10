@@ -131,6 +131,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json",
             "/health",
+            "/ready",
+            "/liveness",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
@@ -184,7 +186,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     def _is_excluded_path(self, path: str) -> bool:
         """Check if path is excluded from authentication."""
-        return any(path.startswith(excluded) for excluded in self.excluded_paths)
+        return any(
+            path == excluded or path.startswith(excluded.rstrip("/") + "/")
+            for excluded in self.excluded_paths
+        )
 
     def _extract_token(self, request: Request) -> Optional[str]:
         """Extract Bearer token from Authorization header."""

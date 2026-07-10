@@ -15,13 +15,13 @@ USES_LINE = re.compile(
 )
 WORKFLOW_CENSUS = {
     "ci-cd-pipeline.yml": ({"pull_request", "push", "workflow_dispatch"}, 7),
-    "container-registry.yml": ({"pull_request", "push", "workflow_dispatch"}, 5),
+    "container-registry.yml": ({"pull_request", "push", "workflow_dispatch"}, 4),
     "index-artifact-management.yml": ({"workflow_call", "workflow_dispatch"}, 2),
     "index-management.yml": ({"workflow_dispatch"}, 1),
     "lockfile-check.yml": ({"workflow_dispatch"}, 1),
     "maintenance.yml": ({"pull_request", "push"}, 1),
     "mcp-index.yml": ({"workflow_dispatch"}, 2),
-    "release-automation.yml": ({"workflow_dispatch"}, 5),
+    "release-automation.yml": ({"workflow_dispatch"}, 6),
 }
 
 

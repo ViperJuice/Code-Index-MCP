@@ -118,6 +118,21 @@ def test_search_capabilities_requires_auth() -> None:
     )
 
 
+def test_public_health_probes_are_reachable_without_a_token() -> None:
+    client = TestClient(app, raise_server_exceptions=False)
+
+    assert client.get("/liveness").status_code == 200
+    assert client.get("/ready").status_code in {200, 503}
+    assert client.get("/health").status_code in {200, 503}
+
+
+def test_public_path_matching_does_not_expose_prefix_collisions() -> None:
+    client = TestClient(app, raise_server_exceptions=False)
+
+    assert client.get("/readiness-private").status_code == 401
+    assert client.get("/health-private").status_code == 401
+
+
 def test_all_protected_routes_return_401_without_token() -> None:
     """Every non-whitelisted route must return 401 when called without credentials."""
     client = TestClient(app, raise_server_exceptions=False)

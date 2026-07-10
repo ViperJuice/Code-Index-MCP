@@ -28,6 +28,8 @@ def test_release_modes_keep_prepare_separate_from_publish() -> None:
     assert inputs["mode"]["options"] == ["prepare", "publish"]
     assert inputs["mode"]["default"] == "prepare"
     assert jobs["prepare-release-pr"]["if"] == "inputs.mode == 'prepare'"
+    assert jobs["create-release-pr"]["if"] == "inputs.mode == 'prepare'"
+    assert jobs["create-release-pr"]["needs"] == "prepare-release-pr"
     assert "publish-release" not in jobs["prepare-release-pr"].get("needs", [])
     for name in PUBLISH_JOBS:
         assert "inputs.mode == 'publish'" in jobs[name]["if"]
@@ -79,6 +81,7 @@ def _is_external_release_mutation(step: dict[str, object]) -> bool:
         ("docker/build-push-action@" in uses and push == "true")
         or "softprops/action-gh-release@" in uses
         or "pypa/gh-action-pypi-publish@" in uses
+        or "actions/delete-package-versions@" in uses
         or "cosign sign" in run
         or step.get("name") == "Create and push tag"
     )
@@ -117,9 +120,16 @@ def test_every_workflow_release_mutation_has_an_adjacent_protected_main_guard() 
     assert mutations
 
 
-def test_prepare_job_is_pr_only_and_honors_auto_merge() -> None:
+def test_package_version_deletion_is_classified_as_an_external_mutation() -> None:
+    assert _is_external_release_mutation(
+        {"uses": "actions/delete-package-versions@pinned", "name": "Delete versions"}
+    )
+
+
+def test_prepare_execution_is_read_only_and_pr_mutation_is_isolated() -> None:
     prepare = _jobs()["prepare-release-pr"]
-    text = yaml.safe_dump(prepare)
+    create_pr = _jobs()["create-release-pr"]
+    text = yaml.safe_dump({"prepare": prepare, "create_pr": create_pr})
 
     for forbidden in ("docker/build-push-action", "action-gh-release", "gh-action-pypi-publish"):
         assert forbidden not in text
@@ -127,8 +137,35 @@ def test_prepare_job_is_pr_only_and_honors_auto_merge() -> None:
     assert "gh release" not in text
     assert "gh workflow run" not in text
 
-    auto_merge = next(step for step in prepare["steps"] if step.get("name") == "Enable auto-merge")
+    assert prepare["permissions"] == {"contents": "read"}
+    assert create_pr["permissions"] == {"contents": "read", "pull-requests": "write"}
+    assert not any(
+        str(step.get("uses", "")).startswith("actions/checkout@") for step in create_pr["steps"]
+    )
+    auto_merge = next(
+        step for step in create_pr["steps"] if step.get("name") == "Enable auto-merge"
+    )
     assert auto_merge["if"] == "inputs.auto_merge == 'true'"
+
+
+def test_publish_permissions_are_job_scoped() -> None:
+    workflow = _workflow()
+    jobs = _jobs()
+
+    assert workflow["permissions"] == {"contents": "read"}
+    assert jobs["preflight-publish"]["permissions"] == {
+        "contents": "read",
+        "packages": "read",
+    }
+    assert jobs["build-release"]["permissions"] == {
+        "contents": "read",
+        "packages": "write",
+        "id-token": "write",
+    }
+    assert jobs["publish-release"]["permissions"] == {
+        "contents": "write",
+        "id-token": "write",
+    }
 
 
 def test_release_workflow_does_not_dispatch_downstream_workflows() -> None:

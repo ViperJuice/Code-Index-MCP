@@ -168,22 +168,6 @@ jobs:
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
 
-  informational-cleanup-old-images:
-    name: Informational - Cleanup Old Images
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    permissions:
-      packages: write
-    steps:
-      - name: Delete old container images
-        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5
-        with:
-          package-name: 'code-index-mcp'
-          package-type: 'container'
-          min-versions-to-keep: 10
-          delete-only-pre-release-versions: false
-          token: ${{ secrets.GITHUB_TOKEN }}
-
   informational-sign-images:
     name: Informational - Sign Container Images
     needs: informational-push-manifests

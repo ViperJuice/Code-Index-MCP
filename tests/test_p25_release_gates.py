@@ -104,9 +104,11 @@ def test_release_automation_refuses_before_mutating_or_publishing():
     workflow_text = _read(".github/workflows/release-automation.yml")
 
     assert jobs["validate-dispatch"]["name"] == "Validate release dispatch"
-    assert jobs["prepare-release-pr"]["name"] == "Prepare release pull request"
+    assert jobs["prepare-release-pr"]["name"] == "Validate release preparation"
+    assert jobs["create-release-pr"]["name"] == "Create release pull request"
     assert jobs["preflight-publish"]["name"] == "Verify protected main and run release gates"
     assert _needs(jobs["prepare-release-pr"]) == {"validate-dispatch"}
+    assert _needs(jobs["create-release-pr"]) == {"prepare-release-pr"}
     assert _needs(jobs["preflight-publish"]) == {"validate-dispatch"}
     assert _needs(jobs["build-release"]) == {"preflight-publish"}
     assert _needs(jobs["publish-release"]) == {"build-release"}
@@ -120,7 +122,9 @@ def test_release_automation_refuses_before_mutating_or_publishing():
     assert preflight.index("make agent-gate") < preflight.index("make release-smoke")
     assert preflight.index("make release-smoke") < preflight.index("make release-smoke-container")
 
-    prepare = yaml.safe_dump(jobs["prepare-release-pr"])
+    prepare = yaml.safe_dump(
+        {"prepare": jobs["prepare-release-pr"], "create": jobs["create-release-pr"]}
+    )
     assert "docker/build-push-action" not in prepare
     assert "action-gh-release" not in prepare
     assert "gh-action-pypi-publish" not in prepare
