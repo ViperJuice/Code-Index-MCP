@@ -53,6 +53,30 @@ class SandboxSupervisor:
             bufsize=0,
         )
 
+    @property
+    def worker_pid(self) -> Optional[int]:
+        """Return the live worker PID without spawning a worker."""
+        if self._proc is None or self._proc.poll() is not None:
+            return None
+        return self._proc.pid
+
+    @property
+    def is_worker_running(self) -> bool:
+        """Return whether a worker subprocess is currently live."""
+        return self.worker_pid is not None
+
+    def worker_rss_bytes(self) -> int:
+        """Measure live worker RSS without creating a process."""
+        pid = self.worker_pid
+        if pid is None:
+            return 0
+        try:
+            import psutil
+
+            return int(psutil.Process(pid).memory_info().rss)
+        except Exception as exc:
+            raise RuntimeError(f"cannot measure sandbox worker {pid}: {exc}") from exc
+
     def _read_line_with_timeout(self, timeout: float) -> bytes:
         """Block up to ``timeout`` s for one line from the worker's stdout."""
         assert self._proc is not None and self._proc.stdout is not None

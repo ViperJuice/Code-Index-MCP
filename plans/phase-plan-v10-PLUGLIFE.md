@@ -66,7 +66,7 @@ SL-2 — Shutdown and process-death proof
 - **Tasks**:
   - test: Extend graceful-shutdown order assertions to include dispatcher/plugin shutdown and add subprocess probes for SIGTERM, SIGINT, and SIGKILL parent exit with bounded child reaping.
   - impl: Add dispatcher shutdown to STDIO signal/finally cleanup and gateway application shutdown, preserving idempotence and bounded timeouts.
-  - impl: Use the existing worker stdin pipe as the cross-platform parent watchdog and add Linux parent-death signaling where it can be installed safely before worker execution.
+  - impl: Use the existing worker stdin pipe as the cross-platform parent watchdog; avoid thread-unsafe subprocess pre-exec hooks.
   - verify: Run `uv run --python 3.12 pytest tests/integration/test_sigterm_shutdown.py tests/security/test_plugin_sandbox.py -q --no-cov`.
 
 ## Verification

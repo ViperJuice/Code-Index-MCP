@@ -815,6 +815,40 @@ class EnhancedDispatcher:
         """Return all loaded legacy plugins."""
         return list(self._legacy_plugins)
 
+    def _managed_plugin_count(self, repo_id: str) -> int:
+        """Read managed worker count without requiring newer test doubles."""
+        loaded_count = getattr(self._plugin_set_registry, "loaded_count", None)
+        if callable(loaded_count):
+            try:
+                count = loaded_count(repo_id)
+                if isinstance(count, int):
+                    return count
+            except Exception as exc:
+                logger.warning("Per-repo plugin count failed: %s", exc)
+        snapshot_fn = getattr(self._plugin_set_registry, "resource_snapshot", None)
+        if callable(snapshot_fn):
+            try:
+                reserved = getattr(snapshot_fn(), "reserved_workers", None)
+                if isinstance(reserved, int):
+                    return reserved
+            except Exception as exc:
+                logger.warning("Plugin resource snapshot failed: %s", exc)
+        return len(self._plugin_set_registry.plugins_for(repo_id))
+
+    def shutdown(self) -> None:
+        """Close managed plugin workers and any explicitly injected adapters."""
+        if hasattr(self._plugin_set_registry, "shutdown"):
+            self._plugin_set_registry.shutdown()
+        for plugin in self._legacy_plugins:
+            close = getattr(plugin, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as exc:
+                    logger.warning("Legacy plugin close failed: %s", exc)
+        self._legacy_plugins.clear()
+        self._lang_cache.clear()
+
     def supported_languages(self) -> List[str]:
         """Get list of all supported languages (loaded and available)."""
         if self._use_factory:
@@ -846,43 +880,53 @@ class EnhancedDispatcher:
         except OSError:
             return True
 
-    def _match_plugin(self, path: Path) -> IPlugin:
+    def _match_plugin(self, ctx: Union[RepoContext, Path], path: Optional[Path] = None) -> IPlugin:
         """Match a plugin for the given file path."""
+        repo_ctx: Optional[RepoContext]
+        if path is None:
+            repo_ctx = None
+            target_path = Path(ctx)  # type: ignore[arg-type]
+        else:
+            repo_ctx = ctx  # type: ignore[assignment]
+            target_path = path
+
         # Check explicitly-registered legacy plugins first
         for p in self._legacy_plugins:
-            if p.supports(path):
+            if p.supports(target_path):
                 return p
 
-        # Fall back to lazy loading via factory
-        if self._lazy_load and self._use_factory:
-            plugin = self._ensure_plugin_for_file(path)
-            if plugin:
-                return plugin
+        if repo_ctx is not None:
+            managed = self._plugin_set_registry.plugins_for_file(repo_ctx, target_path)
+            if managed:
+                return managed[0][0]
+            language = get_language_by_extension(target_path.suffix.lower())
+            if language:
+                availability = PluginFactory.get_plugin_availability(language)
+                if availability.get("state") != "enabled":
+                    compatibility_plugin = self._ensure_plugin_loaded(language)
+                    if compatibility_plugin:
+                        return compatibility_plugin
 
         # Use advanced routing if available
         if self._enable_advanced and self._router:
-            route_result = self._router.get_best_plugin(path)
+            route_result = self._router.get_best_plugin(target_path)
             if route_result:
                 return route_result.plugin
 
-        raise RuntimeError(f"No plugin for {path}")
+        raise RuntimeError(f"No plugin for {target_path}")
 
     def get_plugins_for_file(self, ctx: RepoContext, path: Path) -> List[Tuple[IPlugin, float]]:
         """Get all plugins that can handle a file with confidence scores."""
-        # Ensure plugin is loaded if using lazy loading
-        if self._lazy_load and self._use_factory:
-            self._ensure_plugin_for_file(path)
-
-        if self._enable_advanced and self._router:
+        if self._legacy_plugins and self._enable_advanced and self._router:
             route_results = self._router.route_file(path)
             return [(result.plugin, result.confidence) for result in route_results]
-        else:
-            # Basic fallback
-            matching_plugins = []
+        if self._legacy_plugins:
+            matching_plugins: List[Tuple[IPlugin, float]] = []
             for plugin in self._legacy_plugins:
                 if plugin.supports(path):
                     matching_plugins.append((plugin, 1.0))
             return matching_plugins
+        return self._plugin_set_registry.plugins_for_file(ctx, path)
 
     def lookup(self, ctx: RepoContext, symbol: str, limit: int = 20) -> Optional[SymbolDef]:
         """Look up symbol definition within ctx.repo_id."""
@@ -1419,7 +1463,7 @@ class EnhancedDispatcher:
             },
             "plugins": {
                 "status": "available",
-                "loaded": len(self._plugin_set_registry.plugins_for(ctx.repo_id)),
+                "loaded": self._managed_plugin_count(ctx.repo_id),
             },
             "cross_repo": {
                 "status": "available" if self._cross_repo_coordinator else "unavailable",
@@ -1723,12 +1767,6 @@ class EnhancedDispatcher:
                             collection_name=getattr(_semantic_indexer, "collection", None),
                         ) from e
                     logger.warning(f"Semantic indexer search failed, falling back to plugins: {e}")
-
-            # For search, we may need to search across all languages
-            # Load all plugins if using lazy loading
-            if self._lazy_load and self._use_factory and len(repo_plugins) == 0:
-                self._load_all_plugins()
-                repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
             # If still no plugins, try hybrid or BM25 search directly
             if len(repo_plugins) == 0 and sqlite_store:
@@ -2140,7 +2178,7 @@ class EnhancedDispatcher:
                 shard = bounded_jsonl_shard
             else:
                 # Find the appropriate plugin
-                plugin = self._match_plugin(path)
+                plugin = self._match_plugin(ctx, path)
                 plugin_language = plugin.language
                 plugin_lang = plugin.lang
 
@@ -2437,7 +2475,7 @@ class EnhancedDispatcher:
             )
 
         try:
-            plugin = self._match_plugin(path)
+            plugin = self._match_plugin(ctx, path)
         except RuntimeError as e:
             return IndexResult(
                 status=IndexResultStatus.ERROR,
@@ -3562,7 +3600,7 @@ class EnhancedDispatcher:
             "components": {
                 "dispatcher": {
                     "status": "healthy",
-                    "plugins_loaded": len(self._plugin_set_registry.plugins_for(ctx.repo_id)),
+                    "plugins_loaded": self._managed_plugin_count(ctx.repo_id),
                     "languages_supported": len(self.supported_languages()),
                     "factory_enabled": self._use_factory,
                     "lazy_loading": self._lazy_load,
@@ -3673,7 +3711,7 @@ class EnhancedDispatcher:
 
             # Remove from plugin fuzzy index if available
             try:
-                plugin = self._match_plugin(path)
+                plugin = self._match_plugin(ctx, path)
                 if plugin and hasattr(plugin, "_indexer") and plugin._indexer:
                     plugin._indexer.remove_file(path)
             except Exception as e:

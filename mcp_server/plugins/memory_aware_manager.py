@@ -49,6 +49,29 @@ class PluginMemoryInfo:
     load_time: float
     usage_count: int
     is_high_priority: bool
+    last_used_monotonic: float = 0.0
+
+
+@dataclass(frozen=True)
+class PluginResourceSnapshot:
+    """Immutable process and worker resource sample."""
+
+    sampled_at_monotonic: float
+    parent_rss_bytes: int
+    child_rss_bytes: int
+    reserved_workers: int
+    live_workers: int
+    measurement_ok: bool
+    failure_reason: Optional[str] = None
+
+
+class PluginBackpressureError(RuntimeError):
+    """Raised when a plugin allocation would exceed a hard resource limit."""
+
+    def __init__(self, reason: str, snapshot: PluginResourceSnapshot):
+        self.reason = reason
+        self.snapshot = snapshot
+        super().__init__(f"plugin allocation blocked: {reason}")
 
 
 class MemoryAwarePluginManager:
@@ -63,7 +86,15 @@ class MemoryAwarePluginManager:
     - Per-repo plugin isolation (cache keyed by (repo_id, language))
     """
 
-    def __init__(self, max_memory_mb: int = 1024, high_priority_langs: Optional[List[str]] = None):
+    def __init__(
+        self,
+        max_memory_mb: int = 1024,
+        high_priority_langs: Optional[List[str]] = None,
+        *,
+        max_workers: int = 16,
+        idle_timeout_seconds: float = 900.0,
+        sample_interval_seconds: float = 1.0,
+    ):
         """
         Initialize the memory-aware plugin manager.
 
@@ -80,6 +111,15 @@ class MemoryAwarePluginManager:
             )
 
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
+        if max_workers <= 0:
+            raise ValueError("max_workers must be positive")
+        if idle_timeout_seconds < 0:
+            raise ValueError("idle_timeout_seconds must be non-negative")
+        if sample_interval_seconds < 0:
+            raise ValueError("sample_interval_seconds must be non-negative")
+        self.max_workers = max_workers
+        self.idle_timeout_seconds = idle_timeout_seconds
+        self.sample_interval_seconds = sample_interval_seconds
         self.high_priority_langs = set(
             high_priority_langs or ["python", "javascript", "typescript"]
         )
@@ -101,6 +141,7 @@ class MemoryAwarePluginManager:
         # Memory monitoring
         self._process = psutil.Process()
         self._base_memory = self._get_current_memory()
+        self._last_snapshot: Optional[PluginResourceSnapshot] = None
 
         logger.info(f"Memory-aware plugin manager initialized with {max_memory_mb}MB limit")
 
@@ -122,6 +163,7 @@ class MemoryAwarePluginManager:
         cache_key = (repo_id, language)
 
         with self._lock:
+            self._expire_idle_plugins()
             if cache_key in self._plugins:
                 self._plugins.move_to_end(cache_key)
                 self._update_usage(cache_key)
@@ -134,9 +176,7 @@ class MemoryAwarePluginManager:
         cache_key = (repo_id, language)
         start_time = time.time()
 
-        if not self._ensure_memory_available():
-            logger.warning(f"Cannot load {language} plugin - memory limit reached")
-            return None
+        self._ensure_capacity_for_spawn()
 
         try:
             plugin = self._factory.get_plugin(language)
@@ -156,6 +196,7 @@ class MemoryAwarePluginManager:
             )
 
             self._plugins[cache_key] = loaded
+            self._last_snapshot = None
 
             memory_after = self._get_current_memory()
             memory_used = max(0, memory_after - memory_before)
@@ -167,6 +208,7 @@ class MemoryAwarePluginManager:
                 load_time=time.time() - start_time,
                 usage_count=1,
                 is_high_priority=language in self.high_priority_langs,
+                last_used_monotonic=time.monotonic(),
             )
 
             self._weak_refs[cache_key] = weakref.ref(
@@ -181,6 +223,8 @@ class MemoryAwarePluginManager:
 
             return plugin
 
+        except PluginBackpressureError:
+            raise
         except PluginUnavailableError as e:
             logger.info(
                 "Skipping unavailable %s plugin: %s",
@@ -220,12 +264,35 @@ class MemoryAwarePluginManager:
 
         return self._get_current_memory() < self.max_memory_bytes
 
-    def _get_eviction_candidates(self) -> List[Tuple[Optional[str], str]]:
+    def _ensure_capacity_for_spawn(self) -> None:
+        """Evict LRU entries until one worker slot and RSS budget are available."""
+        snapshot = self.resource_snapshot(force=True)
+        if not snapshot.measurement_ok:
+            raise PluginBackpressureError("resource_measurement_failed", snapshot)
+
+        while (
+            snapshot.reserved_workers >= self.max_workers
+            or snapshot.child_rss_bytes >= self.max_memory_bytes
+        ):
+            candidates = self._get_eviction_candidates(include_high_priority=True)
+            if not candidates:
+                reason = (
+                    "worker_limit" if snapshot.reserved_workers >= self.max_workers else "rss_limit"
+                )
+                raise PluginBackpressureError(reason, snapshot)
+            self._evict_plugin(candidates[0])
+            snapshot = self.resource_snapshot(force=True)
+            if not snapshot.measurement_ok:
+                raise PluginBackpressureError("resource_measurement_failed", snapshot)
+
+    def _get_eviction_candidates(
+        self, include_high_priority: bool = False
+    ) -> List[Tuple[Optional[str], str]]:
         """Get list of plugin cache keys that can be evicted, ordered by LRU."""
         candidates = []
 
         for cache_key, info in self._plugin_info.items():
-            if not info.is_high_priority:
+            if include_high_priority or not info.is_high_priority:
                 candidates.append((info.last_used, cache_key))
 
         candidates.sort(key=lambda x: x[0])
@@ -245,12 +312,20 @@ class MemoryAwarePluginManager:
         info = self._plugin_info.get(cache_key)
         memory_freed = info.memory_bytes if info else 0
 
-        plugin = self._plugins.pop(cache_key, None)
+        loaded = self._plugins.pop(cache_key, None)
         self._plugin_info.pop(cache_key, None)
         self._weak_refs.pop(cache_key, None)
 
-        del plugin
+        if loaded is not None:
+            close = getattr(loaded.instance, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as exc:
+                    logger.warning("Plugin close failed for %s: %s", cache_key, exc)
+        del loaded
         gc.collect()
+        self._last_snapshot = None
 
         language = cache_key[1]
         logger.info(f"Evicted {language} plugin, freed {memory_freed / 1024 / 1024:.1f}MB")
@@ -262,6 +337,7 @@ class MemoryAwarePluginManager:
         if cache_key in self._plugin_info:
             info = self._plugin_info[cache_key]
             info.last_used = datetime.now()
+            info.last_used_monotonic = time.monotonic()
             info.usage_count += 1
 
     def _get_current_memory(self) -> int:
@@ -271,6 +347,127 @@ class MemoryAwarePluginManager:
     def _get_plugin_memory_usage(self) -> int:
         """Get total memory used by plugins (attribution/telemetry only)."""
         return sum(info.memory_bytes for info in self._plugin_info.values())
+
+    @staticmethod
+    def _worker_state(plugin: Any) -> Tuple[bool, int]:
+        """Return live state and RSS for one adapter, raising on invalid telemetry."""
+        running_value = getattr(plugin, "is_worker_running", False)
+        running = running_value() if callable(running_value) else running_value
+        if not isinstance(running, bool):
+            running = False
+        if not running:
+            return False, 0
+
+        rss_value = getattr(plugin, "worker_rss_bytes", None)
+        if rss_value is None:
+            raise RuntimeError("live worker does not expose RSS telemetry")
+        rss = rss_value() if callable(rss_value) else rss_value
+        if not isinstance(rss, int) or rss < 0:
+            raise RuntimeError("live worker returned invalid RSS telemetry")
+        return True, rss
+
+    def resource_snapshot(self, *, force: bool = False) -> PluginResourceSnapshot:
+        """Return a cadence-bounded snapshot of parent and sandbox worker resources."""
+        with self._lock:
+            now = time.monotonic()
+            if (
+                not force
+                and self._last_snapshot is not None
+                and now - self._last_snapshot.sampled_at_monotonic < self.sample_interval_seconds
+            ):
+                return self._last_snapshot
+
+            parent_rss = 0
+            child_rss = 0
+            live_workers = 0
+            failure_reason: Optional[str] = None
+            try:
+                parent_rss = self._get_current_memory()
+                for loaded in self._plugins.values():
+                    running, rss = self._worker_state(loaded.instance)
+                    live_workers += int(running)
+                    child_rss += rss
+            except Exception as exc:
+                failure_reason = f"{type(exc).__name__}: {exc}"
+
+            snapshot = PluginResourceSnapshot(
+                sampled_at_monotonic=now,
+                parent_rss_bytes=parent_rss,
+                child_rss_bytes=child_rss,
+                reserved_workers=len(self._plugins),
+                live_workers=live_workers,
+                measurement_ok=failure_reason is None,
+                failure_reason=failure_reason,
+            )
+            self._last_snapshot = snapshot
+            return snapshot
+
+    def _expire_idle_plugins(self) -> int:
+        """Close plugins idle beyond the configured timeout in deterministic LRU order."""
+        if self.idle_timeout_seconds <= 0:
+            return 0
+        now = time.monotonic()
+        expired = [
+            cache_key
+            for cache_key, info in self._plugin_info.items()
+            if info.last_used_monotonic > 0
+            and now - info.last_used_monotonic >= self.idle_timeout_seconds
+        ]
+        expired.sort(key=lambda key: self._plugin_info[key].last_used_monotonic)
+        for cache_key in expired:
+            self._evict_plugin(cache_key)
+        return len(expired)
+
+    def loaded_plugins_for(self, repo_id: str) -> List[Any]:
+        """Return loaded plugin instances for one repository without allocating."""
+        with self._lock:
+            return [
+                loaded.instance
+                for (loaded_repo_id, _), loaded in self._plugins.items()
+                if loaded_repo_id == repo_id
+            ]
+
+    def confirm_plugin_started(
+        self, language: str, ctx: Optional["RepoContext"] = None
+    ) -> PluginResourceSnapshot:
+        """Revalidate hard limits after a lazy adapter starts its child worker."""
+        repo_id = ctx.repo_id if ctx is not None else None
+        cache_key = (repo_id, language)
+        with self._lock:
+            snapshot = self.resource_snapshot(force=True)
+            if not snapshot.measurement_ok:
+                self._evict_plugin(cache_key)
+                raise PluginBackpressureError("resource_measurement_failed", snapshot)
+
+            while snapshot.child_rss_bytes > self.max_memory_bytes:
+                candidates = [
+                    key
+                    for key in self._get_eviction_candidates(include_high_priority=True)
+                    if key != cache_key
+                ]
+                if not candidates:
+                    self._evict_plugin(cache_key)
+                    raise PluginBackpressureError("rss_limit", snapshot)
+                self._evict_plugin(candidates[0])
+                snapshot = self.resource_snapshot(force=True)
+                if not snapshot.measurement_ok:
+                    self._evict_plugin(cache_key)
+                    raise PluginBackpressureError("resource_measurement_failed", snapshot)
+            return snapshot
+
+    def evict_repo(self, repo_id: str) -> int:
+        """Close and forget every plugin owned by ``repo_id``."""
+        with self._lock:
+            keys = [key for key in self._plugins if key[0] == repo_id]
+            for cache_key in keys:
+                self._evict_plugin(cache_key)
+            return len(keys)
+
+    def shutdown(self) -> None:
+        """Idempotently close every managed plugin adapter."""
+        with self._lock:
+            for cache_key in list(self._plugins):
+                self._evict_plugin(cache_key)
 
     def _on_plugin_deleted(self, cache_key: Tuple[Optional[str], str]):
         """Callback when a plugin is garbage collected."""
@@ -288,6 +485,7 @@ class MemoryAwarePluginManager:
                 "available_memory_mb": (self.max_memory_bytes - current_memory) / 1024 / 1024,
                 "usage_percent": (current_memory / self.max_memory_bytes) * 100,
                 "loaded_plugins": len(self._plugins),
+                "resources": self.resource_snapshot().__dict__,
                 "high_priority_plugins": list(self.high_priority_langs),
                 "plugin_details": [
                     {
@@ -387,7 +585,13 @@ def get_memory_aware_manager(
                     high_priority_langs = ["python", "javascript", "typescript"]
 
             _manager_instance = MemoryAwarePluginManager(
-                max_memory_mb=max_memory_mb, high_priority_langs=high_priority_langs
+                max_memory_mb=max_memory_mb,
+                high_priority_langs=high_priority_langs,
+                max_workers=int(os.environ.get("MCP_MAX_PLUGIN_WORKERS", "16")),
+                idle_timeout_seconds=float(
+                    os.environ.get("MCP_PLUGIN_IDLE_TIMEOUT_SECONDS", "900")
+                ),
+                sample_interval_seconds=float(os.environ.get("MCP_PLUGIN_RSS_SAMPLE_SECONDS", "1")),
             )
 
             # Preload high-priority plugins if configured

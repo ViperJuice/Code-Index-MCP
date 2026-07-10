@@ -875,9 +875,10 @@ async def _graceful_shutdown(
     ref_poller: Any,
     store_registry: Any,
     exporter: Any,
+    dispatcher: Any = None,
     timeout: float = 5.0,
 ) -> None:
-    """Stop watcher -> poller -> store -> exporter in order, each bounded by timeout."""
+    """Stop watcher, poller, dispatcher, store, and exporter with bounded waits."""
     global _shutdown_called
     if _shutdown_called:
         logger.debug("_graceful_shutdown: already called, skipping")
@@ -903,6 +904,16 @@ async def _graceful_shutdown(
             logger.warning("RefPoller.stop timed out after %.1fs", timeout)
         except Exception as exc:
             logger.warning("RefPoller.stop error: %s", exc)
+
+    if dispatcher is not None:
+        try:
+            logger.info("Shutting down dispatcher plugin workers...")
+            await asyncio.wait_for(asyncio.to_thread(dispatcher.shutdown), timeout=timeout)
+            logger.info("Dispatcher plugin workers shut down")
+        except asyncio.TimeoutError:
+            logger.warning("Dispatcher.shutdown timed out after %.1fs", timeout)
+        except Exception as exc:
+            logger.warning("Dispatcher.shutdown error: %s", exc)
 
     if store_registry is not None:
         try:
@@ -1558,7 +1569,14 @@ async def _serve(registry_path=None) -> None:
     def _handle_signal() -> None:
         logger.info("Signal received — initiating graceful shutdown")
         task = asyncio.create_task(
-            _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
+            _graceful_shutdown(
+                multi_watcher,
+                ref_poller,
+                store_registry,
+                exporter,
+                dispatcher=_disp,
+                timeout=5.0,
+            )
         )
         _shutdown_tasks.append(task)
 
@@ -1604,7 +1622,14 @@ async def _serve(registry_path=None) -> None:
                 raise_exceptions=True,
             )
     finally:
-        await _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
+        await _graceful_shutdown(
+            multi_watcher,
+            ref_poller,
+            store_registry,
+            exporter,
+            dispatcher=_disp,
+            timeout=5.0,
+        )
 
 
 def run() -> None:

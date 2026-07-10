@@ -8,9 +8,13 @@ import sys
 import textwrap
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from mcp_server.core.repo_context import RepoContext
+from mcp_server.plugins.memory_aware_manager import MemoryAwarePluginManager
+from mcp_server.plugins.plugin_set_registry import PluginSetRegistry
 from mcp_server.plugins.sandboxed_plugin import SandboxedPlugin
 from mcp_server.sandbox.capabilities import CapabilitySet
 from mcp_server.sandbox.protocol import (
@@ -99,9 +103,56 @@ def test_supervisor_spawn_and_close(tmp_path: Path):
     sup = SandboxSupervisor(_echo_worker_cmd(tmp_path), caps)
     resp = sup.call("ping", {"a": 1}, timeout=5.0)
     assert resp == {"echoed": {"a": 1}}
+    assert sup.worker_pid is not None
+    assert sup.is_worker_running is True
+    assert sup.worker_rss_bytes() > 0
     sup.close()
     # Proc gone.
     assert sup._proc is None
+    assert sup.worker_pid is None
+    assert sup.is_worker_running is False
+
+
+def test_supervisor_introspection_does_not_spawn(tmp_path: Path):
+    caps = CapabilitySet(fs_read=(), fs_write=(), env_allow=frozenset())
+    sup = SandboxSupervisor(_echo_worker_cmd(tmp_path), caps)
+    assert sup.worker_pid is None
+    assert sup.is_worker_running is False
+    assert sup.worker_rss_bytes() == 0
+    assert sup._proc is None
+
+
+def test_registry_worker_count_scales_with_used_languages(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    python_file = repo / "sample.py"
+    rust_file = repo / "lib.rs"
+    python_file.write_text("def sample():\n    return 1\n", encoding="utf-8")
+    rust_file.write_text("fn sample() -> i32 { 1 }\n", encoding="utf-8")
+    ctx = RepoContext(
+        repo_id="sandbox-scale-probe",
+        sqlite_store=None,
+        workspace_root=repo,
+        tracked_branch="main",
+        registry_entry=SimpleNamespace(),
+    )
+    manager = MemoryAwarePluginManager(max_memory_mb=1024, max_workers=4)
+    registry = PluginSetRegistry(manager)
+    started = time.monotonic()
+    try:
+        assert len(registry.plugins_for_file(ctx, python_file)) == 1
+        first = manager.resource_snapshot(force=True)
+        assert (first.reserved_workers, first.live_workers) == (1, 1)
+
+        assert len(registry.plugins_for_file(ctx, rust_file)) == 1
+        second = manager.resource_snapshot(force=True)
+        assert (second.reserved_workers, second.live_workers) == (2, 2)
+        assert time.monotonic() - started < 20.0
+    finally:
+        registry.shutdown()
+
+    closed = manager.resource_snapshot(force=True)
+    assert (closed.reserved_workers, closed.live_workers) == (0, 0)
 
 
 def test_supervisor_timeout(tmp_path: Path):

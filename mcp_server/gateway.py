@@ -1009,6 +1009,13 @@ async def shutdown_event():
         except Exception as e:
             logger.error(f"Error stopping RefPoller: {e}", exc_info=True)
 
+    if dispatcher:
+        try:
+            dispatcher.shutdown()
+            logger.info("Dispatcher plugin workers stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping dispatcher plugin workers: {e}", exc_info=True)
+
     if plugin_manager:
         try:
             shutdown_result = plugin_manager.shutdown_safe()
