@@ -504,6 +504,8 @@ def get_repo_ctx(request: Request) -> RepoContext:
         )
         if resolved is not None:
             return resolved
+        if isinstance(repo_resolver, RepoResolver):
+            raise HTTPException(503, detail=_repository_unavailable_detail(cwd_selector))
 
     if sqlite_store is None:
         raise HTTPException(503, detail="Repository resolver and fallback store are unavailable")

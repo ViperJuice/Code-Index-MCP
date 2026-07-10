@@ -242,6 +242,19 @@ def _index_unavailable_response(
     return _json_text_response(response)
 
 
+def _resolution_transition_response(tool: str) -> list[types.TextContent]:
+    return _json_text_response(
+        {
+            "error": "Index unavailable",
+            "code": "index_unavailable",
+            "tool": tool,
+            "safe_fallback": "native_search",
+            "mutation_performed": False,
+            "remediation": "Re-check repository readiness and rebuild or refresh the index.",
+        }
+    )
+
+
 def _secondary_readiness_refusal_response(
     readiness: RepositoryReadiness,
     tool: str,
@@ -385,6 +398,8 @@ async def handle_symbol_lookup(
         return _index_unavailable_response(readiness, "symbol_lookup", symbol=symbol)
 
     ctx = _resolve_ctx(repo_resolver, repository)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("symbol_lookup")
 
     try:
         if ctx is not None:
@@ -1090,6 +1105,8 @@ async def handle_reindex(
 
     # Resolve ctx — repository takes precedence when both are set and consistent
     ctx = _resolve_ctx(repo_resolver, scope_arg)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("reindex")
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     allowed = _allowed_roots()
@@ -1327,6 +1344,8 @@ async def handle_write_summaries(
         return _secondary_readiness_refusal_response(readiness, "write_summaries")
 
     ctx = _resolve_ctx(repo_resolver, repository)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("write_summaries")
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
@@ -1514,6 +1533,8 @@ async def handle_summarize_sample(
         scope_arg = str(paths_arg[0])
 
     ctx = _resolve_ctx(repo_resolver, scope_arg)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("summarize_sample")
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
