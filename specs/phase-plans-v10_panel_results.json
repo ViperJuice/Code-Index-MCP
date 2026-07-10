@@ -1,0 +1,40 @@
+{
+  "requested_legs": [
+    "codex",
+    "gemini",
+    "claude"
+  ],
+  "available_legs": [
+    "codex",
+    "gemini",
+    "claude"
+  ],
+  "models": {
+    "codex": "gpt-5.5",
+    "gemini": "Gemini 3.1 Pro (High)",
+    "claude": "claude-fable-5"
+  },
+  "legs": [
+    {
+      "leg": "codex",
+      "status": "DEGRADED",
+      "text": "No blocking findings.\n\nBlocking roadmap amendments: none. The staged bundle exactly matches `specs/phase-plans-v10.md`, validates with `phase-loop validate-roadmap`, and maps all ten confirmed defects to machine-checkable gates.\n\nNon-blocking improvements:\n- Phase 1 should correct `mcp_server/security/authentication.py` to `mcp_server/security/auth_manager.py` and use the actual `AuthManager` name.\n- Phase 3 should mention `mcp_server/health/repo_status.py` and FastAPI `/status` in key files, since status truth spans both STDIO and admin status surfaces.\n\nMissing acceptance tests/evidence: none blocking at roadmap stage. The roadmap requires targeted phase tests plus final browser, MCP, worker, package, and quality evidence before closeout.\n\nRecommended phase order: keep the serial DAG. The dependencies are conservative but defensible because each phase freezes contracts used by the next.\n\nImplementation recommendation: proceed to phase planning after applying the minor repo-grounding corrections above; do not execute directly from the roadmap.\n\nAGREE",
+      "detail": null,
+      "seat_key": "codex"
+    },
+    {
+      "leg": "gemini",
+      "status": "DEGRADED",
+      "text": "How can I help you today? Is there a specific coding task or project in `/tmp/pl-panel-pagmticn/review` that you'd like to work on?\n",
+      "detail": null,
+      "seat_key": "gemini"
+    },
+    {
+      "leg": "claude",
+      "status": "UNAVAILABLE",
+      "text": "",
+      "detail": null,
+      "seat_key": "claude"
+    }
+  ]
+}
