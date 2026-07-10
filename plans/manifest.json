@@ -1,6 +1,38 @@
 {
   "plans": [
     {
+      "acceptance_criteria_count": 9,
+      "created_at": "2026-07-10T05:58:00Z",
+      "file": "plans/phase-plan-v10-AUTHBOUND.md",
+      "handoff_ref": ".dev-skills/handoffs/codex-plan-phase/20260710T055800Z-authbound-plan.md",
+      "if_gates_produced": [
+        "IF-0-AUTHBOUND-1",
+        "IF-0-AUTHBOUND-2"
+      ],
+      "lanes": [
+        "SL-0",
+        "SL-1",
+        "SL-2",
+        "SL-3",
+        "SL-4"
+      ],
+      "lifecycle": [],
+      "owner_skill": "codex-plan-phase",
+      "phase_alias": "AUTHBOUND",
+      "reflection_ref": null,
+      "roadmap_ref": {
+        "file": "specs/phase-plans-v10.md",
+        "slug": "phase-plans-v10",
+        "status": "committed",
+        "type": "roadmap"
+      },
+      "slug": "phase-plan-v10-AUTHBOUND",
+      "status": "committed",
+      "task_summary": null,
+      "type": "phase",
+      "updated_at": "2026-07-10T05:58:00Z"
+    },
+    {
       "acceptance_criteria_count": 6,
       "created_at": "2026-07-06T02:11:25Z",
       "file": "plans/phase-plan-v9-COVERAGE.md",
