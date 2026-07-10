@@ -12,14 +12,14 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 import mcp.types as types
 
-from mcp_server.client import ClientValidationError, build_search_options, execute_search_service
 from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, validate_index
 from mcp_server.cli.task_reindex import run_reindex_task
 from mcp_server.cli.task_write_summaries import run_write_summaries_task
+from mcp_server.client import ClientValidationError, build_search_options, execute_search_service
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.dispatcher_enhanced import SemanticSearchFailure
@@ -31,9 +31,22 @@ from mcp_server.health.repository_readiness import (
 )
 from mcp_server.indexing.source_metadata import normalize_friction_category
 
+if TYPE_CHECKING:
+    from mcp_server.storage.git_index_manager import GitAwareIndexManager
+
 logger = logging.getLogger(__name__)
 
 DEBUG_MODE = os.getenv("MCP_DEBUG", "0") == "1"
+_RECOVERABLE_REINDEX_STATES = frozenset(
+    {
+        RepositoryReadinessState.MISSING_INDEX,
+        RepositoryReadinessState.INDEX_EMPTY,
+        RepositoryReadinessState.STALE_COMMIT,
+        RepositoryReadinessState.CORRUPT_SQLITE,
+        RepositoryReadinessState.MISSING_SCHEMA,
+        RepositoryReadinessState.MISSING_PROVENANCE,
+    }
+)
 
 
 def _looks_like_path(x: str) -> bool:
@@ -795,16 +808,21 @@ async def handle_get_status(
         ),
     }
     if _is_enhanced:
-        semantic_active = bool(
-            getattr(dispatcher, "_semantic_registry", None)
-            or getattr(dispatcher, "_semantic_indexer_fallback", None)
-        )
+        semantic_configured = bool(getattr(dispatcher, "_semantic_enabled", False))
+        semantic_active = False
+        if ctx is not None and hasattr(dispatcher, "get_runtime_feature_status"):
+            try:
+                runtime_features = dispatcher.get_runtime_feature_status(ctx)  # type: ignore[call-arg]
+                semantic_active = runtime_features.get("semantic", {}).get("status") == "available"
+            except Exception:
+                semantic_active = False
         features.update(
             {
                 "dynamic_loading": getattr(dispatcher, "_use_factory", False),
                 "lazy_loading": getattr(dispatcher, "_lazy_load", False),
                 "advanced_features": getattr(dispatcher, "_enable_advanced", False),
-                "semantic_search_enabled": getattr(dispatcher, "_semantic_enabled", False),
+                "semantic_search_configured": semantic_configured,
+                "semantic_search_enabled": semantic_active,
                 "semantic_indexer_active": semantic_active,
             }
         )
@@ -920,6 +938,7 @@ async def handle_reindex(
     sqlite_store: Any = None,
     request_experimental: Any = None,
     task_registry: Any = None,
+    git_index_manager: Optional["GitAwareIndexManager"] = None,
 ) -> Sequence[types.TextContent] | types.CreateTaskResult:
     path = (arguments or {}).get("path")
     repository = (arguments or {}).get("repository")
@@ -945,12 +964,14 @@ async def handle_reindex(
 
     # Conflict detection: both path and repository provided but resolve to different repos
     if path and repository:
-        ctx_from_path = _resolve_ctx(repo_resolver, str(path))
-        ctx_from_repo = _resolve_ctx(repo_resolver, repository)
+        readiness_from_path = _classify_ctx(repo_resolver, str(path))
+        readiness_from_repo = _classify_ctx(repo_resolver, repository)
         if (
-            ctx_from_path is not None
-            and ctx_from_repo is not None
-            and ctx_from_path.repo_id != ctx_from_repo.repo_id
+            readiness_from_path is not None
+            and readiness_from_repo is not None
+            and readiness_from_path.repository_id is not None
+            and readiness_from_repo.repository_id is not None
+            and readiness_from_path.repository_id != readiness_from_repo.repository_id
         ):
             return _json_text_response(
                 {
@@ -965,7 +986,66 @@ async def handle_reindex(
     scope_arg = repository or (str(path) if path else None)
     readiness = _classify_ctx(repo_resolver, scope_arg)
     if readiness is not None and not readiness.ready:
-        return _secondary_readiness_refusal_response(readiness, "reindex")
+        if readiness.state not in _RECOVERABLE_REINDEX_STATES:
+            return _secondary_readiness_refusal_response(readiness, "reindex")
+
+        registered_path = (
+            Path(readiness.registered_path).expanduser() if readiness.registered_path else None
+        )
+        recovery_target = Path(path).expanduser() if path else registered_path
+        allowed = _allowed_roots()
+        whole_repository = (
+            registered_path is not None
+            and recovery_target is not None
+            and recovery_target.resolve(strict=False) == registered_path.resolve(strict=False)
+            and not recovery_target.is_file()
+        )
+        if recovery_target is None or not recovery_target.exists():
+            return _json_text_response(
+                {"error": "Path not found", "path": str(recovery_target or scope_arg)}
+            )
+        if not _path_within_allowed(recovery_target, allowed):
+            return _json_text_response(
+                {
+                    "error": "Path outside allowed roots",
+                    "code": "path_outside_allowed_roots",
+                    "path": str(recovery_target.resolve()),
+                    "allowed_roots": [str(root) for root in allowed],
+                    "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+                }
+            )
+        if git_index_manager is None or not whole_repository or readiness.repository_id is None:
+            return _json_text_response(
+                {
+                    "error": "Full repository rebuild required",
+                    "code": "full_rebuild_required",
+                    "readiness": readiness.to_dict(),
+                    "mutation_performed": False,
+                    "hint": "Reindex the registered repository without a file or nested path scope.",
+                }
+            )
+        sync_result = git_index_manager.rebuild_repository_index(readiness.repository_id)
+        if sync_result.action != "full_index":
+            return _json_text_response(
+                {
+                    "error": "Reindex failed",
+                    "code": sync_result.code or "reindex_failed",
+                    "details": sync_result.error,
+                    "readiness": sync_result.readiness,
+                    "mutation_performed": False,
+                }
+            )
+        return _json_text_response(
+            {
+                "path": str(recovery_target),
+                "mode": "staged_full",
+                "indexed_files": sync_result.files_processed,
+                "mutation_performed": True,
+                "commit": sync_result.commit,
+                "recovery": sync_result.readiness,
+                "semantic": sync_result.semantic,
+            }
+        )
 
     # Resolve ctx — repository takes precedence when both are set and consistent
     ctx = _resolve_ctx(repo_resolver, scope_arg)
@@ -991,6 +1071,35 @@ async def handle_reindex(
                 "path": str(target_path.resolve()),
                 "allowed_roots": [str(r) for r in allowed],
                 "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+            }
+        )
+
+    whole_repository = (
+        ctx is not None
+        and target_path.resolve(strict=False) == ctx.workspace_root.resolve(strict=False)
+        and not target_path.is_file()
+    )
+    if git_index_manager is not None and whole_repository:
+        sync_result = git_index_manager.rebuild_repository_index(ctx.repo_id)
+        if sync_result.action != "full_index":
+            return _json_text_response(
+                {
+                    "error": "Reindex failed",
+                    "code": sync_result.code or "reindex_failed",
+                    "details": sync_result.error,
+                    "readiness": sync_result.readiness,
+                    "mutation_performed": False,
+                }
+            )
+        return _json_text_response(
+            {
+                "path": str(target_path),
+                "mode": "staged_full",
+                "indexed_files": sync_result.files_processed,
+                "mutation_performed": True,
+                "commit": sync_result.commit,
+                "recovery": sync_result.readiness,
+                "semantic": sync_result.semantic,
             }
         )
 

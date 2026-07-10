@@ -1,7 +1,10 @@
 """Tests for GitAwareIndexManager branch-change reindex guard (SL-3)."""
 
 import json
+import sqlite3
 import subprocess
+import threading
+import time
 from datetime import datetime
 from inspect import signature
 from pathlib import Path
@@ -11,9 +14,14 @@ import pytest
 
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
+from mcp_server.health.repository_readiness import (
+    ReadinessClassifier,
+    RepositoryReadinessState,
+)
 from mcp_server.storage.git_index_manager import (
     ChangeSet,
     GitAwareIndexManager,
+    IndexSyncResult,
     UpdateResult,
     should_reindex_for_branch,
 )
@@ -163,6 +171,241 @@ def _make_ctx(repo_id: str, repo_path: Path, index_path: Path) -> RepoContext:
         tracked_branch="main",
         registry_entry=MagicMock(repository_id=repo_id, path=repo_path),
     )
+
+
+def _seed_index(index_path: Path, repo_path: Path, relative_path: str) -> None:
+    store = SQLiteStore(str(index_path))
+    repo_row = store.ensure_repository_row(repo_path, name="test-repo")
+    store.store_file(
+        repo_row,
+        path=repo_path / relative_path,
+        relative_path=relative_path,
+    )
+    store.close()
+
+
+class DurableFullIndexDispatcher(CtxSignatureDispatcher):
+    def index_directory(self, ctx, path, recursive=True):
+        row_id = ctx.sqlite_store.ensure_repository_row(path, name="test-repo")
+        ctx.sqlite_store.store_file(
+            row_id,
+            path=Path(path) / "hello.py",
+            relative_path="hello.py",
+        )
+        return super().index_directory(ctx, path, recursive=recursive)
+
+
+def _make_rebuild_manager(repo_info: RepositoryInfo, commit: str):
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+    registry.update_indexed_commit.return_value = commit
+
+    def update_staleness(_repo_id, reason):
+        repo_info.staleness_reason = reason
+        return True
+
+    registry.update_staleness_reason.side_effect = update_staleness
+    manager = GitAwareIndexManager(registry, DurableFullIndexDispatcher())
+    manager._resolve_ctx = MagicMock(return_value=None)
+    return manager, registry
+
+
+def test_staged_rebuild_quarantines_unproven_index_and_publishes(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = None
+    _seed_index(repo_info.index_path, repo, "old.py")
+    manager, registry = _make_rebuild_manager(repo_info, commit)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "full_index", result.error
+    assert result.readiness["previous_state"] == "missing_provenance"
+    quarantine_path = Path(result.readiness["quarantine_path"])
+    assert quarantine_path.exists()
+    with sqlite3.connect(repo_info.index_path) as conn:
+        paths = {row[0] for row in conn.execute("SELECT relative_path FROM files")}
+    assert paths == {"hello.py"}
+    registry.update_indexed_commit.assert_called_once_with(
+        repo_info.repository_id,
+        commit,
+        branch="main",
+    )
+    assert not list(repo_info.index_path.parent.glob(".current.db.staging-*"))
+
+
+def test_staged_rebuild_bootstraps_missing_index(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    manager, _registry = _make_rebuild_manager(repo_info, commit)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "full_index", result.error
+    assert result.readiness["previous_state"] == "missing_index"
+    assert ReadinessClassifier.classify_registered(repo_info).ready is True
+
+
+def test_staged_rebuild_populates_empty_index(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    SQLiteStore(str(repo_info.index_path)).close()
+    manager, _registry = _make_rebuild_manager(repo_info, commit)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "full_index", result.error
+    assert result.readiness["previous_state"] == "index_empty"
+    assert ReadinessClassifier.classify_registered(repo_info).ready is True
+
+
+def test_staged_rebuild_refreshes_stale_index(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-commit"
+    _seed_index(repo_info.index_path, repo, "old.py")
+    manager, _registry = _make_rebuild_manager(repo_info, commit)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "full_index", result.error
+    assert result.readiness["previous_state"] == "stale_commit"
+    assert ReadinessClassifier.classify_registered(repo_info).ready is True
+
+
+def test_staged_rebuild_quarantines_corrupt_bytes_without_reopening_them(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    corrupt_bytes = b"not-a-sqlite-database"
+    repo_info.index_path.write_bytes(corrupt_bytes)
+    manager, _registry = _make_rebuild_manager(repo_info, commit)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "full_index", result.error
+    assert result.readiness["previous_state"] == "corrupt_sqlite"
+    quarantine_path = Path(result.readiness["quarantine_path"])
+    assert quarantine_path.read_bytes() == corrupt_bytes
+    manager._resolve_ctx.assert_not_called()
+    assert ReadinessClassifier.classify_registered(repo_info).ready is True
+
+
+def test_staged_rebuild_failure_before_replacement_preserves_active_bytes(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = None
+    _seed_index(repo_info.index_path, repo, "old.py")
+    original = repo_info.index_path.read_bytes()
+    manager, registry = _make_rebuild_manager(repo_info, commit)
+
+    def checkpoint(stage):
+        if stage == "before_replacement":
+            raise RuntimeError(stage)
+
+    manager._rebuild_checkpoint = MagicMock(side_effect=checkpoint)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "failed"
+    assert repo_info.index_path.read_bytes() == original
+    registry.update_indexed_commit.assert_not_called()
+    assert repo_info.staleness_reason is None
+
+
+@pytest.mark.parametrize("failure_stage", ["after_replacement", "before_provenance"])
+def test_staged_rebuild_interrupted_publication_remains_non_ready(tmp_path, failure_stage):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = None
+    _seed_index(repo_info.index_path, repo, "old.py")
+    manager, registry = _make_rebuild_manager(repo_info, commit)
+
+    def checkpoint(stage):
+        if stage == failure_stage:
+            raise RuntimeError(stage)
+
+    manager._rebuild_checkpoint = MagicMock(side_effect=checkpoint)
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "failed"
+    assert repo_info.staleness_reason == "partial_index_failure"
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+    assert readiness.state == RepositoryReadinessState.MISSING_PROVENANCE
+    registry.update_indexed_commit.assert_not_called()
+
+
+def test_staged_rebuild_refuses_wrong_branch_without_mutation(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.current_branch = "feature"
+    _seed_index(repo_info.index_path, repo, "old.py")
+    original = repo_info.index_path.read_bytes()
+    manager, registry = _make_rebuild_manager(repo_info, commit)
+    registry.update_git_state.return_value = {"commit": commit, "branch": "feature"}
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "refused"
+    assert result.code == "wrong_branch"
+    assert repo_info.index_path.read_bytes() == original
+    registry.update_indexed_commit.assert_not_called()
+
+
+def test_staged_rebuild_requires_pending_marker_before_replacement(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = None
+    _seed_index(repo_info.index_path, repo, "old.py")
+    original = repo_info.index_path.read_bytes()
+    manager, registry = _make_rebuild_manager(repo_info, commit)
+    registry.update_staleness_reason.side_effect = None
+    registry.update_staleness_reason.return_value = False
+
+    result = manager.rebuild_repository_index(repo_info.repository_id)
+
+    assert result.action == "failed"
+    assert repo_info.index_path.read_bytes() == original
+    registry.update_indexed_commit.assert_not_called()
+
+
+def test_rebuild_repository_index_serializes_same_repo(tmp_path):
+    manager = GitAwareIndexManager(MagicMock(), MagicMock())
+    concurrent = 0
+    max_concurrent = 0
+    counter_lock = threading.Lock()
+
+    def rebuild(_repo_id):
+        nonlocal concurrent, max_concurrent
+        with counter_lock:
+            concurrent += 1
+            max_concurrent = max(max_concurrent, concurrent)
+        time.sleep(0.05)
+        with counter_lock:
+            concurrent -= 1
+        return IndexSyncResult(action="full_index", commit="commit")
+
+    manager._rebuild_repository_index_locked = rebuild
+    threads = [
+        threading.Thread(target=manager.rebuild_repository_index, args=("same-repo",))
+        for _ in range(2)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    assert max_concurrent == 1
 
 
 # ---------------------------------------------------------------------------

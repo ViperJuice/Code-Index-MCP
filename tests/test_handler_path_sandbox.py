@@ -513,3 +513,48 @@ class TestWriteSummariesUnguarded:
         assert "path_outside_allowed_roots" not in json.dumps(
             data
         ), f"write_summaries should not be path-guarded; got: {data}"
+
+
+def test_status_semantic_flags_require_usable_runtime_indexer():
+    from mcp_server.cli.tool_handlers import handle_get_status
+    from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
+    dispatcher = object.__new__(EnhancedDispatcher)
+    dispatcher._semantic_enabled = True
+    dispatcher._use_factory = True
+    dispatcher._lazy_load = True
+    dispatcher._enable_advanced = True
+    dispatcher.get_statistics = MagicMock(
+        return_value={
+            "total_plugins": 0,
+            "loaded_languages": [],
+            "supported_languages": 0,
+            "operations": {},
+            "by_language": {},
+        }
+    )
+    dispatcher.health_check = MagicMock(return_value={"status": "healthy"})
+    dispatcher.get_runtime_feature_status = MagicMock(
+        return_value={
+            "semantic": {
+                "status": "unavailable",
+                "reason": "semantic_indexer_unavailable",
+            }
+        }
+    )
+    resolver = _mock_resolver(ctx=SimpleNamespace())
+    resolver._registry = None
+
+    payload = _parsed(
+        _run(
+            handle_get_status(
+                arguments={},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+    )
+
+    assert payload["features"]["semantic_search_configured"] is True
+    assert payload["features"]["semantic_search_enabled"] is False
+    assert payload["features"]["semantic_indexer_active"] is False

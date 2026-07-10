@@ -36,7 +36,7 @@ def _readiness(state: RepositoryReadinessState, path: Path) -> RepositoryReadine
         state=state,
         repository_id="repo-1",
         repository_name="repo",
-        registered_path=str(path.parent / "registered"),
+        registered_path=str(path),
         requested_path=str(path),
         index_path=str(path / ".mcp-index" / "current.db"),
         remediation=f"remediate {state.value}",
@@ -76,6 +76,26 @@ NON_READY_STATES = [
     RepositoryReadinessState.INDEX_BUILDING,
     RepositoryReadinessState.UNSUPPORTED_WORKTREE,
     RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+    RepositoryReadinessState.CORRUPT_SQLITE,
+    RepositoryReadinessState.MISSING_SCHEMA,
+    RepositoryReadinessState.MISSING_PROVENANCE,
+]
+
+REINDEX_REFUSED_STATES = [
+    RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+    RepositoryReadinessState.WRONG_BRANCH,
+    RepositoryReadinessState.INDEX_BUILDING,
+    RepositoryReadinessState.UNSUPPORTED_WORKTREE,
+    RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+]
+
+RECOVERABLE_REINDEX_STATES = [
+    RepositoryReadinessState.MISSING_INDEX,
+    RepositoryReadinessState.INDEX_EMPTY,
+    RepositoryReadinessState.STALE_COMMIT,
+    RepositoryReadinessState.CORRUPT_SQLITE,
+    RepositoryReadinessState.MISSING_SCHEMA,
+    RepositoryReadinessState.MISSING_PROVENANCE,
 ]
 
 
@@ -140,7 +160,7 @@ def test_symbol_lookup_non_ready_returns_index_unavailable_without_dispatch(
     assert resolver.resolve_called is False
 
 
-@pytest.mark.parametrize("state", NON_READY_STATES)
+@pytest.mark.parametrize("state", REINDEX_REFUSED_STATES)
 def test_reindex_non_ready_returns_readiness_refusal_without_mutation(tmp_path, monkeypatch, state):
     monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
     repo = tmp_path / "repo"
@@ -170,6 +190,66 @@ def test_reindex_non_ready_returns_readiness_refusal_without_mutation(tmp_path, 
     dispatcher.index_file.assert_not_called()
     dispatcher.index_directory.assert_not_called()
     store.rebuild_fts_code.assert_not_called()
+    assert resolver.resolve_called is False
+
+
+@pytest.mark.parametrize("state", RECOVERABLE_REINDEX_STATES)
+def test_reindex_recoverable_state_requires_staged_manager(tmp_path, monkeypatch, state):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    dispatcher = MagicMock()
+    resolver = FakeResolver(_readiness(state, repo))
+
+    result = _run(
+        handle_reindex(
+            arguments={"repository": str(repo)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "full_rebuild_required"
+    assert data["readiness"]["state"] == state.value
+    assert data["mutation_performed"] is False
+    dispatcher.index_directory.assert_not_called()
+    assert resolver.resolve_called is False
+
+
+@pytest.mark.parametrize("state", RECOVERABLE_REINDEX_STATES)
+def test_reindex_recoverable_state_runs_staged_rebuild(tmp_path, monkeypatch, state):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    resolver = FakeResolver(_readiness(state, repo))
+    manager = MagicMock()
+    manager.rebuild_repository_index.return_value = SimpleNamespace(
+        action="full_index",
+        code=None,
+        error=None,
+        readiness={"previous_state": state.value},
+        files_processed=3,
+        commit="abc123",
+        semantic=None,
+    )
+
+    result = _run(
+        handle_reindex(
+            arguments={"repository": str(repo)},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+            git_index_manager=manager,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["mode"] == "staged_full"
+    assert data["mutation_performed"] is True
+    assert data["indexed_files"] == 3
+    manager.rebuild_repository_index.assert_called_once_with("repo-1")
     assert resolver.resolve_called is False
 
 
@@ -312,7 +392,7 @@ def test_reindex_path_sandbox_error_precedes_readiness_gate(tmp_path, monkeypatc
     assert resolver.resolve_called is False
 
 
-def test_reindex_non_ready_refuses_before_task_creation(tmp_path, monkeypatch):
+def test_reindex_recoverable_without_manager_refuses_before_task_creation(tmp_path, monkeypatch):
     monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -331,7 +411,7 @@ def test_reindex_non_ready_refuses_before_task_creation(tmp_path, monkeypatch):
     )
 
     data = _parsed(result)
-    assert data["code"] == RepositoryReadinessState.MISSING_INDEX.value
+    assert data["code"] == "full_rebuild_required"
     assert experimental.run_task_called is False
 
 
@@ -390,11 +470,12 @@ def test_reindex_conflicting_path_and_repository_precedes_readiness(tmp_path, mo
     repo_b = tmp_path / "repo-b"
     repo_a.mkdir()
     repo_b.mkdir()
-    ctx_a = SimpleNamespace(repo_id="repo-a")
-    ctx_b = SimpleNamespace(repo_id="repo-b")
     resolver = MagicMock()
-    resolver.classify.return_value = _readiness(RepositoryReadinessState.MISSING_INDEX, repo_a)
-    resolver.resolve.side_effect = [ctx_a, ctx_b]
+    readiness_a = _readiness(RepositoryReadinessState.MISSING_INDEX, repo_a)
+    readiness_b = _readiness(RepositoryReadinessState.MISSING_INDEX, repo_b)
+    readiness_a = RepositoryReadiness(**{**readiness_a.__dict__, "repository_id": "repo-a"})
+    readiness_b = RepositoryReadiness(**{**readiness_b.__dict__, "repository_id": "repo-b"})
+    resolver.classify.side_effect = [readiness_a, readiness_b]
 
     result = _run(
         handle_reindex(

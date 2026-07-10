@@ -166,9 +166,9 @@ def test_get_status_repository_rows_include_readiness(tmp_path):
     )
 
     repos = _parsed(result)["repositories"]
-    assert repos[0]["readiness"] == "index_empty"
+    assert repos[0]["readiness"] == "missing_schema"
     assert repos[0]["ready"] is False
-    assert repos[0]["readiness_code"] == "index_empty"
+    assert repos[0]["readiness_code"] == "missing_schema"
     assert repos[0]["semantic_readiness"] == "enrichment_unavailable"
     assert repos[0]["semantic_ready"] is False
 

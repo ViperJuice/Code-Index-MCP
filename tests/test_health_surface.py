@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -119,7 +120,7 @@ class TestBuildHealthRow:
         row = build_health_row(info)
         assert row["staleness_reason"] == "partial_index_failure"
         assert row["rollout_status"] == "partial_index_failure"
-        assert row["readiness"] == "stale_commit"
+        assert row["readiness"] == "missing_provenance"
 
     def test_index_building(self, tmp_path):
         from mcp_server.health.repo_status import build_health_row
@@ -155,7 +156,7 @@ class TestBuildHealthRow:
     def test_last_indexed_commit_none(self, tmp_path):
         from mcp_server.health.repo_status import build_health_row
 
-        info = make_repo_info(tmp_path)
+        info = make_repo_info(tmp_path, last_indexed_commit=None)
         row = build_health_row(info)
         assert row["last_indexed_commit"] is None
 
@@ -266,14 +267,40 @@ class TestGatewayGetStatusRepositories:
         registry.get_all_repositories.return_value = {"repo-b": info}
         return registry
 
+    def _authenticated_client(self):
+        from fastapi.testclient import TestClient
+
+        import mcp_server.gateway as gateway
+        from mcp_server.security import AuthManager, SecurityConfig, UserRole
+
+        auth_manager = getattr(gateway.app.state, "auth_manager", None)
+        if auth_manager is None:
+            auth_manager = AuthManager(
+                SecurityConfig(
+                    jwt_secret_key=os.environ["JWT_SECRET_KEY"],
+                    jwt_algorithm="HS256",
+                    access_token_expire_minutes=30,
+                )
+            )
+            gateway.app.state.auth_manager = auth_manager
+        user = asyncio.run(auth_manager.get_user_by_username("health_surface_admin"))
+        if user is None:
+            user = asyncio.run(
+                auth_manager.create_user(
+                    username="health_surface_admin",
+                    password="HealthSurfaceAdmin123!",
+                    email="health_surface_admin@test.local",
+                    role=UserRole.ADMIN,
+                )
+            )
+        token = asyncio.run(auth_manager.create_access_token(user))
+        return TestClient(
+            gateway.app,
+            headers={"Authorization": f"Bearer {token}"},
+            raise_server_exceptions=True,
+        )
+
     def test_gateway_repositories_key_present(self, tmp_path, monkeypatch):
-        try:
-            from fastapi.testclient import TestClient
-
-            from mcp_server.gateway import app
-        except Exception:
-            pytest.skip("FastAPI gateway unavailable")
-
         import mcp_server.gateway as gateway
 
         registry = self._make_gateway_registry(tmp_path)
@@ -292,30 +319,15 @@ class TestGatewayGetStatusRepositories:
             if hasattr(gateway, attr):
                 monkeypatch.setattr(gateway, attr, None)
 
-        client = TestClient(app, raise_server_exceptions=True)
-        response = client.get("/status", headers={"Authorization": "Bearer testtoken"})
-        # May be 401 if auth is required; bypass by monkeypatching require_permission
-        if response.status_code == 401:
-            # Patch auth
-            monkeypatch.setattr(
-                "mcp_server.gateway.require_permission",
-                lambda perm: lambda: None,
-                raising=False,
-            )
-            response = client.get("/status")
+        client = self._authenticated_client()
+        response = client.get("/status")
+        client.close()
 
         assert response.status_code == 200
         data = response.json()
         assert "repositories" in data
 
     def test_gateway_repositories_entries_match_registry(self, tmp_path, monkeypatch):
-        try:
-            from fastapi.testclient import TestClient
-
-            from mcp_server.gateway import app
-        except Exception:
-            pytest.skip("FastAPI gateway unavailable")
-
         import mcp_server.gateway as gateway
 
         registry = self._make_gateway_registry(tmp_path)
@@ -334,15 +346,9 @@ class TestGatewayGetStatusRepositories:
             if hasattr(gateway, attr):
                 monkeypatch.setattr(gateway, attr, None)
 
-        client = TestClient(app, raise_server_exceptions=True)
-        response = client.get("/status", headers={"Authorization": "Bearer testtoken"})
-        if response.status_code == 401:
-            monkeypatch.setattr(
-                "mcp_server.gateway.require_permission",
-                lambda perm: lambda: None,
-                raising=False,
-            )
-            response = client.get("/status")
+        client = self._authenticated_client()
+        response = client.get("/status")
+        client.close()
 
         assert response.status_code == 200
         data = response.json()

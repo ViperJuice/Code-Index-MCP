@@ -13,9 +13,9 @@ from mcp_server.health.repository_readiness import (
     RepositoryReadinessState,
     SemanticReadinessState,
 )
-from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 from mcp_server.storage.repository_registry import RepositoryRegistry
+from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.fixtures.health_repo import make_repo_info
 
 
@@ -45,6 +45,9 @@ def test_readiness_state_values_are_exact():
         "index_building",
         "unsupported_worktree",
         "ambiguous_selector",
+        "corrupt_sqlite",
+        "missing_schema",
+        "missing_provenance",
     }
 
 
@@ -312,3 +315,70 @@ def test_classifies_unsupported_worktree(tmp_path):
     assert readiness.state == RepositoryReadinessState.UNSUPPORTED_WORKTREE
     assert readiness.registered_path == str(source.resolve())
     assert readiness.requested_path == str(worktree.resolve())
+
+
+def test_classifies_corrupt_sqlite(tmp_path):
+    repo_info = make_repo_info(tmp_path)
+    repo_info.index_path.write_text(
+        "this is not a database file - it is plain text and corrupt!",
+        encoding="utf-8",
+    )
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+    assert readiness.state == RepositoryReadinessState.CORRUPT_SQLITE
+    assert readiness.ready is False
+    assert "quarantine" in (readiness.remediation or "").lower()
+
+
+def test_classifies_missing_schema(tmp_path):
+    repo_info = make_repo_info(tmp_path)
+    conn = sqlite3.connect(repo_info.index_path)
+    conn.execute("DROP TABLE files")
+    conn.commit()
+    conn.close()
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+    assert readiness.state == RepositoryReadinessState.MISSING_SCHEMA
+    assert readiness.ready is False
+    assert "quarantine" in (readiness.remediation or "").lower()
+
+
+def test_classifies_missing_provenance(tmp_path):
+    repo_info = make_repo_info(tmp_path)
+    repo_info.last_indexed_commit = None
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+    assert readiness.state == RepositoryReadinessState.MISSING_PROVENANCE
+    assert readiness.ready is False
+    assert "quarantine" in (readiness.remediation or "").lower()
+
+
+def test_wrong_branch_precedes_unsafe_storage_classification(tmp_path):
+    repo_info = make_repo_info(tmp_path, current_branch="feature")
+    repo_info.index_path.write_text("corrupt", encoding="utf-8")
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+
+    assert readiness.state == RepositoryReadinessState.WRONG_BRANCH
+
+
+def test_interrupted_publication_is_missing_provenance(tmp_path):
+    repo_info = make_repo_info(tmp_path)
+    repo_info.staleness_reason = "partial_index_failure"
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+
+    assert readiness.state == RepositoryReadinessState.MISSING_PROVENANCE
+
+
+def test_sqlite_query_exception_fails_closed_as_corrupt(tmp_path, monkeypatch):
+    repo_info = make_repo_info(tmp_path)
+
+    def fail_connect(*_args, **_kwargs):
+        raise sqlite3.DatabaseError("cannot open")
+
+    monkeypatch.setattr(sqlite3, "connect", fail_connect)
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+
+    assert readiness.state == RepositoryReadinessState.CORRUPT_SQLITE

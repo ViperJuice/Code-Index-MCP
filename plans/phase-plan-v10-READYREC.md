@@ -35,9 +35,9 @@ SL-2 — Truthful Status and Integration
 
 ### SL-0 — Readiness Classifier and Storage Validation
 - **Scope**: Define strict fail-closed readiness classifications and quarantine states for indexes.
-- **Owned files**: `mcp_server/health/repository_readiness.py`, `tests/test_repository_readiness.py`
+- **Owned files**: `mcp_server/health/repository_readiness.py`, `tests/fixtures/health_repo.py`, `tests/test_repo_resolver.py`, `tests/test_repository_readiness.py`
 - **Interfaces provided**: IF-0-READYREC-1
-- **Interfaces consumed**: IF-0-REPOSEL-1, IF-0-REPOSEL-2
+- **Interfaces consumed**: IF-0-REPOSEL-1 (pre-existing), IF-0-REPOSEL-2 (pre-existing)
 - **Parallel-safe**: no
 - **Tasks**:
   - test: Add fixtures for corrupt SQLite, missing schema, missing provenance, empty index, stale commit, wrong branch, and active build.
@@ -46,25 +46,25 @@ SL-2 — Truthful Status and Integration
 
 ### SL-1 — Locked Staged Recovery Mutation
 - **Scope**: Implement reindex recovery that explicitly repairs recoverable states through a staged temporary index.
-- **Owned files**: `mcp_server/storage/git_index_manager.py`, `mcp_server/cli/tool_handlers.py`, `tests/test_git_index_manager.py`, `tests/test_tool_readiness_fail_closed.py`
+- **Owned files**: `mcp_server/storage/git_index_manager.py`, `tests/test_git_index_manager.py`
 - **Interfaces provided**: IF-0-READYREC-2
 - **Interfaces consumed**: IF-0-READYREC-1
 - **Parallel-safe**: no
 - **Tasks**:
   - test: Add multi-thread lock simulation and failure injection (before/after replacement) tests.
-  - impl: Implement per-repo reindex locking, temporary sibling index generation, atomic swap, and provenance recording in `git_index_manager.py`; update `tool_handlers.py` to permit reindex only for recoverable states.
-  - verify: Run `uv run pytest tests/test_git_index_manager.py tests/test_tool_readiness_fail_closed.py -q`.
+  - impl: Implement per-repo reindex locking, temporary sibling index generation, atomic swap, and provenance recording in `git_index_manager.py`.
+  - verify: Run `uv run pytest tests/test_git_index_manager.py -q`.
 
 ### SL-2 — Truthful Status and Integration
 - **Scope**: Ensure status claims reflect actual usable runtime capabilities and agree with readiness health.
-- **Owned files**: `mcp_server/dispatcher/dispatcher_enhanced.py`, `mcp_server/storage/repository_registry.py`, `tests/test_handler_path_sandbox.py`
+- **Owned files**: `mcp_server/cli/stdio_runner.py`, `mcp_server/cli/tool_handlers.py`, `mcp_server/dispatcher/dispatcher_enhanced.py`, `tests/test_handler_path_sandbox.py`, `tests/test_health_surface.py`, `tests/test_tool_handlers_readiness.py`, `tests/test_tool_readiness_fail_closed.py`
 - **Interfaces provided**: IF-0-READYREC-3
 - **Interfaces consumed**: IF-0-READYREC-1
 - **Parallel-safe**: yes
 - **Tasks**:
-  - test: Add status feature flag validation tests simulating unavailable semantic backend.
-  - impl: Update `dispatcher_enhanced.py` and `repository_registry.py` to accurately report semantic active flags only when the indexer is reachable and healthy.
-  - verify: Run `uv run pytest tests/test_handler_path_sandbox.py -q`.
+  - test: Add status feature flag validation tests simulating unavailable semantic backend and handler transition tests for recoverable and refused readiness states.
+  - impl: Wire staged recovery through `stdio_runner.py` and `tool_handlers.py`; use `dispatcher_enhanced.py` runtime capability status so semantic active flags are true only when the indexer is reachable.
+  - verify: Run `uv run pytest tests/test_handler_path_sandbox.py tests/test_health_surface.py tests/test_tool_readiness_fail_closed.py -q`.
 
 ## Verification
 - Run full readiness tests: `uv run pytest tests/test_repository_readiness.py tests/test_tool_readiness_fail_closed.py -q`

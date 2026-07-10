@@ -25,6 +25,9 @@ class RepositoryReadinessState(str, Enum):
     INDEX_BUILDING = "index_building"
     UNSUPPORTED_WORKTREE = "unsupported_worktree"
     AMBIGUOUS_SELECTOR = "ambiguous_selector"
+    CORRUPT_SQLITE = "corrupt_sqlite"
+    MISSING_SCHEMA = "missing_schema"
+    MISSING_PROVENANCE = "missing_provenance"
 
 
 class SemanticReadinessState(str, Enum):
@@ -133,24 +136,44 @@ class ReadinessClassifier:
         current_commit = getattr(repo_info, "current_commit", None) or _git_commit(registered_path)
         tracked_branch = getattr(repo_info, "tracked_branch", None)
         last_indexed_commit = getattr(repo_info, "last_indexed_commit", None)
+        staleness_reason = getattr(repo_info, "staleness_reason", None)
 
         state = RepositoryReadinessState.READY
         remediation = None
-        if indexing_active:
+
+        if indexing_active or staleness_reason == "index_building":
             state = RepositoryReadinessState.INDEX_BUILDING
             remediation = "Wait for indexing to finish, then retry the request."
+        elif tracked_branch and current_branch and tracked_branch != current_branch:
+            state = RepositoryReadinessState.WRONG_BRANCH
+            remediation = (
+                f"Switch to the tracked branch '{tracked_branch}' or register the intended "
+                "repository path."
+            )
         elif index_path is None or not index_path.exists():
             state = RepositoryReadinessState.MISSING_INDEX
             remediation = "Run reindex or pull the latest artifact for this repository."
-        elif cls._index_is_empty(index_path):
-            state = RepositoryReadinessState.INDEX_EMPTY
-            remediation = "Run reindex to populate the repository index."
-        elif tracked_branch and current_branch and tracked_branch != current_branch:
-            state = RepositoryReadinessState.WRONG_BRANCH
-            remediation = f"Switch to the tracked branch '{tracked_branch}' or register the intended repository path."
-        elif current_commit and last_indexed_commit and current_commit != last_indexed_commit:
-            state = RepositoryReadinessState.STALE_COMMIT
-            remediation = "Run reindex to update the repository index to the current commit."
+        else:
+            db_state = cls._inspect_index(index_path)
+
+            if db_state == RepositoryReadinessState.CORRUPT_SQLITE:
+                state = RepositoryReadinessState.CORRUPT_SQLITE
+                remediation = "Run reindex to quarantine the corrupt bytes and rebuild the index."
+            elif db_state == RepositoryReadinessState.MISSING_SCHEMA:
+                state = RepositoryReadinessState.MISSING_SCHEMA
+                remediation = "Run reindex to quarantine the incomplete schema and rebuild it."
+            elif staleness_reason in {"index_publication_pending", "partial_index_failure"}:
+                state = RepositoryReadinessState.MISSING_PROVENANCE
+                remediation = "Run reindex to quarantine the interrupted generation and rebuild it."
+            elif db_state == RepositoryReadinessState.INDEX_EMPTY:
+                state = RepositoryReadinessState.INDEX_EMPTY
+                remediation = "Run reindex to populate the repository index."
+            elif last_indexed_commit is None or not str(last_indexed_commit).strip():
+                state = RepositoryReadinessState.MISSING_PROVENANCE
+                remediation = "Run reindex to quarantine the unproven index and rebuild it."
+            elif current_commit and last_indexed_commit and current_commit != last_indexed_commit:
+                state = RepositoryReadinessState.STALE_COMMIT
+                remediation = "Run reindex to update the repository index to the current commit."
 
         return RepositoryReadiness(
             state=state,
@@ -431,35 +454,27 @@ class ReadinessClassifier:
         )
 
     @staticmethod
-    def _index_is_empty(index_path: Path) -> bool:
-        if index_path.stat().st_size == 0:
-            return True
+    def _inspect_index(index_path: Path) -> Optional[RepositoryReadinessState]:
+        required_tables = {"schema_version", "repositories", "files", "symbols", "code_chunks"}
         try:
-            conn = sqlite3.connect(str(index_path))
-            try:
-                cursor = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='files'"
-                )
-                if cursor.fetchone() is None:
-                    return True
-                cursor = conn.execute(
+            with sqlite3.connect(str(index_path)) as conn:
+                integrity = conn.execute("PRAGMA quick_check").fetchone()
+                if not integrity or integrity[0] != "ok":
+                    return RepositoryReadinessState.CORRUPT_SQLITE
+                rows = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+                ).fetchall()
+                tables = {str(row[0]) for row in rows}
+                if not required_tables.issubset(tables):
+                    return RepositoryReadinessState.MISSING_SCHEMA
+                count = conn.execute(
                     "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
-                )
-                return int(cursor.fetchone()[0]) == 0
-            finally:
-                conn.close()
-        except sqlite3.OperationalError:
-            try:
-                conn = sqlite3.connect(str(index_path))
-                try:
-                    cursor = conn.execute("SELECT COUNT(*) FROM files")
-                    return int(cursor.fetchone()[0]) == 0
-                finally:
-                    conn.close()
-            except Exception:
-                return False
-        except Exception:
-            return False
+                ).fetchone()
+                if not count or int(count[0]) == 0:
+                    return RepositoryReadinessState.INDEX_EMPTY
+        except sqlite3.DatabaseError:
+            return RepositoryReadinessState.CORRUPT_SQLITE
+        return None
 
 
 def _worktree_remediation() -> str:
@@ -510,8 +525,8 @@ def _run_git(args: list[str], cwd: Path) -> Optional[str]:
 
 def _current_semantic_profile() -> Any:
     try:
-        from mcp_server.config.settings import get_settings
         from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
+        from mcp_server.config.settings import get_settings
 
         settings = get_settings()
         if not settings.semantic_search_enabled:

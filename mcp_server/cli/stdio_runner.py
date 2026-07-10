@@ -79,6 +79,7 @@ _indexing_total_files: int = 0
 _indexing_started_at: Optional[float] = None
 _repo_resolver: Any = None
 _store_registry: Any = None
+_git_index_manager: Any = None
 _local_ctx: Any = None  # RepoContext for the local repo, built by initialize_services()
 _task_registry: MCPTaskRegistry | None = None
 
@@ -1393,6 +1394,7 @@ async def call_tool(
                 sqlite_store=sqlite_store,
                 request_experimental=_request_experimental,
                 task_registry=_task_registry,
+                git_index_manager=_git_index_manager,
             )
         elif name == "write_summaries":
             response = await tool_handlers.handle_write_summaries(
@@ -1485,6 +1487,7 @@ async def call_tool(
 async def _serve(registry_path=None) -> None:
     """Set up and run the MCP stdio server."""
     global _shutdown_called, _gate, _repo_resolver, _store_registry, _task_registry
+    global _git_index_manager
 
     _shutdown_called = False
 
@@ -1515,6 +1518,7 @@ async def _serve(registry_path=None) -> None:
     )
     _repo_resolver = repo_resolver
     _store_registry = store_registry
+    _git_index_manager = git_index_manager
 
     # Start Prometheus metrics exporter
     exporter = PrometheusExporter()

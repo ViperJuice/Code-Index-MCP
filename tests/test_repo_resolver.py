@@ -232,8 +232,8 @@ class TestRepoResolver:
         nested = repo_path / "pkg"
         nested.mkdir()
 
-        assert resolver.classify(repo_path).state.value == "index_empty"
-        assert resolver.classify(nested).state.value == "index_empty"
+        assert resolver.classify(repo_path).state.value == "missing_schema"
+        assert resolver.classify(nested).state.value == "missing_schema"
 
     def test_classify_unregistered_git_repo_and_path_outside_git(self, tmp_path):
         registry = RepositoryRegistry(tmp_path / "registry.json")
