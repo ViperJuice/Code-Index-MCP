@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ class RepositoryReadinessState(str, Enum):
     WRONG_BRANCH = "wrong_branch"
     INDEX_BUILDING = "index_building"
     UNSUPPORTED_WORKTREE = "unsupported_worktree"
+    AMBIGUOUS_SELECTOR = "ambiguous_selector"
 
 
 class SemanticReadinessState(str, Enum):
@@ -170,41 +172,125 @@ class ReadinessClassifier:
     def classify_path(
         cls,
         registry: Any,
-        path: Path,
+        selector: str | Path,
         indexing_active: bool = False,
     ) -> RepositoryReadiness:
-        requested_path = Path(path).expanduser().resolve(strict=False)
-        git_root = _find_git_root(requested_path)
-        if git_root is None:
-            return cls._unregistered(requested_path)
+        selector_str = str(selector)
 
+        # 1. Exact ID match
+        id_matches = [repo for repo in registry.list_all() if repo.repository_id == selector_str]
+        if len(id_matches) > 1:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+                requested_path=selector_str,
+                remediation="Ambiguous selector: matches multiple repository IDs.",
+            )
+        if len(id_matches) == 1:
+            return cls.classify_registered(
+                id_matches[0], requested_path=None, indexing_active=indexing_active
+            )
+
+        # 2. Exact registered name match
+        name_matches = [repo for repo in registry.list_all() if repo.name == selector_str]
+        if len(name_matches) > 1:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+                requested_path=selector_str,
+                remediation="Ambiguous selector: matches multiple repository names.",
+            )
+        if len(name_matches) == 1:
+            return cls.classify_registered(
+                name_matches[0], requested_path=None, indexing_active=indexing_active
+            )
+
+        # 3. Path-based matching
+        is_path_like = (
+            isinstance(selector, Path)
+            or Path(selector_str).expanduser().exists()
+            or any(sep in selector_str for sep in (os.path.sep, "/"))
+            or selector_str.startswith(".")
+            or selector_str.startswith("~")
+        )
+
+        resolved_path = None
+        if is_path_like:
+            p = Path(selector).expanduser()
+            if p.is_absolute():
+                resolved_path = p.resolve()
+            else:
+                # Relative path: only resolve if it exists. No CWD fallback for nonexistent relative paths/names.
+                if (Path.cwd() / p).exists() or p.exists():
+                    resolved_path = p.resolve()
+                else:
+                    resolved_path = None
+
+        if resolved_path is None:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+                requested_path=selector_str,
+                remediation="Register this repository path before querying it.",
+            )
+
+        # Fast-path for exact registered path
+        repo_id = registry.find_by_path(resolved_path)
+        if repo_id:
+            repo_info = registry.get(repo_id)
+            if repo_info is not None:
+                return cls.classify_registered(
+                    repo_info, requested_path=resolved_path, indexing_active=indexing_active
+                )
+
+        git_root = _find_git_root(resolved_path)
+        if git_root is None:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+                requested_path=str(resolved_path),
+                remediation="Register this repository path before querying it.",
+            )
+
+        # Fast-path for exact registered path on git_root
         repo_id = registry.find_by_path(git_root)
         if repo_id:
             repo_info = registry.get(repo_id)
             if repo_info is not None:
                 return cls.classify_registered(
-                    repo_info,
-                    requested_path=requested_path,
-                    indexing_active=indexing_active,
+                    repo_info, requested_path=resolved_path, indexing_active=indexing_active
                 )
 
-        if hasattr(registry, "find_unsupported_worktree"):
-            repo_info = registry.find_unsupported_worktree(git_root)
-            if repo_info is not None:
-                return cls._unsupported_worktree(repo_info, requested_path)
-
         try:
-            repo_id = compute_repo_id(git_root).repo_id
+            git_common_dir = compute_repo_id(git_root).git_common_dir
         except Exception:
-            return cls._unregistered(requested_path)
-        repo_info = registry.get(repo_id)
-        if repo_info is None:
-            return cls._unregistered(requested_path)
-        return cls.classify_registered(
-            repo_info,
-            requested_path=requested_path,
-            indexing_active=indexing_active,
-        )
+            git_common_dir = None
+
+        exact_matches = []
+        worktree_matches = []
+        for repo in registry.list_all():
+            reg_path = Path(repo.path).resolve()
+            if git_root == reg_path:
+                exact_matches.append(repo)
+            else:
+                if repo.git_common_dir and git_common_dir:
+                    if Path(repo.git_common_dir).resolve() == Path(git_common_dir).resolve():
+                        worktree_matches.append(repo)
+
+        if exact_matches:
+            if len(exact_matches) > 1:
+                return RepositoryReadiness(
+                    state=RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+                    requested_path=str(resolved_path),
+                    remediation="Ambiguous path selector: matches multiple registered repositories.",
+                )
+            return cls.classify_registered(
+                exact_matches[0], requested_path=resolved_path, indexing_active=indexing_active
+            )
+        elif worktree_matches:
+            return cls._unsupported_worktree(worktree_matches[0], resolved_path)
+        else:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+                requested_path=str(resolved_path),
+                remediation="Register this repository path before querying it.",
+            )
 
     @classmethod
     def classify_semantic_registered(
@@ -226,9 +312,7 @@ class ReadinessClassifier:
         discovered_fingerprint = _metadata_fingerprint(metadata_profile)
         discovered_collection = _metadata_string(metadata_profile, "collection_name")
         discovered_dimension = _metadata_int(metadata_profile, "model_dimension")
-        remediation = (
-            "Run semantic summary/vector generation for the current profile before semantic queries."
-        )
+        remediation = "Run semantic summary/vector generation for the current profile before semantic queries."
 
         if evidence is None:
             return SemanticReadiness(
@@ -295,8 +379,7 @@ class ReadinessClassifier:
             )
 
         if metadata_profile is None or (
-            discovered_fingerprint
-            and discovered_fingerprint != profile.compatibility_fingerprint
+            discovered_fingerprint and discovered_fingerprint != profile.compatibility_fingerprint
         ):
             return SemanticReadiness(
                 state=SemanticReadinessState.SEMANTIC_STALE,
@@ -469,7 +552,9 @@ def _semantic_evidence(
         return None
 
 
-def _current_profile_metadata(metadata: dict[str, Any], profile_id: str) -> Optional[dict[str, Any]]:
+def _current_profile_metadata(
+    metadata: dict[str, Any], profile_id: str
+) -> Optional[dict[str, Any]]:
     try:
         from mcp_server.artifacts.semantic_profiles import get_primary_semantic_profile_metadata
     except Exception:

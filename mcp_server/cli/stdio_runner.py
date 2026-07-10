@@ -98,7 +98,7 @@ class _LocalRepoResolver:
         return _local_ctx
 
 
-_REPOSITORY_DESCRIPTION = "Repository ID, path, or git URL. Defaults to current repository."
+_REPOSITORY_DESCRIPTION = "Exact registered repository ID, registered name, or registered path."
 _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -476,9 +476,7 @@ def _build_tool_list() -> list[types.Tool]:
                                         "last_indexed": {"type": ["string", "null"]},
                                         "semantic_source": {"type": ["string", "null"]},
                                         "semantic_profile_id": {"type": ["string", "null"]},
-                                        "semantic_collection_name": {
-                                            "type": ["string", "null"]
-                                        },
+                                        "semantic_collection_name": {"type": ["string", "null"]},
                                         "source_metadata": {"type": ["object", "null"]},
                                         "_usage_hint": {"type": "string"},
                                     },

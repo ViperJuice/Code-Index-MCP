@@ -29,10 +29,7 @@ from mcp_server.health.repository_readiness import (
     RepositoryReadiness,
     RepositoryReadinessState,
 )
-from mcp_server.indexing.source_metadata import (
-    FRICTION_CATEGORIES,
-    normalize_friction_category,
-)
+from mcp_server.indexing.source_metadata import normalize_friction_category
 
 logger = logging.getLogger(__name__)
 
@@ -133,14 +130,18 @@ def _resolve_ctx(
     if readiness is not None and readiness.state in {
         RepositoryReadinessState.UNREGISTERED_REPOSITORY,
         RepositoryReadinessState.UNSUPPORTED_WORKTREE,
+        RepositoryReadinessState.AMBIGUOUS_SELECTOR,
     }:
         return None
 
-    target = path_arg or os.environ.get("MCP_WORKSPACE_ROOT", "")
-    if not target:
-        target = str(Path.cwd())
+    if path_arg:
+        target = path_arg
+    else:
+        target = os.environ.get("MCP_WORKSPACE_ROOT", "")
+        if not target:
+            target = str(Path.cwd())
     try:
-        return repo_resolver.resolve(Path(target))
+        return repo_resolver.resolve(target)
     except Exception as exc:
         logger.debug("RepoResolver.resolve(%s) failed: %s", target, exc)
         return None
@@ -151,14 +152,17 @@ def _classify_ctx(
     path_arg: Optional[str],
 ) -> Optional[RepositoryReadiness]:
     """Classify a tool repository/path target when the resolver supports it."""
-    target = path_arg or os.environ.get("MCP_WORKSPACE_ROOT", "")
-    if not target:
-        target = str(Path.cwd())
+    if path_arg:
+        target = path_arg
+    else:
+        target = os.environ.get("MCP_WORKSPACE_ROOT", "")
+        if not target:
+            target = str(Path.cwd())
     classifier = getattr(repo_resolver, "classify", None)
     if not callable(classifier):
         return None
     try:
-        readiness = classifier(Path(target))
+        readiness = classifier(target)
     except Exception as exc:
         logger.debug("RepoResolver.classify(%s) failed: %s", target, exc)
         return None
@@ -456,9 +460,7 @@ async def handle_search_code(
             friction_categories=(arguments or {}).get("friction_categories"),
             history_labels=(arguments or {}).get("history_labels"),
             history_repos=(arguments or {}).get("history_repos"),
-            include_source_metadata=bool(
-                (arguments or {}).get("include_source_metadata", False)
-            ),
+            include_source_metadata=bool((arguments or {}).get("include_source_metadata", False)),
         )
     except ClientValidationError as exc:
         payload = {"error": exc.error, "details": exc.details}
@@ -557,7 +559,9 @@ async def handle_search_code(
                 "semantic_fallback_status": "refused_not_ready",
                 "semantic_readiness": semantic_readiness,
                 "message": result.message,
-                "remediation": semantic_readiness.get("remediation") if semantic_readiness else None,
+                "remediation": (
+                    semantic_readiness.get("remediation") if semantic_readiness else None
+                ),
             }
         )
     if result.code == "semantic_search_failed":
@@ -667,12 +671,8 @@ async def handle_search_code(
         if semantic:
             response_data["semantic_requested"] = True
             response_data["semantic_source"] = "semantic"
-            response_data["semantic_profile_id"] = (
-                result.semantic_profile_id
-            )
-            response_data["semantic_collection_name"] = (
-                result.semantic_collection_name
-            )
+            response_data["semantic_profile_id"] = result.semantic_profile_id
+            response_data["semantic_collection_name"] = result.semantic_collection_name
             response_data["semantic_fallback_status"] = "not_attempted"
         if source_type:
             response_data["source_type"] = source_type

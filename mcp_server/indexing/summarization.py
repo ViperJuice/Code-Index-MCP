@@ -8,7 +8,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence
 
 import mcp.types as types
 
@@ -72,6 +72,13 @@ class SummaryGenerationResult:
     blocked_call_chunk_ids: List[str] = field(default_factory=list)
     blocked_call_timeout_seconds: Optional[float] = None
     cancelled: bool = False
+    summaries: List[Any] = field(default_factory=list)
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self.summaries)
+
+    def __len__(self) -> int:
+        return len(self.summaries)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -358,7 +365,9 @@ class ChunkWriter:
         finally:
             await client.close()
 
-    async def _call_direct_api(self, system: str, prompt: str) -> tuple[Optional[str], Optional[str]]:
+    async def _call_direct_api(
+        self, system: str, prompt: str
+    ) -> tuple[Optional[str], Optional[str]]:
         """Try profile endpoint first, then Cerebras, Anthropic, OpenAI."""
         if self.summarization_config.get("base_url"):
             try:
@@ -389,7 +398,9 @@ class ChunkWriter:
             return self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001")
         return self.summarization_config.get("openai_model", "gpt-5.4-nano")
 
-    def _build_api_file_context(self, *, language: str, file_content: str, chunk_content: str) -> str:
+    def _build_api_file_context(
+        self, *, language: str, file_content: str, chunk_content: str
+    ) -> str:
         if not file_content:
             return ""
         normalized_language = (language or "").lower()
@@ -641,7 +652,9 @@ class FileBatchSummarizer(ChunkWriter):
         error: Exception,
         retry_profile_batch: bool = True,
     ) -> SummaryGenerationResult | List[Any]:
-        logger.warning("%s for %s (%s), falling back to per-chunk path", warning_prefix, file_path, error)
+        logger.warning(
+            "%s for %s (%s), falling back to per-chunk path", warning_prefix, file_path, error
+        )
         if retry_profile_batch and self.summarization_config.get("base_url"):
             try:
                 return await self._call_profile_batch_api(
@@ -726,7 +739,9 @@ class FileBatchSummarizer(ChunkWriter):
             batch = chunks[offset : offset + _PROFILE_BATCH_CHUNK_COUNT]
             chunk_blocks = []
             for chunk in batch:
-                symbol = symbol_map.get(chunk.get("symbol_id")) or chunk.get("node_type") or "unknown"
+                symbol = (
+                    symbol_map.get(chunk.get("symbol_id")) or chunk.get("node_type") or "unknown"
+                )
                 chunk_blocks.append(
                     "\n".join(
                         [
@@ -1012,6 +1027,7 @@ class FileBatchSummarizer(ChunkWriter):
             files_summarized=1 if summaries else 0,
             remaining_chunks=len(missing_chunk_ids),
             scope_drained=len(missing_chunk_ids) == 0,
+            summaries=summaries,
         )
 
 
@@ -1222,7 +1238,9 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                         scope_drained=False,
                         cancelled=True,
                     )
-                file_language = (file_meta[file_id][1] or "unknown") if file_id in file_meta else "unknown"
+                file_language = (
+                    (file_meta[file_id][1] or "unknown") if file_id in file_meta else "unknown"
+                )
                 file_chunk_window = self._file_chunk_window_for_language(
                     file_language,
                     repo_scope=repo_scope,

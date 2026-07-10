@@ -44,6 +44,7 @@ def test_readiness_state_values_are_exact():
         "wrong_branch",
         "index_building",
         "unsupported_worktree",
+        "ambiguous_selector",
     }
 
 

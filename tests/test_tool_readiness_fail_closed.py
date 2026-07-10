@@ -75,6 +75,7 @@ NON_READY_STATES = [
     RepositoryReadinessState.WRONG_BRANCH,
     RepositoryReadinessState.INDEX_BUILDING,
     RepositoryReadinessState.UNSUPPORTED_WORKTREE,
+    RepositoryReadinessState.AMBIGUOUS_SELECTOR,
 ]
 
 

@@ -100,9 +100,11 @@ def _resolve_readiness(
     *,
     workspace_root: Path | None = None,
 ) -> Any:
-    target = repository or str(workspace_root or Path.cwd())
-    target_path = Path(target)
-    readiness = repo_resolver.classify(target_path)
+    if repository:
+        target = repository
+    else:
+        target = str(workspace_root or Path.cwd())
+    readiness = repo_resolver.classify(target)
 
     registry = getattr(repo_resolver, "_registry", None)
     repo_id = getattr(readiness, "repository_id", None)
@@ -111,7 +113,7 @@ def _resolve_readiness(
             registry.update_git_state(repo_id)
         except Exception:
             return readiness
-        return repo_resolver.classify(target_path)
+        return repo_resolver.classify(target)
 
     return readiness
 
@@ -122,9 +124,12 @@ def _resolve_ctx(
     *,
     workspace_root: Path | None = None,
 ) -> RepoContext | None:
-    target = repository or str(workspace_root or Path.cwd())
+    if repository:
+        target = repository
+    else:
+        target = str(workspace_root or Path.cwd())
     try:
-        return repo_resolver.resolve(Path(target))
+        return repo_resolver.resolve(target)
     except Exception:
         return None
 
@@ -380,7 +385,9 @@ class IndexItClient:
             workspace_root=self.workspace_root,
         )
         if ctx is None:
-            return ClientSymbolResult(symbol=symbol, found=False, message="Repository context could not be resolved")
+            return ClientSymbolResult(
+                symbol=symbol, found=False, message="Repository context could not be resolved"
+            )
         result = self.dispatcher.lookup(ctx, symbol)
         if not result:
             return ClientSymbolResult(
@@ -422,7 +429,9 @@ class IndexItClient:
         repository: str | Path | None = None,
     ) -> ClientReindexResult:
         scope = str(repository) if repository is not None else (str(path) if path else None)
-        readiness = _resolve_readiness(self.repo_resolver, scope, workspace_root=self.workspace_root)
+        readiness = _resolve_readiness(
+            self.repo_resolver, scope, workspace_root=self.workspace_root
+        )
         if readiness is not None and not readiness.ready:
             return ClientReindexResult(
                 path=str(path) if path is not None else scope,

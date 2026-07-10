@@ -33,22 +33,23 @@ def _find_git_root(start: Path) -> Optional[Path]:
 
 
 class RepoResolver:
-    """Resolves arbitrary filesystem paths to a RepoContext, or None when
-    the path is outside any registered repository. Does NOT auto-register."""
+    """Resolves arbitrary selectors to a RepoContext, or None when
+    the selector is outside any registered repository. Does NOT auto-register."""
 
     def __init__(self, registry: RepositoryRegistry, store_registry: StoreRegistry):
         self._registry = registry
         self._store_registry = store_registry
 
-    def classify(self, path: Path) -> RepositoryReadiness:
-        """Classify repository readiness for a path without registering it."""
-        return ReadinessClassifier.classify_path(self._registry, path)
+    def classify(self, selector: str | Path) -> RepositoryReadiness:
+        """Classify repository readiness for a selector without registering it."""
+        return ReadinessClassifier.classify_path(self._registry, selector)
 
-    def resolve(self, path: Path) -> Optional[RepoContext]:
-        readiness = self.classify(path)
+    def resolve(self, selector: str | Path) -> Optional[RepoContext]:
+        readiness = self.classify(selector)
         if readiness.state in {
             RepositoryReadinessState.UNREGISTERED_REPOSITORY,
             RepositoryReadinessState.UNSUPPORTED_WORKTREE,
+            RepositoryReadinessState.AMBIGUOUS_SELECTOR,
         }:
             return None
 
@@ -63,7 +64,11 @@ class RepoResolver:
         tracked_branch = info.tracked_branch or ""
 
         store = self._store_registry.get(repo_id)
-        requested_path = path.expanduser().resolve()
+        if readiness.requested_path:
+            requested_path = Path(readiness.requested_path)
+        else:
+            requested_path = Path(info.path).expanduser().resolve()
+
         workspace_root = Path(info.path).expanduser().resolve()
         return RepoContext(
             repo_id=repo_id,
