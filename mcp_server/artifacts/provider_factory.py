@@ -65,10 +65,11 @@ class ArtifactProviderFactory:
         if settings is None:
             settings = get_settings()
 
-        configured_provider = provider_override or getattr(
-            settings, "artifact_provider", "github_actions"
-        )
-        configured_provider = configured_provider.lower()
+        configured_provider = str(
+            provider_override
+            or getattr(settings, "artifact_provider", "github_actions")
+            or "github_actions"
+        ).lower()
 
         if configured_provider in ArtifactProviderFactory._UNIMPLEMENTED_PROVIDERS:
             raise ValueError(
@@ -83,10 +84,13 @@ class ArtifactProviderFactory:
                 reasons=[f"configured provider override: {configured_provider}"],
             )
 
-        fallback_order_raw = getattr(
-            settings,
-            "artifact_routing_fallback_order",
-            "local_fs,github_actions",
+        fallback_order_raw = str(
+            getattr(
+                settings,
+                "artifact_routing_fallback_order",
+                "local_fs,github_actions",
+            )
+            or "local_fs,github_actions"
         )
         fallback_order = [p.strip() for p in fallback_order_raw.split(",") if p.strip()]
 
@@ -101,15 +105,21 @@ class ArtifactProviderFactory:
         )
 
         context = ArtifactRoutingContext(
-            repo_visibility=repo_visibility
-            or getattr(settings, "artifact_routing_default_repo_visibility", "private"),
+            repo_visibility=str(
+                repo_visibility
+                or getattr(settings, "artifact_routing_default_repo_visibility", "private")
+                or "private"
+            ),
             artifact_size_bytes=(
                 artifact_size_bytes
                 if artifact_size_bytes is not None
                 else getattr(settings, "artifact_routing_default_artifact_size_bytes", 0)
             ),
-            profile_type=profile_type
-            or getattr(settings, "artifact_routing_default_profile_type", "standard"),
+            profile_type=str(
+                profile_type
+                or getattr(settings, "artifact_routing_default_profile_type", "standard")
+                or "standard"
+            ),
             explicit_override=provider_override if provider_override else None,
         )
         return policy.choose(context)

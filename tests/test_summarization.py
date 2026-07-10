@@ -4,6 +4,7 @@ import asyncio
 import importlib
 import json
 import re
+import socket
 import sqlite3
 import time
 from pathlib import Path
@@ -11,16 +12,25 @@ from types import SimpleNamespace
 
 import pytest
 
+from mcp_server.config.settings import get_settings
 from mcp_server.indexing.summarization import (
     ChunkWriter,
     ComprehensiveChunkWriter,
     FileBatchSummarizer,
+    GeneratedSummary,
     LazyChunkWriter,
     SummaryGenerationResult,
 )
-from mcp_server.config.settings import get_settings
 from mcp_server.setup.semantic_preflight import EnrichmentModelResolution
 from mcp_server.storage.sqlite_store import SQLiteStore
+
+
+@pytest.fixture(autouse=True)
+def _deny_network_connections(monkeypatch):
+    def deny_connect(*_args, **_kwargs):
+        raise AssertionError("unit summarization tests must not open network connections")
+
+    monkeypatch.setattr(socket.socket, "connect", deny_connect)
 
 
 def _seed_chunk_summary_tables(db_path: Path, tmp_path: Path) -> tuple[SQLiteStore, int]:
@@ -72,6 +82,26 @@ def _store_chunk(
         language="python",
         node_type="function_definition",
     )
+
+
+def test_summary_generation_result_normalizes_immutable_items_and_ids():
+    source_items = [SimpleNamespace(chunk_id="chunk-1", summary="Summary text")]
+    source_missing = ["chunk-2"]
+    result = SummaryGenerationResult(
+        chunks_attempted=2,
+        summaries_written=1,
+        missing_chunk_ids=source_missing,
+        summaries=source_items,
+    )
+
+    source_items.append(SimpleNamespace(chunk_id="chunk-2", summary="Late mutation"))
+    source_missing.append("chunk-3")
+
+    assert result.summaries == (GeneratedSummary("chunk-1", "Summary text"),)
+    assert result.missing_chunk_ids == ("chunk-2",)
+    assert result.to_dict()["summaries"] == [{"chunk_id": "chunk-1", "summary": "Summary text"}]
+    with pytest.raises(TypeError):
+        iter(result)
 
 
 class TestChunkWriterInit:
@@ -350,7 +380,7 @@ async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_p
     async def _fake_batch_api(*_args, **_kwargs):
         return [SimpleNamespace(chunk_id="chunk-1", summary="Semantic summary")]
 
-    summarizer._call_batch_api = _fake_batch_api  # type: ignore[method-assign]
+    summarizer._call_profile_batch_api = _fake_batch_api  # type: ignore[method-assign]
     summarizer._profile_model_resolution = EnrichmentModelResolution(
         configured_model="chat",
         effective_model="cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
@@ -377,7 +407,7 @@ async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_p
 
     stored = store.get_chunk_summary("chunk-1")
     assert result.summaries_written == 1
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
     assert stored is not None
     assert stored["is_authoritative"] is True
     assert stored["provider_name"] == "openai_compatible"
@@ -386,10 +416,12 @@ async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_p
     assert stored["audit_metadata"]["llm_model"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     assert stored["audit_metadata"]["configured_model_name"] == "chat"
     assert (
-        stored["audit_metadata"]["effective_model_name"]
-        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+        stored["audit_metadata"]["effective_model_name"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
-    assert stored["audit_metadata"]["model_resolution_strategy"] == "single_served_model_for_chat_alias"
+    assert (
+        stored["audit_metadata"]["model_resolution_strategy"]
+        == "single_served_model_for_chat_alias"
+    )
 
 
 @pytest.mark.asyncio
@@ -406,6 +438,11 @@ async def test_file_batch_summarizer_reports_missing_chunks_without_claiming_suc
         return [SimpleNamespace(chunk_id="chunk-1", summary="Only one summary")]
 
     summarizer._call_profile_batch_api = _fake_batch_api  # type: ignore[method-assign]
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="fake-model",
+        resolution_strategy="injected_test_model",
+    )
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
@@ -419,7 +456,7 @@ async def test_file_batch_summarizer_reports_missing_chunks_without_claiming_suc
     )
 
     assert result.summaries_written == 1
-    assert result.missing_chunk_ids == ["chunk-2"]
+    assert result.missing_chunk_ids == ("chunk-2",)
 
 
 @pytest.mark.asyncio
@@ -442,6 +479,11 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
 
     async def _fake_profile_batch(file_id, file_path, file_content, chunks, symbol_map):
         del file_id, file_path, file_content, symbol_map
+        profile_attempts["count"] += 1
+        if profile_attempts["count"] == 1:
+            raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError(
+                "big"
+            )
         profile_batches.append([chunk["chunk_id"] for chunk in chunks])
         return [
             SimpleNamespace(chunk_id=chunk["chunk_id"], summary=f"summary for {chunk['chunk_id']}")
@@ -450,16 +492,24 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
 
     async def _should_not_run(*_args, **_kwargs):
         topological_called["value"] = True
-        raise AssertionError("topological fallback should not run when bounded profile recovery succeeds")
+        raise AssertionError(
+            "topological fallback should not run when bounded profile recovery succeeds"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
     summarizer._call_profile_batch_api = _fake_profile_batch  # type: ignore[method-assign]
     summarizer._summarize_topological = _should_not_run  # type: ignore[method-assign]
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="fake-model",
+        resolution_strategy="injected_test_model",
+    )
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
-        file_content="x" * (
+        file_content="x"
+        * (
             importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
             + 1
         ),
@@ -480,7 +530,7 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
     assert topological_called["value"] is False
     assert profile_batches == [[f"chunk-{idx}" for idx in range(1, 67)]]
     assert result.summaries_written == 66
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
     stored = store.get_chunk_summary("chunk-1")
     assert stored is not None
     assert stored["is_authoritative"] is True
@@ -532,7 +582,9 @@ async def test_file_batch_summarizer_tracks_missing_chunks_after_large_file_prof
         return json.dumps(payload), "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
 
     async def _should_not_run(*_args, **_kwargs):
-        raise AssertionError("topological fallback should not run when large-file profile batches succeed")
+        raise AssertionError(
+            "topological fallback should not run when large-file profile batches succeed"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
@@ -563,7 +615,7 @@ async def test_file_batch_summarizer_tracks_missing_chunks_after_large_file_prof
     assert profile_api_calls[0] == chunk_ids[:64]
     assert profile_api_calls[1] == chunk_ids[64:]
     assert result.summaries_written == 65
-    assert result.missing_chunk_ids == ["chunk-66"]
+    assert result.missing_chunk_ids == ("chunk-66",)
     stored = store.get_chunk_summary("chunk-1")
     assert stored is not None
     assert stored["is_authoritative"] is True
@@ -571,8 +623,7 @@ async def test_file_batch_summarizer_tracks_missing_chunks_after_large_file_prof
     assert stored["profile_id"] == "oss_high"
     assert stored["audit_metadata"]["configured_model_name"] == "chat"
     assert (
-        stored["audit_metadata"]["effective_model_name"]
-        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+        stored["audit_metadata"]["effective_model_name"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
 
 
@@ -600,13 +651,9 @@ async def test_file_batch_summarizer_falls_back_to_topological_path_when_large_f
     async def _fake_topological(*args, **kwargs):
         del args, kwargs
         topological_called["value"] = True
-        return importlib.import_module("mcp_server.indexing.summarization").SummaryGenerationResult(
-            chunks_attempted=2,
-            summaries_written=2,
-            authoritative_chunks=2,
-            missing_chunk_ids=[],
-            files_attempted=1,
-            files_summarized=1,
+        return (
+            GeneratedSummary("chunk-1", "Summary one"),
+            GeneratedSummary("chunk-2", "Summary two"),
         )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
@@ -616,7 +663,8 @@ async def test_file_batch_summarizer_falls_back_to_topological_path_when_large_f
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
-        file_content="x" * (
+        file_content="x"
+        * (
             importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
             + 1
         ),
@@ -686,7 +734,7 @@ async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_r
     stored = store.get_chunk_summary("chunk-1")
     assert result.summaries_written == 1
     assert result.authoritative_chunks == 1
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
     assert stored is not None
     assert stored["summary_text"] == "Recovered authoritative summary"
     assert stored["is_authoritative"] is True
@@ -695,8 +743,7 @@ async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_r
     assert stored["audit_metadata"]["llm_model"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     assert stored["audit_metadata"]["configured_model_name"] == "chat"
     assert (
-        stored["audit_metadata"]["effective_model_name"]
-        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+        stored["audit_metadata"]["effective_model_name"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
 
 
@@ -753,7 +800,7 @@ async def test_file_batch_summarizer_prefers_profile_batch_path_when_base_url_is
     stored = store.get_chunk_summary("chunk-1")
     assert result.summaries_written == 1
     assert result.authoritative_chunks == 1
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
     assert stored is not None
     assert stored["summary_text"] == "Recovered authoritative summary"
     assert stored["provider_name"] == "openai_compatible"
@@ -779,22 +826,26 @@ async def test_file_batch_summarizer_uses_profile_batch_fallback_before_per_chun
     async def _raise_runtime_mismatch(*_args, **_kwargs):
         raise ImportError("generated client 0.220.0 is incompatible with baml-py 0.221.0")
 
-    async def _fake_profile_api(_system: str, _prompt: str, **_kwargs) -> tuple[str, str]:
-        return (
-            '{"summaries":['
-            '{"chunk_id":"chunk-1","summary":"Summary one. Still concise."},'
-            '{"chunk_id":"chunk-2","summary":"Summary two. Still concise."}'
-            ']}',
-            "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
-        )
+    async def _fake_profile_batch(*_args, **_kwargs):
+        return [
+            GeneratedSummary("chunk-1", "Summary one. Still concise."),
+            GeneratedSummary("chunk-2", "Summary two. Still concise."),
+        ]
 
     async def _should_not_run(*_args, **_kwargs):
-        raise AssertionError("per-chunk fallback should not run when profile batch fallback succeeds")
+        raise AssertionError(
+            "per-chunk fallback should not run when profile batch fallback succeeds"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_runtime_mismatch  # type: ignore[method-assign]
-    summarizer._call_profile_api = _fake_profile_api  # type: ignore[method-assign]
+    summarizer._call_profile_batch_api = _fake_profile_batch  # type: ignore[method-assign]
     summarizer._summarize_topological = _should_not_run  # type: ignore[method-assign]
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="fake-model",
+        resolution_strategy="injected_test_model",
+    )
 
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
@@ -825,7 +876,7 @@ async def test_file_batch_summarizer_uses_profile_batch_fallback_before_per_chun
     stored_one = store.get_chunk_summary("chunk-1")
     stored_two = store.get_chunk_summary("chunk-2")
     assert result.summaries_written == 2
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
     assert stored_one is not None
     assert stored_two is not None
     assert stored_one["summary_text"] == "Summary one. Still concise."
@@ -982,7 +1033,7 @@ async def test_process_scope_drains_multiple_batches_for_target_scope(tmp_path, 
     assert result.batches_processed == 2
     assert result.remaining_chunks == 0
     assert result.scope_drained is True
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
 
 
 @pytest.mark.asyncio
@@ -1052,15 +1103,25 @@ async def test_process_scope_retries_large_file_profile_recovery_until_backlog_i
                 prompt_fingerprint="test-fingerprint",
                 audit_metadata={"provider_name": "openai_compatible", "profile_id": "oss_high"},
             )
-        return [SimpleNamespace(chunk_id=chunk_id, summary=f"summary for {chunk_id}") for chunk_id in chunk_ids]
+        return [
+            SimpleNamespace(chunk_id=chunk_id, summary=f"summary for {chunk_id}")
+            for chunk_id in chunk_ids
+        ]
 
     async def _should_not_run(*_args, **_kwargs):
-        raise AssertionError("topological fallback should not run when large-file profile recovery keeps making progress")
+        raise AssertionError(
+            "topological fallback should not run when large-file profile recovery keeps making progress"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     monkeypatch.setattr(writer, "_call_batch_api", _raise_large)
     monkeypatch.setattr(writer, "_call_profile_batch_api", _fake_profile_batch)
     monkeypatch.setattr(writer, "_summarize_topological", _should_not_run)
+    writer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="fake-model",
+        resolution_strategy="injected_test_model",
+    )
 
     result = await writer.process_scope(limit=10, target_paths=[target])
 
@@ -1068,13 +1129,11 @@ async def test_process_scope_retries_large_file_profile_recovery_until_backlog_i
     assert result.summaries_written == 3
     assert result.authoritative_chunks == 3
     assert result.chunks_attempted == 5
-    assert result.missing_chunk_ids == ["chunk-2", "chunk-3"]
+    assert result.missing_chunk_ids == ("chunk-2", "chunk-3")
 
 
 @pytest.mark.asyncio
-async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(
-    tmp_path, monkeypatch
-):
+async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(tmp_path, monkeypatch):
     db_path = tmp_path / "summaries.db"
     store = SQLiteStore(str(db_path))
     repo_id = store.ensure_repository_row(tmp_path)
@@ -1163,9 +1222,7 @@ async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(
 
 
 @pytest.mark.asyncio
-async def test_process_scope_uses_smaller_doc_batch_cap_for_repo_scope(
-    tmp_path, monkeypatch
-):
+async def test_process_scope_uses_smaller_doc_batch_cap_for_repo_scope(tmp_path, monkeypatch):
     db_path = tmp_path / "summaries.db"
     store = SQLiteStore(str(db_path))
     repo_id = store.ensure_repository_row(tmp_path)
@@ -1497,6 +1554,11 @@ async def test_summarize_file_chunks_bounds_repo_scope_doc_like_backlog_and_repo
         return [SimpleNamespace(chunk_id=chunks[0]["chunk_id"], summary="Only one summary")]
 
     monkeypatch.setattr(summarizer, "_call_profile_batch_api", _fake_profile_batch)
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="fake-model",
+        resolution_strategy="injected_test_model",
+    )
 
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
@@ -1512,7 +1574,7 @@ async def test_summarize_file_chunks_bounds_repo_scope_doc_like_backlog_and_repo
     assert result.chunks_attempted == 1
     assert result.summaries_written == 1
     assert result.authoritative_chunks == 1
-    assert result.missing_chunk_ids == ["chunk-2", "chunk-3", "chunk-4"]
+    assert result.missing_chunk_ids == ("chunk-2", "chunk-3", "chunk-4")
     assert result.remaining_chunks == 3
     assert result.scope_drained is False
     assert store.get_chunk_summary("chunk-1") is not None
@@ -1596,12 +1658,12 @@ async def test_summarize_file_chunks_returns_exact_timeout_result_for_repo_scope
     assert result.summaries_written == 0
     assert result.chunks_attempted == 1
     assert result.authoritative_chunks == 0
-    assert result.missing_chunk_ids == ["chunk-1", "chunk-2", "chunk-3", "chunk-4"]
+    assert result.missing_chunk_ids == ("chunk-1", "chunk-2", "chunk-3", "chunk-4")
     assert result.remaining_chunks == 4
     assert result.scope_drained is False
     assert result.blocked_call_reason == "timeout"
     assert result.blocked_call_file_path == str(target)
-    assert result.blocked_call_chunk_ids == ["chunk-1"]
+    assert result.blocked_call_chunk_ids == ("chunk-1",)
     assert result.blocked_call_timeout_seconds == 17.0
     assert store.get_chunk_summary("chunk-1") is None
 
@@ -1689,7 +1751,7 @@ async def test_process_scope_max_batches_stops_after_one_batch(tmp_path, monkeyp
     assert result.batches_processed == 1
     assert result.remaining_chunks == 1
     assert result.scope_drained is False
-    assert result.missing_chunk_ids == []
+    assert result.missing_chunk_ids == ()
 
 
 @pytest.mark.asyncio
@@ -1769,5 +1831,5 @@ async def test_process_scope_returns_exact_timeout_result_for_repo_scope_single_
     assert result.scope_drained is False
     assert result.blocked_call_reason == "timeout"
     assert result.blocked_call_file_path == str(first)
-    assert result.blocked_call_chunk_ids == ["first-chunk-1"]
+    assert result.blocked_call_chunk_ids == ("first-chunk-1",)
     assert result.blocked_call_timeout_seconds == 30.0

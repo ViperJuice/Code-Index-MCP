@@ -43,6 +43,10 @@ P8 SL-3 sweep — 2026-04-18. All 49 files in scope bannered; 0 deleted. All 16 
 | `docs/status/MARKDOWN_PLUGIN_SUMMARY.md` | bannered | Subject active in mcp_server/plugins/markdown_plugin; historical snapshot | 2026-04-18 |
 | `docs/status/MCP_COMPREHENSIVE_VALIDATION_REPORT.md` | bannered | Subject active in mcp_server/dispatcher and mcp_server/storage; historical validation snapshot | 2026-04-18 |
 | `docs/status/MCP_VALIDATION_SUMMARY.md` | bannered | Subject active in mcp_server/dispatcher and mcp_server/storage; historical snapshot | 2026-04-18 |
+| `docs/status/PMCP_FLEET_PILOT.md` | deleted | Superseded PMCP pilot snapshot removed after fleet-readiness reconciliation; current setup guidance lives in operator documentation and versioned phase evidence | 2026-04-25 |
+| `docs/status/pmcp-pilot/query-evidence.json` | deleted | Superseded generated PMCP query evidence removed during repository cleanup | 2026-04-25 |
+| `docs/status/pmcp-pilot/repository-readiness-evidence.json` | deleted | Superseded generated PMCP readiness evidence removed during repository cleanup | 2026-04-25 |
+| `docs/status/pmcp-pilot/startup-evidence.json` | deleted | Superseded generated PMCP startup evidence removed during repository cleanup | 2026-04-25 |
 | `docs/status/PHASE2_COMPLETION_SUMMARY.md` | bannered | Subject (phase2) referenced in scripts/parallel_claude_integration.py; historical phase snapshot | 2026-04-18 |
 | `docs/status/PLAINTEXT_PLUGIN_SUMMARY.md` | bannered | Subject active in mcp_server/plugins/plugin_factory.py and tests; historical snapshot | 2026-04-18 |
 | `docs/status/SEMANTIC_INDEXER_ENHANCEMENTS.md` | bannered | Subject active in mcp_server/utils/semantic_indexer.py; historical snapshot | 2026-04-18 |

@@ -5,7 +5,7 @@ import secrets
 import string
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import bcrypt
 import jwt
@@ -106,7 +106,7 @@ class PasswordManager(IPasswordManager):
 
     def hash_password(self, password: str) -> str:
         """Hash *password* with argon2id.  Returns a ``$argon2id$`` hash string."""
-        return self._ph.hash(password)
+        return cast(str, self._ph.hash(password))
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify *plain_password* against *hashed_password*.
@@ -123,9 +123,11 @@ class PasswordManager(IPasswordManager):
             except VerifyMismatchError:
                 return False
         if hashed_password.startswith(("$2b$", "$2a$")):
-            return bcrypt.checkpw(
-                plain_password.encode("utf-8"),
-                hashed_password.encode("utf-8"),
+            return bool(
+                bcrypt.checkpw(
+                    plain_password.encode("utf-8"),
+                    hashed_password.encode("utf-8"),
+                )
             )
         return False
 
@@ -165,7 +167,7 @@ class PasswordManager(IPasswordManager):
         - unknown format: ``True`` — safer to rehash.
         """
         if hashed.startswith("$argon2"):
-            return self._ph.check_needs_rehash(hashed)
+            return bool(self._ph.check_needs_rehash(hashed))
         if hashed.startswith("$2b$") or hashed.startswith("$2a$"):
             return True  # all bcrypt hashes need rehash to argon2
         return True  # unknown format, safer to rehash
@@ -389,7 +391,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
         await self._log_security_event(
             "access_token_created", user_id=user.id, username=user.username
         )
-        return token
+        return cast(str, token)
 
     async def create_refresh_token(self, user: User) -> str:
         """Create refresh token for user."""
@@ -418,7 +420,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
         await self._log_security_event(
             "refresh_token_created", user_id=user.id, username=user.username
         )
-        return token
+        return cast(str, token)
 
     async def verify_token(self, token: str) -> Optional[TokenData]:
         """Verify and decode JWT token."""
@@ -427,6 +429,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
                 token,
                 self.config.jwt_secret_key,
                 algorithms=[self.config.jwt_algorithm],
+                options={"require": ["exp", "iat", "type", "user_id", "username", "role"]},
             )
 
             if payload.get("type") != "access":
@@ -440,11 +443,27 @@ class AuthManager(IAuthenticator, IAuthorizer):
             if not user or not user.is_active:
                 return None
 
+            permissions_payload = payload.get("permissions")
+            if permissions_payload is None or not isinstance(permissions_payload, list):
+                return None
+
+            try:
+                UserRole(payload["role"])
+                [Permission(permission) for permission in permissions_payload]
+            except ValueError:
+                await self._log_security_event(
+                    "token_invalid",
+                    user_id=user.id,
+                    username=user.username,
+                    details={"token_type": "access", "reason": "invalid_claim_value"},
+                )
+                return None
+
             return TokenData(
-                user_id=payload["user_id"],
-                username=payload["username"],
-                role=UserRole(payload["role"]),
-                permissions=[Permission(p) for p in payload["permissions"]],
+                user_id=user.id,
+                username=user.username,
+                role=user.role,
+                permissions=user.permissions,
                 issued_at=datetime.fromtimestamp(payload["iat"]),
                 expires_at=datetime.fromtimestamp(payload["exp"]),
             )

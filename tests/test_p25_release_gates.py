@@ -103,46 +103,40 @@ def test_release_automation_refuses_before_mutating_or_publishing():
     jobs = _jobs(".github/workflows/release-automation.yml")
     workflow_text = _read(".github/workflows/release-automation.yml")
 
-    assert jobs["preflight-release-gates"]["name"] == "Preflight Release Gates"
-    assert "make agent-gate" in workflow_text
-    assert "make release-smoke-container" in workflow_text
-    assert workflow_text.index("make agent-gate") < workflow_text.index(
-        "make release-smoke-container"
-    )
-    assert workflow_text.index("make release-smoke-container") < workflow_text.index(
-        "prepare-release:"
-    )
-    assert _needs(jobs["prepare-release"]) == {"preflight-release-gates"}
-    assert "default: 'custom'" in workflow_text
-    assert "Prerelease tags must use release_type=custom" in workflow_text
-    assert "printf '\\n' >> RELEASE_NOTES.md" in workflow_text
-    assert 'DELIMITER="release_notes_${RANDOM}_$(date +%s%N)"' in workflow_text
-    assert "changelog<<$DELIMITER" in workflow_text
-    assert 'echo "$DELIMITER"' in workflow_text
+    assert jobs["validate-dispatch"]["name"] == "Validate release dispatch"
+    assert jobs["prepare-release-pr"]["name"] == "Validate release preparation"
+    assert jobs["create-release-pr"]["name"] == "Create release pull request"
+    assert jobs["preflight-publish"]["name"] == "Verify protected main and run release gates"
+    assert _needs(jobs["prepare-release-pr"]) == {"validate-dispatch"}
+    assert _needs(jobs["create-release-pr"]) == {"prepare-release-pr"}
+    assert _needs(jobs["preflight-publish"]) == {"validate-dispatch"}
+    assert _needs(jobs["build-release"]) == {"preflight-publish"}
+    assert _needs(jobs["publish-release"]) == {"build-release"}
 
-    downstream = {
-        "run-tests",
-        "build-artifacts",
-        "create-release",
-        "merge-release",
-        "post-release",
-    }
-    for job_id in downstream:
-        assert "preflight-release-gates" in _needs(jobs[job_id]) or (
-            "prepare-release" in _needs(jobs[job_id])
-            or "run-tests" in _needs(jobs[job_id])
-            or "build-artifacts" in _needs(jobs[job_id])
-            or "create-release" in _needs(jobs[job_id])
-        )
+    for job_id in ("preflight-publish", "build-release", "publish-release"):
+        condition = jobs[job_id]["if"]
+        assert "inputs.mode == 'publish'" in condition
+        assert "github.ref == 'refs/heads/main'" in condition
+
+    preflight = workflow_text.split("preflight-publish:", 1)[1].split("build-release:", 1)[0]
+    assert preflight.index("make agent-gate") < preflight.index("make release-smoke")
+    assert preflight.index("make release-smoke") < preflight.index("make release-smoke-container")
+
+    prepare = yaml.safe_dump(
+        {"prepare": jobs["prepare-release-pr"], "create": jobs["create-release-pr"]}
+    )
+    assert "docker/build-push-action" not in prepare
+    assert "action-gh-release" not in prepare
+    assert "gh-action-pypi-publish" not in prepare
+    assert "release_type" not in workflow_text
 
 
 def test_release_automation_marks_prerelease_and_keeps_latest_stable_only():
     workflow_text = _read(".github/workflows/release-automation.yml")
 
-    assert "is_prerelease: ${{ steps.release_flags.outputs.is_prerelease }}" in workflow_text
-    assert "prerelease: ${{ needs.prepare-release.outputs.is_prerelease }}" in workflow_text
-    assert "tags: ${{ needs.prepare-release.outputs.docker_tags }}" in workflow_text
-    assert 'if [ "$IS_PRERELEASE" = "false" ]; then' in workflow_text
+    assert "prerelease: ${{ contains(inputs.version, '-') }}" in workflow_text
+    assert "ghcr.io/viperjuice/code-index-mcp:${{ inputs.version }}" in workflow_text
+    assert "!contains(inputs.version, '-')" in workflow_text
     assert "ghcr.io/viperjuice/code-index-mcp:latest" in workflow_text
     assert 'find docs -name "*.md" -exec sed -i' not in workflow_text
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, cast
 
 import jedi
 
@@ -265,7 +265,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                     )
                     if expr and expr.type == "string":
                         # Extract the string content
-                        doc_text = expr.text.decode("utf-8")
+                        doc_text: str = expr.text.decode("utf-8")
                         # Remove quotes and clean up
                         doc_text = doc_text.strip()
                         if doc_text.startswith('"""') or doc_text.startswith("'''"):
@@ -332,7 +332,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
         limit = 20
         if opts and "limit" in opts:
             limit = opts["limit"]
-        return self._indexer.search(query, limit=limit)
+        return cast(Iterable[SearchResult], self._indexer.search(query, limit=limit))
 
     def get_indexed_count(self) -> int:
         """Return the number of indexed files."""

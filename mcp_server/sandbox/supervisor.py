@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import selectors
 import subprocess
+import threading
 import uuid
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 
 from mcp_server.core.errors import MCPError
 from mcp_server.sandbox.capabilities import CapabilitySet
@@ -39,8 +40,14 @@ class SandboxSupervisor:
         self._worker_cmd = list(worker_cmd)
         self._capabilities = capabilities
         self._proc: Optional[subprocess.Popen] = None
+        self._call_lock = threading.RLock()
+        self._closed = False
 
     def _ensure_spawned(self) -> None:
+        if self._closed:
+            raise SandboxCallError(
+                {"type": "SupervisorClosed", "message": "sandbox supervisor is closed"}
+            )
         if self._proc is not None and self._proc.poll() is None:
             return
         # Spawn with empty env by default — caps_apply scrubs anyway, but
@@ -52,6 +59,30 @@ class SandboxSupervisor:
             stderr=subprocess.PIPE,
             bufsize=0,
         )
+
+    @property
+    def worker_pid(self) -> Optional[int]:
+        """Return the live worker PID without spawning a worker."""
+        if self._proc is None or self._proc.poll() is not None:
+            return None
+        return self._proc.pid
+
+    @property
+    def is_worker_running(self) -> bool:
+        """Return whether a worker subprocess is currently live."""
+        return self.worker_pid is not None
+
+    def worker_rss_bytes(self) -> int:
+        """Measure live worker RSS without creating a process."""
+        pid = self.worker_pid
+        if pid is None:
+            return 0
+        try:
+            import psutil
+
+            return int(psutil.Process(pid).memory_info().rss)
+        except Exception as exc:
+            raise RuntimeError(f"cannot measure sandbox worker {pid}: {exc}") from exc
 
     def _read_line_with_timeout(self, timeout: float) -> bytes:
         """Block up to ``timeout`` s for one line from the worker's stdout."""
@@ -70,7 +101,7 @@ class SandboxSupervisor:
         finally:
             sel.close()
 
-        line = self._proc.stdout.readline()
+        line = cast(bytes, self._proc.stdout.readline())
         if not line:
             # Worker died; include stderr for diagnostics.
             stderr_tail = b""
@@ -94,82 +125,94 @@ class SandboxSupervisor:
         *,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> dict:
-        self._ensure_spawned()
-        assert self._proc is not None and self._proc.stdin is not None
+        with self._call_lock:
+            self._ensure_spawned()
+            assert self._proc is not None and self._proc.stdin is not None
 
-        call_id = uuid.uuid4().hex
-        env = Envelope(v=1, id=call_id, kind="call", method=method, payload=payload)
+            call_id = uuid.uuid4().hex
+            env = Envelope(v=1, id=call_id, kind="call", method=method, payload=payload)
 
-        try:
-            self._proc.stdin.write(encode(env))
-            self._proc.stdin.flush()
-        except (BrokenPipeError, OSError) as exc:
-            raise SandboxCallError(
-                {"type": "WriteFailed", "message": f"worker stdin closed: {exc}"}
-            ) from exc
+            try:
+                self._proc.stdin.write(encode(env))
+                self._proc.stdin.flush()
+            except (BrokenPipeError, OSError) as exc:
+                raise SandboxCallError(
+                    {"type": "WriteFailed", "message": f"worker stdin closed: {exc}"}
+                ) from exc
 
-        line = self._read_line_with_timeout(timeout)
-        try:
-            resp = decode(line)
-        except ProtocolError as exc:
-            raise SandboxCallError({"type": "ProtocolError", "message": str(exc)}) from exc
+            line = self._read_line_with_timeout(timeout)
+            try:
+                resp = decode(line)
+            except ProtocolError as exc:
+                raise SandboxCallError({"type": "ProtocolError", "message": str(exc)}) from exc
 
-        if resp.kind == "error":
-            raise SandboxCallError(resp.payload)
-        if resp.kind != "result":
-            raise SandboxCallError(
-                {
-                    "type": "UnexpectedKind",
-                    "message": f"expected result envelope, got {resp.kind!r}",
-                }
-            )
-        return resp.payload
+            if resp.kind == "error" and resp.method == "startup" and not resp.id:
+                raise SandboxCallError(resp.payload)
+            if resp.id != call_id:
+                raise SandboxCallError(
+                    {
+                        "type": "ResponseMismatch",
+                        "message": f"expected response {call_id}, got {resp.id}",
+                    }
+                )
+            if resp.kind == "error":
+                raise SandboxCallError(resp.payload)
+            if resp.kind != "result":
+                raise SandboxCallError(
+                    {
+                        "type": "UnexpectedKind",
+                        "message": f"expected result envelope, got {resp.kind!r}",
+                    }
+                )
+            return cast(dict[str, Any], resp.payload)
 
     def close(self) -> None:
-        if self._proc is None:
-            return
-        proc = self._proc
-        self._proc = None
+        with self._call_lock:
+            self._closed = True
+            if self._proc is None:
+                return
+            proc = self._proc
+            self._proc = None
 
-        if proc.poll() is not None:
-            return
+            if proc.poll() is not None:
+                return
 
-        # Polite close: send a ``close`` envelope and give it 2s.
-        try:
-            if proc.stdin is not None and not proc.stdin.closed:
-                try:
-                    proc.stdin.write(
-                        encode(
-                            Envelope(
-                                v=1,
-                                id=uuid.uuid4().hex,
-                                kind="call",
-                                method="close",
-                                payload={},
+            # Polite close: send a ``close`` envelope and give it 2s.
+            try:
+                if proc.stdin is not None and not proc.stdin.closed:
+                    try:
+                        proc.stdin.write(
+                            encode(
+                                Envelope(
+                                    v=1,
+                                    id=uuid.uuid4().hex,
+                                    kind="call",
+                                    method="close",
+                                    payload={},
+                                )
                             )
                         )
-                    )
-                    proc.stdin.flush()
-                except (BrokenPipeError, OSError):
-                    pass
-        except Exception:
-            pass
+                        proc.stdin.flush()
+                    except (BrokenPipeError, OSError):
+                        pass
+            except Exception:
+                pass
 
-        try:
-            proc.wait(timeout=2.0)
-            return
-        except subprocess.TimeoutExpired:
-            pass
+            try:
+                proc.wait(timeout=2.0)
+                return
+            except subprocess.TimeoutExpired:
+                pass
 
-        try:
-            proc.terminate()
-            proc.wait(timeout=1.0)
-            return
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+            try:
+                proc.terminate()
+                proc.wait(timeout=1.0)
+                return
+            except (subprocess.TimeoutExpired, OSError):
+                pass
 
-        try:
-            proc.kill()
-            proc.wait(timeout=1.0)
-        except Exception:
-            pass
+            try:
+                proc.kill()
+                proc.wait(timeout=1.0)
+            except Exception:
+                pass

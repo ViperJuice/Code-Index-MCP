@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[2]
 SEMANTIC_ONBOARDING = REPO / "docs" / "guides" / "semantic-onboarding.md"
 SUPPORT_MATRIX = REPO / "docs" / "SUPPORT_MATRIX.md"
@@ -24,5 +23,8 @@ def test_semantic_onboarding_distinguishes_lexical_and_semantic_readiness():
 
 def test_support_matrix_keeps_semantic_search_experimental_and_readiness_gated():
     text = _read(SUPPORT_MATRIX)
-    assert "semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental" in text
+    assert (
+        "semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental"
+        in text
+    )
     assert "requires semantic readiness `ready`" in text

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -23,6 +26,10 @@ class RepositoryReadinessState(str, Enum):
     WRONG_BRANCH = "wrong_branch"
     INDEX_BUILDING = "index_building"
     UNSUPPORTED_WORKTREE = "unsupported_worktree"
+    AMBIGUOUS_SELECTOR = "ambiguous_selector"
+    CORRUPT_SQLITE = "corrupt_sqlite"
+    MISSING_SCHEMA = "missing_schema"
+    MISSING_PROVENANCE = "missing_provenance"
 
 
 class SemanticReadinessState(str, Enum):
@@ -113,6 +120,91 @@ class SemanticReadiness:
         }
 
 
+def _index_file_signature(path: Path) -> tuple[int, int, int, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _index_integrity_signature(
+    index_path: Path,
+) -> tuple[
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+]:
+    database = _index_file_signature(index_path)
+    wal = _index_file_signature(Path(f"{index_path}-wal"))
+    shm = _index_file_signature(Path(f"{index_path}-shm"))
+    return (database, wal, shm)
+
+
+_IndexSignature = tuple[
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+]
+_HEALTHY_INDEX_CACHE_SIZE = 256
+_healthy_index_cache: OrderedDict[tuple[str, _IndexSignature], None] = OrderedDict()
+_healthy_index_cache_lock = threading.Lock()
+
+
+def _inspect_index_uncached(index_path: Path) -> Optional[RepositoryReadinessState]:
+    required_tables = {"schema_version", "repositories", "files", "symbols", "code_chunks"}
+    try:
+        with sqlite3.connect(str(index_path)) as conn:
+            integrity = conn.execute("PRAGMA quick_check").fetchone()
+            if not integrity or integrity[0] != "ok":
+                return RepositoryReadinessState.CORRUPT_SQLITE
+            rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+            ).fetchall()
+            tables = {str(row[0]) for row in rows}
+            if not required_tables.issubset(tables):
+                return RepositoryReadinessState.MISSING_SCHEMA
+            count = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
+            ).fetchone()
+            if not count or int(count[0]) == 0:
+                return RepositoryReadinessState.INDEX_EMPTY
+    except sqlite3.DatabaseError:
+        return RepositoryReadinessState.CORRUPT_SQLITE
+    return None
+
+
+def _inspect_index_snapshot(
+    index_path: str,
+    signature: _IndexSignature,
+) -> Optional[RepositoryReadinessState]:
+    key = (index_path, signature)
+    with _healthy_index_cache_lock:
+        if key in _healthy_index_cache:
+            _healthy_index_cache.move_to_end(key)
+            return None
+
+    result = _inspect_index_uncached(Path(index_path))
+    if result is not None:
+        return result
+
+    with _healthy_index_cache_lock:
+        stale_keys = [
+            cached_key for cached_key in _healthy_index_cache if cached_key[0] == index_path
+        ]
+        for stale_key in stale_keys:
+            _healthy_index_cache.pop(stale_key, None)
+        _healthy_index_cache[key] = None
+        while len(_healthy_index_cache) > _HEALTHY_INDEX_CACHE_SIZE:
+            _healthy_index_cache.popitem(last=False)
+    return None
+
+
+def _clear_index_inspection_cache() -> None:
+    with _healthy_index_cache_lock:
+        _healthy_index_cache.clear()
+
+
 class ReadinessClassifier:
     """Classify registered and arbitrary repository paths without mutating state."""
 
@@ -127,28 +219,63 @@ class ReadinessClassifier:
         index_path = (
             Path(repo_info.index_path).resolve(strict=False) if repo_info.index_path else None
         )
-        current_branch = getattr(repo_info, "current_branch", None) or _git_branch(registered_path)
-        current_commit = getattr(repo_info, "current_commit", None) or _git_commit(registered_path)
+        cached_branch = getattr(repo_info, "current_branch", None)
+        cached_commit = getattr(repo_info, "current_commit", None)
+        live_git_required = bool(
+            getattr(repo_info, "git_common_dir", None)
+            and isinstance(cached_commit, str)
+            and len(cached_commit) == 40
+            and all(char in "0123456789abcdef" for char in cached_commit.lower())
+        )
+        if live_git_required:
+            current_branch = _git_branch(registered_path)
+            current_commit = _git_commit(registered_path)
+        else:
+            current_branch = cached_branch or _git_branch(registered_path)
+            current_commit = cached_commit or _git_commit(registered_path)
         tracked_branch = getattr(repo_info, "tracked_branch", None)
         last_indexed_commit = getattr(repo_info, "last_indexed_commit", None)
+        staleness_reason = getattr(repo_info, "staleness_reason", None)
 
         state = RepositoryReadinessState.READY
         remediation = None
-        if indexing_active:
+
+        if live_git_required and (current_branch is None or current_commit is None):
+            state = RepositoryReadinessState.UNREGISTERED_REPOSITORY
+            remediation = "Restore the registered Git checkout or register an available repository."
+        elif indexing_active or staleness_reason == "index_building":
             state = RepositoryReadinessState.INDEX_BUILDING
             remediation = "Wait for indexing to finish, then retry the request."
+        elif tracked_branch and current_branch and tracked_branch != current_branch:
+            state = RepositoryReadinessState.WRONG_BRANCH
+            remediation = (
+                f"Switch to the tracked branch '{tracked_branch}' or register the intended "
+                "repository path."
+            )
         elif index_path is None or not index_path.exists():
             state = RepositoryReadinessState.MISSING_INDEX
             remediation = "Run reindex or pull the latest artifact for this repository."
-        elif cls._index_is_empty(index_path):
-            state = RepositoryReadinessState.INDEX_EMPTY
-            remediation = "Run reindex to populate the repository index."
-        elif tracked_branch and current_branch and tracked_branch != current_branch:
-            state = RepositoryReadinessState.WRONG_BRANCH
-            remediation = f"Switch to the tracked branch '{tracked_branch}' or register the intended repository path."
-        elif current_commit and last_indexed_commit and current_commit != last_indexed_commit:
-            state = RepositoryReadinessState.STALE_COMMIT
-            remediation = "Run reindex to update the repository index to the current commit."
+        else:
+            db_state = cls._inspect_index(index_path)
+
+            if db_state == RepositoryReadinessState.CORRUPT_SQLITE:
+                state = RepositoryReadinessState.CORRUPT_SQLITE
+                remediation = "Run reindex to quarantine the corrupt bytes and rebuild the index."
+            elif db_state == RepositoryReadinessState.MISSING_SCHEMA:
+                state = RepositoryReadinessState.MISSING_SCHEMA
+                remediation = "Run reindex to quarantine the incomplete schema and rebuild it."
+            elif staleness_reason in {"index_publication_pending", "partial_index_failure"}:
+                state = RepositoryReadinessState.MISSING_PROVENANCE
+                remediation = "Run reindex to quarantine the interrupted generation and rebuild it."
+            elif db_state == RepositoryReadinessState.INDEX_EMPTY:
+                state = RepositoryReadinessState.INDEX_EMPTY
+                remediation = "Run reindex to populate the repository index."
+            elif last_indexed_commit is None or not str(last_indexed_commit).strip():
+                state = RepositoryReadinessState.MISSING_PROVENANCE
+                remediation = "Run reindex to quarantine the unproven index and rebuild it."
+            elif current_commit and last_indexed_commit and current_commit != last_indexed_commit:
+                state = RepositoryReadinessState.STALE_COMMIT
+                remediation = "Run reindex to update the repository index to the current commit."
 
         return RepositoryReadiness(
             state=state,
@@ -170,41 +297,125 @@ class ReadinessClassifier:
     def classify_path(
         cls,
         registry: Any,
-        path: Path,
+        selector: str | Path,
         indexing_active: bool = False,
     ) -> RepositoryReadiness:
-        requested_path = Path(path).expanduser().resolve(strict=False)
-        git_root = _find_git_root(requested_path)
-        if git_root is None:
-            return cls._unregistered(requested_path)
+        selector_str = str(selector)
 
+        # 1. Exact ID match
+        id_matches = [repo for repo in registry.list_all() if repo.repository_id == selector_str]
+        if len(id_matches) > 1:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+                requested_path=selector_str,
+                remediation="Ambiguous selector: matches multiple repository IDs.",
+            )
+        if len(id_matches) == 1:
+            return cls.classify_registered(
+                id_matches[0], requested_path=None, indexing_active=indexing_active
+            )
+
+        # 2. Exact registered name match
+        name_matches = [repo for repo in registry.list_all() if repo.name == selector_str]
+        if len(name_matches) > 1:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+                requested_path=selector_str,
+                remediation="Ambiguous selector: matches multiple repository names.",
+            )
+        if len(name_matches) == 1:
+            return cls.classify_registered(
+                name_matches[0], requested_path=None, indexing_active=indexing_active
+            )
+
+        # 3. Path-based matching
+        is_path_like = (
+            isinstance(selector, Path)
+            or Path(selector_str).expanduser().exists()
+            or any(sep in selector_str for sep in (os.path.sep, "/"))
+            or selector_str.startswith(".")
+            or selector_str.startswith("~")
+        )
+
+        resolved_path = None
+        if is_path_like:
+            p = Path(selector).expanduser()
+            if p.is_absolute():
+                resolved_path = p.resolve()
+            else:
+                # Relative path: only resolve if it exists. No CWD fallback for nonexistent relative paths/names.
+                if (Path.cwd() / p).exists() or p.exists():
+                    resolved_path = p.resolve()
+                else:
+                    resolved_path = None
+
+        if resolved_path is None:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+                requested_path=selector_str,
+                remediation="Register this repository path before querying it.",
+            )
+
+        # Fast-path for exact registered path
+        repo_id = registry.find_by_path(resolved_path)
+        if repo_id:
+            repo_info = registry.get(repo_id)
+            if repo_info is not None:
+                return cls.classify_registered(
+                    repo_info, requested_path=resolved_path, indexing_active=indexing_active
+                )
+
+        git_root = _find_git_root(resolved_path)
+        if git_root is None:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+                requested_path=str(resolved_path),
+                remediation="Register this repository path before querying it.",
+            )
+
+        # Fast-path for exact registered path on git_root
         repo_id = registry.find_by_path(git_root)
         if repo_id:
             repo_info = registry.get(repo_id)
             if repo_info is not None:
                 return cls.classify_registered(
-                    repo_info,
-                    requested_path=requested_path,
-                    indexing_active=indexing_active,
+                    repo_info, requested_path=resolved_path, indexing_active=indexing_active
                 )
 
-        if hasattr(registry, "find_unsupported_worktree"):
-            repo_info = registry.find_unsupported_worktree(git_root)
-            if repo_info is not None:
-                return cls._unsupported_worktree(repo_info, requested_path)
-
         try:
-            repo_id = compute_repo_id(git_root).repo_id
+            git_common_dir = compute_repo_id(git_root).git_common_dir
         except Exception:
-            return cls._unregistered(requested_path)
-        repo_info = registry.get(repo_id)
-        if repo_info is None:
-            return cls._unregistered(requested_path)
-        return cls.classify_registered(
-            repo_info,
-            requested_path=requested_path,
-            indexing_active=indexing_active,
-        )
+            git_common_dir = None
+
+        exact_matches = []
+        worktree_matches = []
+        for repo in registry.list_all():
+            reg_path = Path(repo.path).resolve()
+            if git_root == reg_path:
+                exact_matches.append(repo)
+            else:
+                if repo.git_common_dir and git_common_dir:
+                    if Path(repo.git_common_dir).resolve() == Path(git_common_dir).resolve():
+                        worktree_matches.append(repo)
+
+        if exact_matches:
+            if len(exact_matches) > 1:
+                return RepositoryReadiness(
+                    state=RepositoryReadinessState.AMBIGUOUS_SELECTOR,
+                    requested_path=str(resolved_path),
+                    remediation="Ambiguous path selector: matches multiple registered repositories.",
+                )
+            return cls.classify_registered(
+                exact_matches[0], requested_path=resolved_path, indexing_active=indexing_active
+            )
+        elif worktree_matches:
+            return cls._unsupported_worktree(worktree_matches[0], resolved_path)
+        else:
+            return RepositoryReadiness(
+                state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+                requested_path=str(resolved_path),
+                remediation="Register this repository path before querying it.",
+            )
 
     @classmethod
     def classify_semantic_registered(
@@ -226,9 +437,7 @@ class ReadinessClassifier:
         discovered_fingerprint = _metadata_fingerprint(metadata_profile)
         discovered_collection = _metadata_string(metadata_profile, "collection_name")
         discovered_dimension = _metadata_int(metadata_profile, "model_dimension")
-        remediation = (
-            "Run semantic summary/vector generation for the current profile before semantic queries."
-        )
+        remediation = "Run semantic summary/vector generation for the current profile before semantic queries."
 
         if evidence is None:
             return SemanticReadiness(
@@ -295,8 +504,7 @@ class ReadinessClassifier:
             )
 
         if metadata_profile is None or (
-            discovered_fingerprint
-            and discovered_fingerprint != profile.compatibility_fingerprint
+            discovered_fingerprint and discovered_fingerprint != profile.compatibility_fingerprint
         ):
             return SemanticReadiness(
                 state=SemanticReadinessState.SEMANTIC_STALE,
@@ -348,35 +556,13 @@ class ReadinessClassifier:
         )
 
     @staticmethod
-    def _index_is_empty(index_path: Path) -> bool:
-        if index_path.stat().st_size == 0:
-            return True
-        try:
-            conn = sqlite3.connect(str(index_path))
-            try:
-                cursor = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='files'"
-                )
-                if cursor.fetchone() is None:
-                    return True
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
-                )
-                return int(cursor.fetchone()[0]) == 0
-            finally:
-                conn.close()
-        except sqlite3.OperationalError:
-            try:
-                conn = sqlite3.connect(str(index_path))
-                try:
-                    cursor = conn.execute("SELECT COUNT(*) FROM files")
-                    return int(cursor.fetchone()[0]) == 0
-                finally:
-                    conn.close()
-            except Exception:
-                return False
-        except Exception:
-            return False
+    def _inspect_index(index_path: Path) -> Optional[RepositoryReadinessState]:
+        resolved = index_path.resolve(strict=False)
+        return _inspect_index_snapshot(str(resolved), _index_integrity_signature(resolved))
+
+    @staticmethod
+    def clear_index_inspection_cache() -> None:
+        _clear_index_inspection_cache()
 
 
 def _worktree_remediation() -> str:
@@ -427,8 +613,8 @@ def _run_git(args: list[str], cwd: Path) -> Optional[str]:
 
 def _current_semantic_profile() -> Any:
     try:
-        from mcp_server.config.settings import get_settings
         from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
+        from mcp_server.config.settings import get_settings
 
         settings = get_settings()
         if not settings.semantic_search_enabled:
@@ -449,7 +635,8 @@ def _load_index_metadata(repo_root: Path) -> dict[str, Any]:
     if not metadata_path.exists():
         return {}
     try:
-        return json.loads(metadata_path.read_text(encoding="utf-8"))
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {}
     except Exception:
         return {}
 
@@ -469,7 +656,9 @@ def _semantic_evidence(
         return None
 
 
-def _current_profile_metadata(metadata: dict[str, Any], profile_id: str) -> Optional[dict[str, Any]]:
+def _current_profile_metadata(
+    metadata: dict[str, Any], profile_id: str
+) -> Optional[dict[str, Any]]:
     try:
         from mcp_server.artifacts.semantic_profiles import get_primary_semantic_profile_metadata
     except Exception:

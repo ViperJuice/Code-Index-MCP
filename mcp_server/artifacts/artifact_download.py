@@ -365,14 +365,7 @@ class IndexArtifactDownloader:
                 pass
         elif artifact_model:
             try:
-                current_model = None
-                metadata_path = Path(".index_metadata.json")
-                if metadata_path.exists():
-                    current_model = json.loads(metadata_path.read_text(encoding="utf-8")).get(
-                        "embedding_model"
-                    )
-                if not current_model:
-                    current_model = get_settings().semantic_embedding_model
+                current_model = get_settings().semantic_embedding_model
                 if artifact_model != current_model:
                     issues.append(
                         f"Embedding model mismatch: artifact={artifact_model}, current={current_model}"
@@ -843,8 +836,8 @@ def run_cli(args: argparse.Namespace) -> int:
 
     if args.command == "info":
         artifacts = downloader.list_artifacts()
-        artifact = next((item for item in artifacts if item["id"] == args.artifact_id), None)
-        if artifact is None:
+        artifact = next((item for item in artifacts if item["id"] == args.artifact_id), {})
+        if not artifact:
             print(f"❌ Artifact {args.artifact_id} not found")
             return 1
         print("\n📋 Artifact Information:")

@@ -2,7 +2,7 @@
 
 This guide provides comprehensive information on configuring the Code-Index-MCP for different environments and use cases.
 
-> **Stable-surface prep status**: This guide targets `1.3.0`. MCP STDIO is the primary
+> **Stable-surface prep status**: This guide targets `1.3.1`. MCP STDIO is the primary
 > LLM surface. FastAPI remains a secondary admin surface. Docker examples use
 > `ghcr.io/viperjuice/code-index-mcp`.
 > That container image name is a container identity surface, not the canonical
@@ -140,7 +140,7 @@ For the current named-client and transport matrix, see
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
         "-e", "MCP_ARTIFACT_SYNC=false",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.3.0}",
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.3.1}",
         "mcp-index",
         "stdio"
       ]
@@ -175,7 +175,7 @@ For the current named-client and transport matrix, see
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.3.0}",
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.3.1}",
         "mcp-index",
         "stdio"
       ]
@@ -302,7 +302,7 @@ one worktree per git common directory, and check readiness before MCP tool use:
         "-v", "${HOME}/projects/repo-a:/repos/repo-a",
         "-v", "${HOME}/projects/repo-b:/repos/repo-b",
         "-e", "MCP_ALLOWED_ROOTS=/repos/repo-a:/repos/repo-b",
-        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.1"
       ]
     }
   }
@@ -356,7 +356,7 @@ Add Docker resource constraints:
         "--memory", "2g",
         "--cpus", "2",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.1"
       ]
     }
   }
@@ -376,7 +376,7 @@ For maximum security:
         "run", "-i", "--rm",
         "--network", "none",
         "-v", "${workspace}:/workspace:ro",
-        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.1"
       ],
       "env": {
         "MCP_ARTIFACT_SYNC": "false"
@@ -453,7 +453,7 @@ Enable debug logging:
         "-v", "${workspace}:/workspace",
         "-e", "LOG_LEVEL=DEBUG",
         "-e", "MCP_DEBUG=true",
-        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.1"
       ]
     }
   }
@@ -466,7 +466,7 @@ Test your configuration:
 
 ```bash
 # Test MCP connection
-echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:v1.3.0
+echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:v1.3.1
 
 # Expected response:
 # {"jsonrpc":"2.0","id":1,"result":{"capabilities":...}}
@@ -542,7 +542,7 @@ Enable security audit logs:
         "-v", "${HOME}/mcp-audit:/app/logs",
         "-e", "MCP_AUDIT_LOG=/app/logs/audit.log",
         "-e", "MCP_SECURITY_MODE=strict",
-        "ghcr.io/viperjuice/code-index-mcp:v1.3.0"
+        "ghcr.io/viperjuice/code-index-mcp:v1.3.1"
       ]
     }
   }

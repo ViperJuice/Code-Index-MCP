@@ -137,11 +137,13 @@ class IncrementalIndexer:
                 if contract is not None:
                     return contract
             except Exception:
-                logger.debug("Falling back to local semantic summary contract lookup", exc_info=True)
+                logger.debug(
+                    "Falling back to local semantic summary contract lookup", exc_info=True
+                )
 
         try:
-            from ..indexing.summarization import ComprehensiveChunkWriter
             from ..config.settings import reload_settings
+            from ..indexing.summarization import ComprehensiveChunkWriter
 
             settings = reload_settings()
             summarization_config = settings.get_profile_summarization_config(
@@ -172,9 +174,11 @@ class IncrementalIndexer:
         return self.store.plan_semantic_invalidation(
             path,
             self._get_repository_id(),
-            profile_id=getattr(self.semantic_indexer.semantic_profile, "profile_id", None)
-            if self.semantic_indexer is not None
-            else None,
+            profile_id=(
+                getattr(self.semantic_indexer.semantic_profile, "profile_id", None)
+                if self.semantic_indexer is not None
+                else None
+            ),
             new_relative_path=new_path,
             preserve_matching_summaries=preserve_matching_summaries,
             expected_summary_profile_id=contract.get("profile_id"),

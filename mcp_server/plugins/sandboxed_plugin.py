@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from mcp_server.plugin_base import (
     IndexShard,
@@ -122,6 +122,20 @@ class SandboxedPlugin(IPlugin):
         return list(resp.get("items", []))  # type: ignore[return-value]
 
     # ------------------------------------------------------------------ lifecycle
+
+    @property
+    def worker_pid(self) -> Optional[int]:
+        """Return the current worker PID without triggering a spawn."""
+        return self._supervisor.worker_pid
+
+    @property
+    def is_worker_running(self) -> bool:
+        """Return whether the sandbox worker is live."""
+        return self._supervisor.is_worker_running
+
+    def worker_rss_bytes(self) -> int:
+        """Return live child RSS for resource governance."""
+        return self._supervisor.worker_rss_bytes()
 
     def close(self) -> None:
         if self._closed:

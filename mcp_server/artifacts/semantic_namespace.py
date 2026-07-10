@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from urllib.parse import urlsplit
 from typing import Optional
+from urllib.parse import urlsplit
 
 
 class SemanticNamespaceResolver:

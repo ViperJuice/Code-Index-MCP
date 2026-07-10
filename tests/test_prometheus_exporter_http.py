@@ -9,6 +9,8 @@ from unittest import mock
 
 import pytest
 
+pytestmark = pytest.mark.requires_network
+
 
 def _free_port() -> int:
     """Return an unused TCP port."""

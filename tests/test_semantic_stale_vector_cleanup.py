@@ -167,8 +167,11 @@ def test_cleanup_stale_semantic_artifacts_deletes_mappings_and_invalidated_summa
     assert cleanup["mappings_deleted"] == 3
     assert cleanup["summaries_deleted"] == 1
     assert qdrant.deleted[0]["points"] == [101, 102, 103]
-    assert store.get_semantic_point_ids(
-        "test-profile",
-        ["chunk-1", "chunk-1:part:1:1", "file.py:file-summary"],
-    ) == []
+    assert (
+        store.get_semantic_point_ids(
+            "test-profile",
+            ["chunk-1", "chunk-1:part:1:1", "file.py:file-summary"],
+        )
+        == []
+    )
     assert store.get_chunk_summary("chunk-1") is None

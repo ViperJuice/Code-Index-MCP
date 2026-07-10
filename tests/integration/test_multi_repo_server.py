@@ -28,8 +28,8 @@ from tests.fixtures.multi_repo import boot_test_server, build_temp_repo
 
 class TestRepoIsolation:
     def test_repo_isolation(self, tmp_path):
-        """Results from repo A must not bleed into repo B and vice versa."""
-        repo_a, _ = build_temp_repo(
+        """Exact ID/name selectors must not bleed results across repositories."""
+        repo_a, repo_id_a = build_temp_repo(
             tmp_path,
             "repo_a",
             seed_files={"alpha.py": "def zxqfoo_alpha(): pass\n"},
@@ -45,14 +45,14 @@ class TestRepoIsolation:
                 "search_code",
                 {
                     "query": "zxqfoo_alpha",
-                    "repository": str(repo_a),
+                    "repository": repo_id_a,
                 },
             )
             results_b = srv.call_tool(
                 "search_code",
                 {
                     "query": "zxqbar_beta",
-                    "repository": str(repo_b),
+                    "repository": "repo_b",
                 },
             )
 
@@ -380,8 +380,17 @@ class TestWriteSummariesScopedToRepo:
         mock_lazy_summarizer.can_summarize.return_value = True
         mock_lazy_summarizer._get_model_name.return_value = "test-model"
 
+        from mcp_server.indexing.summarization import SummaryGenerationResult
+
         mock_writer = MagicMock()
-        mock_writer.process_all = AsyncMock(return_value=0)
+        mock_writer.process_scope = AsyncMock(
+            return_value=SummaryGenerationResult(
+                chunks_attempted=0,
+                summaries_written=0,
+                authoritative_chunks=0,
+                missing_chunk_ids=[],
+            )
+        )
 
         with boot_test_server(tmp_path, [repo_a, repo_b]) as srv:
             store_b = srv.store_registry.get(repo_id_b)
@@ -411,7 +420,7 @@ class TestWriteSummariesScopedToRepo:
         assert (
             "error" not in result_data or result_data.get("error") != "sqlite_store not initialized"
         ), f"Expected write_summaries to run, got: {result_data}"
-        mock_writer.process_all.assert_called_once()
+        mock_writer.process_scope.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -441,18 +450,39 @@ class TestSummarizeSampleScopedToRepo:
             store_b = srv.store_registry.get(repo_id_b)
 
             from mcp_server.cli import tool_handlers
+            from mcp_server.indexing.summarization import (
+                FileBatchSummarizer,
+                GeneratedSummary,
+                SummaryGenerationResult,
+            )
+
+            async def fake_summarize(*_args, **_kwargs):
+                return SummaryGenerationResult(
+                    chunks_attempted=2,
+                    summaries_written=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=("missing-chunk",),
+                    remaining_chunks=1,
+                    scope_drained=False,
+                    summaries=(GeneratedSummary("generated-chunk", "Generated summary"),),
+                )
 
             loop = asyncio.new_event_loop()
             try:
-                result = loop.run_until_complete(
-                    tool_handlers.handle_summarize_sample(
-                        arguments={"repository": str(repo_b), "n": 1},
-                        dispatcher=srv.dispatcher,
-                        repo_resolver=srv.repo_resolver,
-                        sqlite_store=store_b,
-                        lazy_summarizer=mock_lazy_summarizer,
+                with patch.object(
+                    FileBatchSummarizer,
+                    "summarize_file_chunks",
+                    new=fake_summarize,
+                ):
+                    result = loop.run_until_complete(
+                        tool_handlers.handle_summarize_sample(
+                            arguments={"repository": str(repo_b), "n": 1},
+                            dispatcher=srv.dispatcher,
+                            repo_resolver=srv.repo_resolver,
+                            sqlite_store=store_b,
+                            lazy_summarizer=mock_lazy_summarizer,
+                        )
                     )
-                )
             finally:
                 loop.close()
 
@@ -464,3 +494,6 @@ class TestSummarizeSampleScopedToRepo:
                 assert (
                     str(repo_b) in fp
                 ), f"summarize_sample returned file from outside repo_b: {fp}"
+        assert result_data["files"][0]["summaries_written"] == 1
+        assert result_data["files"][0]["missing_chunk_ids"] == ["missing-chunk"]
+        assert result_data["files"][0]["scope_drained"] is False

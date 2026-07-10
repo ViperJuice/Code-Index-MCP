@@ -259,6 +259,6 @@ class ArtifactPublisher:
             return False
         try:
             data = json.loads(result.stdout)
-            return data.get("targetCommitish", "") == commit
+            return bool(data.get("targetCommitish", "") == commit)
         except (json.JSONDecodeError, AttributeError):
             return False

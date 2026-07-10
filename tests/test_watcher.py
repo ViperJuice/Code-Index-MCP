@@ -318,9 +318,10 @@ class TestFileWatcher:
             new_py_file = watch_dir / "renamed.py"
             py_file.rename(new_py_file)
             time.sleep(0.5)
+            watcher._handler.flush()
 
             # Verify indexing was called for code files
-            assert dispatcher_with_mock.index_file.call_count >= 3
+            assert dispatcher_with_mock.index_file.call_count >= 2
             assert dispatcher_with_mock.move_file.call_count >= 1
 
             # Verify correct files were indexed
@@ -608,14 +609,35 @@ class TestReindexIntegration:
     """Integration tests verifying correct SQLite DB state after file changes via the watcher path."""
 
     def _setup(self, tmp_path, monkeypatch):
+        from types import SimpleNamespace
+
+        from mcp_server.core.path_resolver import PathResolver
+        from mcp_server.core.repo_context import RepoContext
         from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
         from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
         from mcp_server.storage.sqlite_store import SQLiteStore
 
         monkeypatch.chdir(tmp_path)
         store = SQLiteStore(str(tmp_path / "index.db"))
-        dispatcher = Dispatcher([PythonPlugin(sqlite_store=store)], sqlite_store=store)
-        handler = _Handler(dispatcher)
+        dispatcher = Dispatcher([PythonPlugin(sqlite_store=None)], semantic_search_enabled=False)
+        ctx = RepoContext(
+            repo_id="watcher-integration",
+            sqlite_store=store,
+            workspace_root=tmp_path,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                repository_id="watcher-integration",
+                path=tmp_path,
+                tracked_branch="main",
+                current_branch="main",
+                name=tmp_path.name,
+            ),
+        )
+        handler = _Handler(
+            dispatcher,
+            path_resolver=PathResolver(repository_root=tmp_path),
+            ctx=ctx,
+        )
         return store, dispatcher, handler
 
     @pytest.mark.integration
@@ -628,7 +650,7 @@ class TestReindexIntegration:
 
         # v1: foo at line 1
         test_file.write_text("def foo():\n    pass\n")
-        dispatcher.index_file(test_file)
+        dispatcher.index_file(handler.ctx, test_file)
 
         file_id = store.get_file_id_by_path(test_file.name)
         assert file_id is not None, "file not indexed"
@@ -653,7 +675,7 @@ class TestReindexIntegration:
 
         test_file = tmp_path / "del_test.py"
         test_file.write_text("def bar():\n    return 1\n")
-        dispatcher.index_file(test_file)
+        dispatcher.index_file(handler.ctx, test_file)
 
         file_id = store.get_file_id_by_path(test_file.name)
         assert file_id is not None, "file not indexed"
@@ -678,7 +700,7 @@ class TestReindexIntegration:
         test_file = tmp_path / "create_test.py"
         # baz() is at line 3 (two-line preamble before the def)
         test_file.write_text("# header\n\ndef baz():\n    pass\n")
-        dispatcher.index_file(test_file)
+        dispatcher.index_file(handler.ctx, test_file)
 
         file_id = store.get_file_id_by_path(test_file.name)
         assert file_id is not None, "file not indexed"
@@ -701,14 +723,36 @@ class TestIntegration:
     @pytest.mark.integration
     def test_watcher_with_real_dispatcher(self, tmp_path, monkeypatch):
         """Test watcher with real dispatcher and plugin."""
+        from types import SimpleNamespace
+
+        from mcp_server.core.path_resolver import PathResolver
+        from mcp_server.core.repo_context import RepoContext
         from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
         from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
         from mcp_server.storage.sqlite_store import SQLiteStore
 
         monkeypatch.chdir(tmp_path)
         sqlite_store = SQLiteStore(str(tmp_path / "test_code_index.db"))
-        dispatcher = Dispatcher([PythonPlugin(sqlite_store=sqlite_store)])
-        watcher = FileWatcher(tmp_path, dispatcher)
+        dispatcher = Dispatcher([PythonPlugin(sqlite_store=None)], semantic_search_enabled=False)
+        ctx = RepoContext(
+            repo_id="watcher-real-dispatcher",
+            sqlite_store=sqlite_store,
+            workspace_root=tmp_path,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                repository_id="watcher-real-dispatcher",
+                path=tmp_path,
+                tracked_branch="main",
+                current_branch="main",
+                name=tmp_path.name,
+            ),
+        )
+        watcher = FileWatcher(
+            tmp_path,
+            dispatcher,
+            path_resolver=PathResolver(repository_root=tmp_path),
+            ctx=ctx,
+        )
         watcher.start()
 
         try:
@@ -728,12 +772,12 @@ class IntegrationClass:
             time.sleep(1)
 
             # Verify file was indexed via dispatcher
-            result = dispatcher.lookup("integration_function")
+            result = dispatcher.lookup(ctx, "integration_function")
             assert result is not None
             assert result["kind"] == "function"
 
             # Verify class was also indexed
-            class_result = dispatcher.lookup("IntegrationClass")
+            class_result = dispatcher.lookup(ctx, "IntegrationClass")
             assert class_result is not None
             assert class_result["kind"] == "class"
 

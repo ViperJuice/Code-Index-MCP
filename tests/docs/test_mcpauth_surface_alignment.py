@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOC_PATHS = [
     REPO_ROOT / "README.md",
@@ -19,12 +18,12 @@ def test_mcpauth_docs_freeze_current_auth_boundary() -> None:
         text = path.read_text()
         assert "MCP_CLIENT_SECRET" in text, f"{path} must document the STDIO guard"
         assert "local STDIO handshake guard" in text, f"{path} must keep the auth scope local"
-        assert "admin/debug bearer token authentication" in text, (
-            f"{path} must describe the FastAPI admin/debug auth surface"
-        )
-        assert "no remote MCP authorization is implemented" in text, (
-            f"{path} must state that remote MCP auth is deferred"
-        )
+        assert (
+            "admin/debug bearer token authentication" in text
+        ), f"{path} must describe the FastAPI admin/debug auth surface"
+        assert (
+            "no remote MCP authorization is implemented" in text
+        ), f"{path} must state that remote MCP auth is deferred"
 
 
 def test_transport_decision_still_defers_remote_mcp_auth() -> None:

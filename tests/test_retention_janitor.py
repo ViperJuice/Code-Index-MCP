@@ -175,9 +175,15 @@ class TestDeleteReleasesOlderThan:
                 result.stderr = "HTTP 429: rate limit exceeded"
             return result
 
-        with patch("subprocess.run", side_effect=side_effect):
+        with (
+            patch("subprocess.run", side_effect=side_effect),
+            patch(
+                "mcp_server.artifacts.providers.github_actions._respect_rate_limit"
+            ) as respect_rate_limit,
+        ):
             with pytest.raises(TransientArtifactError):
                 delete_releases_older_than("owner/repo", older_than_days=30)
+        respect_rate_limit.assert_not_called()
 
     def test_returns_release_refs(self):
         releases = [_make_release("v1.0.0", days_ago=60)]

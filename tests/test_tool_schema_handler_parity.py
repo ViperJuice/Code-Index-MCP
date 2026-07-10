@@ -100,9 +100,7 @@ def test_mcpstruct_output_schemas_stay_object_shaped_for_structured_results():
         if isinstance(branch, dict)
     ]
     reindex_branch_types = [
-        branch.get("type")
-        for branch in schema_map["reindex"]["oneOf"]
-        if isinstance(branch, dict)
+        branch.get("type") for branch in schema_map["reindex"]["oneOf"] if isinstance(branch, dict)
     ]
 
     assert "array" not in search_branch_types

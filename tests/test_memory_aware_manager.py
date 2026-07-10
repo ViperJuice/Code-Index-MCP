@@ -9,6 +9,7 @@ import gc
 import importlib
 import os
 import sys
+import time
 import weakref
 from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
@@ -18,7 +19,9 @@ import pytest
 from mcp_server.plugins.memory_aware_manager import (
     LoadedPlugin,
     MemoryAwarePluginManager,
+    PluginBackpressureError,
     PluginMemoryInfo,
+    PluginResourceSnapshot,
     get_memory_aware_manager,
 )
 
@@ -85,20 +88,19 @@ class TestMemoryAwarePluginManager:
             assert plugin_keys == [(None, "lang1"), (None, "lang2"), (None, "lang0")]
 
     def test_memory_limit_enforcement(self, manager):
-        """Test that memory limits are enforced."""
-        old_key = (None, "old_plugin")
-        # Simulate RSS always above limit so eviction loop doesn't short-circuit
-        with patch.object(manager, "_should_evict", return_value=True):
-            with patch.object(
-                manager, "_get_current_memory", return_value=manager.max_memory_bytes + 1
-            ):
-                with patch.object(manager, "_get_eviction_candidates", return_value=[old_key]):
-                    with patch.object(
-                        manager, "_evict_plugin", return_value=1024 * 1024
-                    ) as mock_evict:
-                        with patch.object(manager._factory, "get_plugin", return_value=Mock()):
-                            manager.get_plugin("new_plugin")
-                            mock_evict.assert_called_once_with(old_key)
+        """An unrecoverable child-RSS breach returns typed backpressure."""
+        snapshot = PluginResourceSnapshot(
+            sampled_at_monotonic=time.monotonic(),
+            parent_rss_bytes=1,
+            child_rss_bytes=manager.max_memory_bytes + 1,
+            reserved_workers=0,
+            live_workers=1,
+            measurement_ok=True,
+        )
+        with patch.object(manager, "resource_snapshot", return_value=snapshot):
+            with pytest.raises(PluginBackpressureError) as exc_info:
+                manager.get_plugin("new_plugin")
+        assert exc_info.value.reason == "rss_limit"
 
     def test_high_priority_protection(self, manager):
         """Test that high-priority plugins are protected from eviction."""
@@ -482,3 +484,114 @@ class TestP3Behaviour:
             p = manager.get_plugin("python", None)
 
         assert p is mock_plugin
+
+
+class TestWorkerLifecycleGovernance:
+    """PLUGLIFE resource, close, and deterministic eviction contract."""
+
+    @staticmethod
+    def _plugin(*, running: bool = False, rss: int = 0):
+        plugin = Mock()
+        plugin.close = Mock()
+        plugin.is_worker_running = running
+        plugin.worker_rss_bytes = Mock(return_value=rss)
+        return plugin
+
+    def test_worker_limit_evicts_deterministic_lru(self):
+        manager = MemoryAwarePluginManager(max_memory_mb=4096, max_workers=2)
+        oldest = self._plugin()
+        newest = self._plugin()
+        replacement = self._plugin()
+        with patch.object(
+            manager._factory, "get_plugin", side_effect=[oldest, newest, replacement]
+        ):
+            manager.get_plugin("rust")
+            manager.get_plugin("go")
+            manager.get_plugin("go")
+            manager.get_plugin("java")
+
+        oldest.close.assert_called_once_with()
+        newest.close.assert_not_called()
+        assert list(manager._plugins) == [(None, "go"), (None, "java")]
+
+    def test_child_rss_breach_evicts_before_next_allocation(self):
+        manager = MemoryAwarePluginManager(max_memory_mb=50, max_workers=4)
+        first = self._plugin(running=True, rss=60 * 1024 * 1024)
+        second = self._plugin()
+        with patch.object(manager, "_get_current_memory", return_value=50 * 1024 * 1024):
+            with patch.object(manager._factory, "get_plugin", side_effect=[first, second]):
+                manager.get_plugin("rust")
+                manager.get_plugin("go")
+
+        first.close.assert_called_once_with()
+        assert (None, "go") in manager._plugins
+
+    def test_new_worker_is_revalidated_after_spawn(self):
+        manager = MemoryAwarePluginManager(max_memory_mb=50, max_workers=4)
+        oversized = self._plugin(running=True, rss=60 * 1024 * 1024)
+        with patch.object(manager, "_get_current_memory", return_value=50 * 1024 * 1024):
+            with patch.object(manager._factory, "get_plugin", return_value=oversized):
+                manager.get_plugin("rust")
+                with pytest.raises(RuntimeError) as exc_info:
+                    manager.confirm_plugin_started("rust")
+
+        assert getattr(exc_info.value, "reason", None) == "rss_limit"
+        oversized.close.assert_called_once_with()
+        assert (None, "rust") not in manager._plugins
+
+    def test_measurement_failure_blocks_allocation(self):
+        manager = MemoryAwarePluginManager(max_memory_mb=4096)
+        live = self._plugin(running=True)
+        live.worker_rss_bytes.side_effect = RuntimeError("probe failed")
+        manager._plugins[(None, "rust")] = LoadedPlugin("rust", live, {})
+        manager._plugin_info[(None, "rust")] = PluginMemoryInfo(
+            plugin_name="rust",
+            memory_bytes=0,
+            last_used=datetime.now(),
+            load_time=0.0,
+            usage_count=1,
+            is_high_priority=False,
+            last_used_monotonic=time.monotonic(),
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            manager.get_plugin("go")
+        assert getattr(exc_info.value, "reason", None) == "resource_measurement_failed"
+
+    def test_idle_expiry_closes_adapter(self):
+        manager = MemoryAwarePluginManager(max_memory_mb=4096, idle_timeout_seconds=1.0)
+        idle = self._plugin()
+        fresh = self._plugin()
+        with patch.object(manager._factory, "get_plugin", side_effect=[idle, fresh]):
+            manager.get_plugin("rust")
+            manager._plugin_info[(None, "rust")].last_used_monotonic = time.monotonic() - 2.0
+            manager.get_plugin("go")
+
+        idle.close.assert_called_once_with()
+        assert (None, "rust") not in manager._plugins
+
+    def test_repo_eviction_and_shutdown_close_every_adapter_once(self):
+        manager = MemoryAwarePluginManager(max_memory_mb=4096)
+        repo_a_python = self._plugin()
+        repo_a_rust = self._plugin()
+        repo_b_go = self._plugin()
+        ctx_a = Mock(repo_id="repo-a")
+        ctx_b = Mock(repo_id="repo-b")
+        with patch.object(
+            manager._factory,
+            "get_plugin",
+            side_effect=[repo_a_python, repo_a_rust, repo_b_go],
+        ):
+            manager.get_plugin("python", ctx_a)
+            manager.get_plugin("rust", ctx_a)
+            manager.get_plugin("go", ctx_b)
+
+        assert manager.evict_repo("repo-a") == 2
+        repo_a_python.close.assert_called_once_with()
+        repo_a_rust.close.assert_called_once_with()
+        repo_b_go.close.assert_not_called()
+
+        manager.shutdown()
+        manager.shutdown()
+        repo_b_go.close.assert_called_once_with()
+        assert not manager._plugins

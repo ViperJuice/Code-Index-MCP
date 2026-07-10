@@ -1,4 +1,4 @@
-"""Release metadata assertions for the prepared stable v1.3.0 contract.
+"""Release metadata assertions for the prepared, unpublished v1.3.1 contract.
 
 Historical GARC soak target: v1.2.0-rc6.
 """
@@ -15,8 +15,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.3.0"
-EXPECTED_TAG = "v1.3.0"
+EXPECTED_VERSION = "1.3.1"
+EXPECTED_TAG = "v1.3.1"
 GA_RC_EVIDENCE = REPO / "docs" / "validation" / "ga-rc-evidence.md"
 DOCKER_INSTALLERS = (
     "scripts/install-mcp-docker.sh",
@@ -61,34 +61,30 @@ def test_readme_distribution_identity_remains_stable():
     assert "docs/status/public-package-identity.md" in readme
 
 
-def test_changelog_has_stable_contract_section():
+def test_changelog_has_prepared_unpublished_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-07-06" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-07-10" in changelog
+    assert "Unpublished" in changelog
 
 
-def test_release_workflow_matches_rc_contract():
+def test_release_workflow_separates_prepare_from_protected_main_publish():
     workflow = _read_text(".github/workflows/release-automation.yml")
 
-    assert f"Version to release (e.g., {EXPECTED_TAG})" in workflow
+    assert f"Exact version to prepare or publish (e.g., {EXPECTED_TAG})" in workflow
     assert f"default: '{EXPECTED_TAG}'" in workflow
-    assert "default: 'custom'" in workflow
-    assert f"GAREL stable release contract target: {EXPECTED_TAG}" in workflow
-    assert (
-        'gh workflow run "Release Automation" -f version=v1.3.0 -f release_type=custom -f auto_merge=false'
-        in workflow
-    )
-    assert "peter-evans/create-pull-request@v8" in workflow
-    assert "softprops/action-gh-release@v3" in workflow
-    assert "peter-evans/create-pull-request@v7" not in workflow
-    assert "softprops/action-gh-release@v2" not in workflow
-    assert 'grep -q "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
-    assert 'grep -q "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
-    assert "Stable tags still use release_type=custom" in workflow
-    assert "prerelease: ${{ needs.prepare-release.outputs.is_prerelease }}" in workflow
-    assert "tags: ${{ needs.prepare-release.outputs.docker_tags }}" in workflow
-    assert "No automatic documentation rewrite" in workflow
-    assert 'sed -i "s/Latest Version:' not in workflow
+    assert "default: 'prepare'" in workflow
+    assert "prepare-release-pr:" in workflow
+    assert "publish-release:" in workflow
+    assert "inputs.mode == 'publish' && github.ref == 'refs/heads/main'" in workflow
+    assert "Publication remains a separate protected-main workflow dispatch after merge" in workflow
+    assert "gh workflow run" not in workflow
+    assert 'grep -Fxq "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
+    assert 'grep -Fxq "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
+    assert "prerelease: ${{ contains(inputs.version, '-') }}" in workflow
+    assert "ghcr.io/viperjuice/code-index-mcp:${{ inputs.version }}" in workflow
+    assert "pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b" in workflow
+    assert "softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b" in workflow
 
 
 def test_release_tag_is_not_reused_locally():
@@ -133,9 +129,16 @@ def test_installers_and_download_helper_match_stable_identity_contract():
     powershell = _read_text("scripts/install-mcp-docker.ps1")
     download_helper = _read_text("scripts/download-release.py")
 
-    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.3.0}"' in shell
-    assert 'param(\n    [string]$Variant = "v1.3.0"' in powershell
-    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.3.0' in powershell
+    assert 'MCP_VARIANT="${MCP_VARIANT:-local-smoke}"' in shell
+    assert 'param(\n    [string]$Variant = "local-smoke"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke' in powershell
+    assert "v1.3.1 is prepared but unpublished" in shell
+    assert "v1.3.1 is prepared but unpublished" in powershell
+
+    readme = _read_text("README.md")
+    quick_start = readme.split("## 🚀 Quick Start", 1)[1].split("## Using Against Many Repos", 1)[0]
+    assert "after protected-main publication" in quick_start
+    assert "ghcr.io/viperjuice/code-index-mcp:v1.3.1" not in quick_start
 
     for expected in (
         "index_it_mcp-",

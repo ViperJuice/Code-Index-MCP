@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from .artifacts.semantic_profiles import SemanticProfileRegistry
 from .cache import (
@@ -33,20 +34,25 @@ from .config.validation import (
 from .core import RepoContext, RepoResolver
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from .health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from .indexing.source_metadata import normalize_friction_category
 from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
-from .plugin_base import SearchResult, SymbolDef
+from .plugin_base import SymbolDef
 from .plugin_system import PluginManager
 from .security import (
     AuthCredentials,
+    AuthenticationMiddleware,
     AuthManager,
+    AuthorizationMiddleware,
     Permission,
+    RateLimitMiddleware,
+    RequestValidationMiddleware,
     SecurityConfig,
-    SecurityMiddlewareStack,
+    SecurityHeadersMiddleware,
     User,
     UserRole,
     get_current_active_user,
@@ -96,6 +102,84 @@ def _parse_cors_origins_from_env() -> list[str]:
     return origins
 
 
+def _build_security_config_from_env() -> SecurityConfig:
+    """Build SecurityConfig from environment and fail closed on invalid input."""
+    jwt_secret_key = os.getenv("JWT_SECRET_KEY")
+    if not jwt_secret_key:
+        raise RuntimeError(
+            "JWT_SECRET_KEY env var must be set. Generate one with: openssl rand -base64 32"
+        )
+
+    try:
+        return SecurityConfig(
+            jwt_secret_key=jwt_secret_key,
+            jwt_algorithm="HS256",
+            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
+            refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
+            password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
+            max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
+            lockout_duration_minutes=int(os.getenv("LOCKOUT_DURATION_MINUTES", "15")),
+            rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "100")),
+            rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "1")),
+            cors_origins=_parse_cors_origins_from_env(),
+            cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            cors_headers=["*"],
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Invalid JWT security configuration: {exc}") from exc
+
+
+def _require_default_admin_password() -> str:
+    """Return the configured default admin password or raise fail-closed."""
+    admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
+    if not admin_password:
+        raise RuntimeError(
+            "DEFAULT_ADMIN_PASSWORD env var must be set. Choose a strong password for the admin account."
+        )
+    if admin_password.strip().lower() in WEAK_CREDENTIAL_BLOCKLIST:
+        raise RuntimeError(
+            "DEFAULT_ADMIN_PASSWORD is on the well-known-weak list. "
+            "Pick a strong password (see config/validation.py blocklist)."
+        )
+    return admin_password
+
+
+def _build_boot_auth_manager() -> tuple[SecurityConfig | None, AuthManager | None]:
+    """Best-effort import-time auth bootstrap for pre-startup route protection."""
+    try:
+        config = _build_security_config_from_env()
+    except RuntimeError:
+        return None, None
+    return config, AuthManager(config)
+
+
+def _register_security_middleware(
+    target_app: FastAPI,
+    config: SecurityConfig | None,
+    active_auth_manager: AuthManager | None,
+) -> None:
+    """Register the HTTP security stack before startup."""
+    cors_origins = config.cors_origins if config is not None else _parse_cors_origins_from_env()
+    security_headers = (
+        config.security_headers
+        if config is not None
+        else SecurityConfig(jwt_secret_key="x" * 32).security_headers
+    )
+
+    target_app.add_middleware(SecurityHeadersMiddleware, security_headers=security_headers)
+    target_app.add_middleware(AuthorizationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(AuthenticationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(RateLimitMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(RequestValidationMiddleware)
+    target_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
+
+
 app = FastAPI(
     title="MCP Server",
     description="Code Index MCP Server with Security, Metrics, and Health Checks",
@@ -114,11 +198,13 @@ query_cache: QueryResultCache | None = None
 bm25_indexer: BM25Indexer | None = None
 hybrid_search: HybridSearch | None = None
 fuzzy_indexer: FuzzyIndexer | None = None
+git_index_manager: Any = None
 semantic_indexer = None
 profile_hydration_status: Dict[str, Any] | None = None
 semantic_setup_status: Dict[str, Any] | None = None
 _repo_registry = None
 _store_registry: StoreRegistry | None = None
+security_config, auth_manager = _build_boot_auth_manager()
 
 
 def _get_path_guard() -> Optional[PathTraversalGuard]:
@@ -274,35 +360,155 @@ def _normalize_csv_filters(value: Optional[str]) -> list[str]:
 language_detection_status: Dict[str, Any] | None = None
 
 _FALLBACK_REPO_ID = "default"
+_repo_search_backends: dict[str, tuple[SQLiteStore, BM25Indexer, FuzzyIndexer, HybridSearch]] = {}
+_repo_search_backends_lock = threading.Lock()
+_RECOVERABLE_REINDEX_STATES = frozenset(
+    {
+        RepositoryReadinessState.MISSING_INDEX,
+        RepositoryReadinessState.INDEX_EMPTY,
+        RepositoryReadinessState.STALE_COMMIT,
+        RepositoryReadinessState.CORRUPT_SQLITE,
+        RepositoryReadinessState.MISSING_SCHEMA,
+        RepositoryReadinessState.MISSING_PROVENANCE,
+    }
+)
+
+
+def _repository_unavailable_detail(selector: str) -> dict[str, Any]:
+    try:
+        readiness = repo_resolver.classify(selector) if repo_resolver is not None else None
+    except Exception:
+        readiness = None
+    return {
+        "error": "Index unavailable",
+        "code": getattr(getattr(readiness, "state", None), "value", "repository_unavailable"),
+        "safe_fallback": "native_search",
+        "repository": selector,
+        "readiness": readiness.to_dict() if readiness is not None else None,
+    }
+
+
+def _search_backends_for_repo(
+    ctx: RepoContext,
+) -> tuple[Optional[BM25Indexer], Optional[FuzzyIndexer], Optional[HybridSearch]]:
+    if ctx.repo_id == _FALLBACK_REPO_ID:
+        return bm25_indexer, fuzzy_indexer, hybrid_search
+
+    with _repo_search_backends_lock:
+        cached = _repo_search_backends.get(ctx.repo_id)
+        if cached is not None and cached[0] is ctx.sqlite_store:
+            return cached[1], cached[2], cached[3]
+
+        repo_bm25 = BM25Indexer(ctx.sqlite_store)
+        repo_fuzzy = FuzzyIndexer(ctx.sqlite_store)
+        source_config = hybrid_search.config if hybrid_search is not None else HybridSearchConfig()
+        repo_hybrid = HybridSearch(
+            storage=ctx.sqlite_store,
+            bm25_indexer=repo_bm25,
+            semantic_indexer=None,
+            fuzzy_indexer=repo_fuzzy,
+            config=HybridSearchConfig(
+                bm25_weight=source_config.bm25_weight,
+                semantic_weight=0.0,
+                fuzzy_weight=source_config.fuzzy_weight,
+                rrf_k=source_config.rrf_k,
+                enable_bm25=source_config.enable_bm25,
+                enable_semantic=False,
+                enable_fuzzy=source_config.enable_fuzzy,
+                individual_limit=source_config.individual_limit,
+                final_limit=source_config.final_limit,
+                parallel_execution=source_config.parallel_execution,
+                parallel_timeout_seconds=source_config.parallel_timeout_seconds,
+                cache_results=source_config.cache_results,
+                min_bm25_score=source_config.min_bm25_score,
+                min_semantic_score=source_config.min_semantic_score,
+                min_fuzzy_score=source_config.min_fuzzy_score,
+            ),
+        )
+        _repo_search_backends[ctx.repo_id] = (
+            ctx.sqlite_store,
+            repo_bm25,
+            repo_fuzzy,
+            repo_hybrid,
+        )
+        return repo_bm25, repo_fuzzy, repo_hybrid
 
 
 def get_repo_ctx(request: Request) -> RepoContext:
     """Resolve a RepoContext for the current request.
 
     Resolution order:
-    1. ``X-Repo-Id`` header value treated as a filesystem path.
-    2. ``?repository=<path>`` query parameter.
+    1. ``X-Repo-Id`` header value treated as an exact repository selector.
+    2. ``?repository=<selector>`` query parameter.
     3. ``repo_resolver.resolve(cwd)`` fallback when a resolver is available.
     4. Minimal context built from the module-global ``sqlite_store`` as last resort.
     """
-    candidate_path: Optional[str] = None
+    candidate_selector: Optional[str] = None
 
     repo_id_header = request.headers.get("X-Repo-Id")
     if repo_id_header:
-        candidate_path = repo_id_header
+        candidate_selector = repo_id_header
 
-    if candidate_path is None:
-        candidate_path = request.query_params.get("repository")
+    if candidate_selector is None:
+        candidate_selector = request.query_params.get("repository")
 
-    if candidate_path is not None and repo_resolver is not None:
-        resolved = repo_resolver.resolve(Path(candidate_path))
+    if candidate_selector is not None:
+        if repo_resolver is None:
+            raise HTTPException(503, detail=_repository_unavailable_detail(candidate_selector))
+        try:
+            readiness = repo_resolver.classify(candidate_selector)
+        except Exception as exc:
+            raise HTTPException(
+                503, detail=_repository_unavailable_detail(candidate_selector)
+            ) from exc
+        if isinstance(readiness, RepositoryReadiness) and not readiness.ready:
+            raise HTTPException(
+                503,
+                detail={
+                    "error": "Index unavailable",
+                    "code": readiness.code,
+                    "safe_fallback": "native_search",
+                    "repository": candidate_selector,
+                    "readiness": readiness.to_dict(),
+                },
+            )
+        resolved = (
+            repo_resolver.resolve_ready(candidate_selector)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(candidate_selector)
+        )
         if resolved is not None:
             return resolved
+        raise HTTPException(503, detail=_repository_unavailable_detail(candidate_selector))
 
-    if candidate_path is None and repo_resolver is not None:
-        resolved = repo_resolver.resolve(Path.cwd())
+    if repo_resolver is not None:
+        cwd_selector = str(Path.cwd())
+        try:
+            readiness = repo_resolver.classify(cwd_selector)
+        except Exception as exc:
+            raise HTTPException(503, detail=_repository_unavailable_detail(cwd_selector)) from exc
+        if isinstance(readiness, RepositoryReadiness) and not readiness.ready:
+            raise HTTPException(
+                503,
+                detail={
+                    "error": "Index unavailable",
+                    "code": readiness.code,
+                    "safe_fallback": "native_search",
+                    "readiness": readiness.to_dict(),
+                },
+            )
+        resolved = (
+            repo_resolver.resolve_ready(cwd_selector)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(cwd_selector)
+        )
         if resolved is not None:
             return resolved
+        if isinstance(repo_resolver, RepoResolver):
+            raise HTTPException(503, detail=_repository_unavailable_detail(cwd_selector))
+
+    if sqlite_store is None:
+        raise HTTPException(503, detail="Repository resolver and fallback store are unavailable")
 
     # Final fallback: wrap the gateway-global sqlite_store in a minimal context.
     from datetime import datetime
@@ -338,15 +544,17 @@ business_metrics = get_business_metrics()
 setup_metrics_middleware(app, enable_detailed_metrics=True)
 
 # Register SecretRedactionResponseMiddleware at import time so it applies
-# regardless of how the app is booted. The rest of the security stack needs
-# runtime-configured auth_manager and stays in startup_event.
+# regardless of how the app is booted.
 app.add_middleware(SecretRedactionResponseMiddleware)
+_register_security_middleware(app, security_config, auth_manager)
+app.state.auth_manager = auth_manager
+app.state.security_config = security_config
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, repo_resolver, sqlite_store, multi_watcher, ref_poller, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status, _store_registry
+    global dispatcher, repo_resolver, sqlite_store, multi_watcher, ref_poller, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, git_index_manager, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status, _store_registry
 
     app.state.startup_time = time.monotonic()
 
@@ -360,25 +568,7 @@ async def startup_event():
 
         # Initialize security configuration
         logger.info("Initializing security configuration...")
-        jwt_secret_key = os.getenv("JWT_SECRET_KEY")
-        if not jwt_secret_key:
-            raise RuntimeError(
-                "JWT_SECRET_KEY env var must be set. " "Generate one with: openssl rand -base64 32"
-            )
-        security_config = SecurityConfig(
-            jwt_secret_key=jwt_secret_key,
-            jwt_algorithm="HS256",
-            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
-            refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
-            password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
-            max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
-            lockout_duration_minutes=int(os.getenv("LOCKOUT_DURATION_MINUTES", "15")),
-            rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "100")),
-            rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "1")),
-            cors_origins=_parse_cors_origins_from_env(),
-            cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            cors_headers=["*"],
-        )
+        security_config = _build_security_config_from_env()
 
         # Validate security config before constructing auth manager
         _validation_errors = validate_production_config(
@@ -392,6 +582,8 @@ async def startup_event():
         # Initialize authentication manager
         logger.info("Initializing authentication manager...")
         auth_manager = AuthManager(security_config)
+        app.state.auth_manager = auth_manager
+        app.state.security_config = security_config
 
         # Validate GitHub token scopes (warns and continues if token absent; raises only if MCP_REQUIRE_TOKEN_SCOPES=1)
         TokenValidator.validate_scopes(
@@ -407,17 +599,7 @@ async def startup_event():
         # Create default admin user if it doesn't exist
         admin_user = await auth_manager.get_user_by_username("admin")
         if not admin_user:
-            admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
-            if not admin_password:
-                raise RuntimeError(
-                    "DEFAULT_ADMIN_PASSWORD env var must be set. "
-                    "Choose a strong password for the admin account."
-                )
-            if admin_password.strip().lower() in WEAK_CREDENTIAL_BLOCKLIST:
-                raise RuntimeError(
-                    "DEFAULT_ADMIN_PASSWORD is on the well-known-weak list. "
-                    "Pick a strong password (see config/validation.py blocklist)."
-                )
+            admin_password = _require_default_admin_password()
             logger.info("Creating default admin user...")
             await auth_manager.create_user(
                 username="admin",
@@ -426,18 +608,6 @@ async def startup_event():
                 role=UserRole.ADMIN,
             )
             logger.info("Default admin user created")
-
-        # Set up security middleware
-        logger.info("Setting up security middleware...")
-        security_middleware = SecurityMiddlewareStack(app, security_config, auth_manager)
-        try:
-            security_middleware.setup_middleware()
-        except RuntimeError as exc:
-            if "Cannot add middleware after an application has started" in str(exc):
-                logger.warning("Skipping late middleware registration on this runtime: %s", exc)
-            else:
-                raise
-        logger.info("Security middleware configured successfully")
 
         # Initialize cache system
         logger.info("Initializing cache system...")
@@ -832,6 +1002,15 @@ async def startup_event():
             f"Hybrid Search initialized (BM25: {hybrid_config.enable_bm25}, Semantic: {hybrid_config.enable_semantic}, Fuzzy: {hybrid_config.enable_fuzzy})"
         )
 
+        from .storage.git_index_manager import GitAwareIndexManager
+
+        git_index_manager = GitAwareIndexManager(
+            registry=_repo_registry,
+            dispatcher=dispatcher,
+            repo_resolver=repo_resolver,
+            store_registry=_store_registry,
+        )
+
         # Initialize multi-repo watcher + ref poller
         if settings.mcp_fast_startup:
             logger.info("MCP fast startup enabled: skipping watcher start")
@@ -840,18 +1019,10 @@ async def startup_event():
         else:
             logger.info("Starting MultiRepositoryWatcher and RefPoller...")
             try:
-                from .storage.git_index_manager import GitAwareIndexManager
-
-                _git_index_manager = GitAwareIndexManager(
-                    registry=_repo_registry,
-                    dispatcher=dispatcher,
-                    repo_resolver=repo_resolver,
-                    store_registry=_store_registry,
-                )
                 multi_watcher = MultiRepositoryWatcher(
                     registry=_repo_registry,
                     dispatcher=dispatcher,
-                    index_manager=_git_index_manager,
+                    index_manager=git_index_manager,
                     repo_resolver=repo_resolver,
                     store_registry=_store_registry,
                     semantic_indexer_registry=semantic_indexer_registry,
@@ -859,7 +1030,7 @@ async def startup_event():
                 )
                 ref_poller = RefPoller(
                     registry=_repo_registry,
-                    git_index_manager=_git_index_manager,
+                    git_index_manager=git_index_manager,
                     dispatcher=dispatcher,
                     repo_resolver=repo_resolver,
                 )
@@ -886,6 +1057,7 @@ async def startup_event():
         app.state.bm25_indexer = bm25_indexer
         app.state.hybrid_search = hybrid_search
         app.state.fuzzy_indexer = fuzzy_indexer
+        app.state.git_index_manager = git_index_manager
         app.state.semantic_indexer = semantic_indexer
         app.state.profile_hydration = profile_hydration_status
         app.state.semantic_setup = semantic_setup_status
@@ -962,6 +1134,13 @@ async def shutdown_event():
             logger.info("RefPoller stopped successfully")
         except Exception as e:
             logger.error(f"Error stopping RefPoller: {e}", exc_info=True)
+
+    if dispatcher:
+        try:
+            dispatcher.shutdown()
+            logger.info("Dispatcher plugin workers stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping dispatcher plugin workers: {e}", exc_info=True)
 
     if plugin_manager:
         try:
@@ -1305,7 +1484,7 @@ async def symbol(
         cached_result = None
         if query_cache and query_cache.config.enabled:
             cached_result = await query_cache.get_cached_result(
-                QueryType.SYMBOL_LOOKUP, symbol=symbol
+                QueryType.SYMBOL_LOOKUP, symbol=symbol, repo_id=ctx.repo_id
             )
 
         if cached_result is not None:
@@ -1322,7 +1501,9 @@ async def symbol(
 
         # Cache the result if available
         if query_cache and query_cache.config.enabled and result:
-            await query_cache.cache_result(QueryType.SYMBOL_LOOKUP, result, symbol=symbol)
+            await query_cache.cache_result(
+                QueryType.SYMBOL_LOOKUP, result, symbol=symbol, repo_id=ctx.repo_id
+            )
 
         # Record business metrics
         duration = time.time() - start_time
@@ -1401,6 +1582,11 @@ async def search(
         ) from exc
 
     ctx = get_repo_ctx(request)
+    repo_bm25: Optional[BM25Indexer] = None
+    repo_fuzzy: Optional[FuzzyIndexer] = None
+    repo_hybrid: Optional[HybridSearch] = None
+    if mode in {"hybrid", "bm25", "fuzzy"} or ctx.repo_id == _FALLBACK_REPO_ID:
+        repo_bm25, repo_fuzzy, repo_hybrid = _search_backends_for_repo(ctx)
     explicit_repository = request.query_params.get("repository")
     service_repo_resolver = repo_resolver
     if explicit_repository is None and ctx.repo_id == _FALLBACK_REPO_ID:
@@ -1421,11 +1607,13 @@ async def search(
                 effective_mode = "semantic" if semantic else "classic"
             elif semantic and dispatcher and hasattr(dispatcher, "search"):
                 effective_mode = "semantic"
+            elif ctx.repo_id != _FALLBACK_REPO_ID:
+                effective_mode = "classic"
             # Non-semantic requests use hybrid if available, otherwise fall back.
-            elif hybrid_search is not None:
+            elif repo_hybrid is not None:
                 effective_mode = "hybrid"
             else:
-                effective_mode = "bm25" if bm25_indexer else "classic"
+                effective_mode = "bm25" if repo_bm25 else "classic"
 
         logger.debug(
             f"Searching for: '{q}' (mode={effective_mode}, limit={limit}, language={language}) for user: {current_user.username}"
@@ -1439,6 +1627,7 @@ async def search(
             filters["file_filter"] = file_filter
 
         cache_params = {
+            "repo_id": ctx.repo_id,
             "q": q,
             "semantic": effective_mode == "semantic",
             "limit": limit,
@@ -1475,33 +1664,33 @@ async def search(
         # Perform search based on mode
         results = []
 
-        if effective_mode == "hybrid" and hybrid_search:
+        if effective_mode == "hybrid" and repo_hybrid:
             # Use hybrid search
             with metrics_collector.time_function("search", labels={"mode": "hybrid"}):
-                hybrid_results = await hybrid_search.search(query=q, filters=filters, limit=limit)
+                hybrid_results = await repo_hybrid.search(query=q, filters=filters, limit=limit)
                 results = [
                     r
                     for r in (_normalize_search_result(x) for x in hybrid_results)
                     if r is not None
                 ]
 
-        elif effective_mode == "bm25" and bm25_indexer:
+        elif effective_mode == "bm25" and repo_bm25:
             # Direct BM25 search
             with metrics_collector.time_function("search", labels={"mode": "bm25"}):
-                bm25_results = bm25_indexer.search(q, limit=limit, **filters)
-                if not bm25_results and sqlite_store:
-                    bm25_results = sqlite_store.search_bm25(q, table="fts_code", limit=limit)
+                bm25_results = repo_bm25.search(q, limit=limit, **filters)
+                if not bm25_results:
+                    bm25_results = ctx.sqlite_store.search_bm25(q, table="fts_code", limit=limit)
                 results = [
                     r for r in (_normalize_search_result(x) for x in bm25_results) if r is not None
                 ]
 
-        elif effective_mode == "fuzzy" and fuzzy_indexer:
+        elif effective_mode == "fuzzy" and repo_fuzzy:
             # Direct fuzzy search
             with metrics_collector.time_function("search", labels={"mode": "fuzzy"}):
-                if hasattr(fuzzy_indexer, "search_fuzzy"):
-                    fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
+                if hasattr(repo_fuzzy, "search_fuzzy"):
+                    fuzzy_results = repo_fuzzy.search_fuzzy(q, max_results=limit)
                 else:
-                    fuzzy_results = fuzzy_indexer.search(q, limit=limit)
+                    fuzzy_results = repo_fuzzy.search(q, limit=limit)
                 results = [
                     r for r in (_normalize_search_result(x) for x in fuzzy_results) if r is not None
                 ]
@@ -1721,23 +1910,32 @@ async def get_status(
             "message": "Dispatcher not initialized",
         }
 
+    explicit_selector = request.headers.get("X-Repo-Id") or request.query_params.get("repository")
+    try:
+        ctx: Optional[RepoContext] = get_repo_ctx(request)
+    except HTTPException:
+        if explicit_selector is not None:
+            raise
+        ctx = None
+    cache_repo_id = ctx.repo_id if ctx is not None else "aggregate"
     try:
         # Try cache first if query cache is available
         cached_status = None
         if query_cache and query_cache.config.enabled:
-            cached_status = await query_cache.get_cached_result(QueryType.PROJECT_STATUS)
+            cached_status = await query_cache.get_cached_result(
+                QueryType.PROJECT_STATUS, repo_id=cache_repo_id
+            )
 
         if cached_status is not None:
             return cached_status
 
-        ctx = get_repo_ctx(request)
         # Get plugin count via public Protocol method
         loaded_plugins = dispatcher.plugins()
         plugin_count = len(loaded_plugins)
 
         # Get indexed files statistics
         indexed_stats = {"total": 0, "by_language": {}}
-        if hasattr(dispatcher, "get_statistics"):
+        if ctx is not None and hasattr(dispatcher, "get_statistics"):
             indexed_stats = dispatcher.get_statistics(ctx)
         else:
             # Calculate basic statistics from plugins
@@ -1750,8 +1948,8 @@ async def get_status(
 
         # Add database statistics if available
         db_stats = {}
-        if sqlite_store:
-            db_stats = sqlite_store.get_statistics()
+        if ctx is not None and ctx.sqlite_store:
+            db_stats = ctx.sqlite_store.get_statistics()
 
         # Add cache statistics if available
         cache_stats = {}
@@ -1778,9 +1976,15 @@ async def get_status(
                         dispatcher, "get_runtime_feature_status"
                     ):
                         try:
-                            _ctx = repo_resolver.resolve(info.path)
-                            if _ctx is not None:
-                                _features = dispatcher.get_runtime_feature_status(_ctx)
+                            _readiness = repo_resolver.classify(info.path)
+                            if isinstance(_readiness, RepositoryReadiness) and _readiness.ready:
+                                _ctx = (
+                                    repo_resolver.resolve_ready(info.path)
+                                    if isinstance(repo_resolver, RepoResolver)
+                                    else repo_resolver.resolve(info.path)
+                                )
+                                if _ctx is not None:
+                                    _features = dispatcher.get_runtime_feature_status(_ctx)
                         except Exception:
                             _features = None
                     _repositories.append(_build_health_row(info, features=_features))
@@ -1813,9 +2017,13 @@ async def get_status(
 
         # Cache the status
         if query_cache and query_cache.config.enabled:
-            await query_cache.cache_result(QueryType.PROJECT_STATUS, status_data)
+            await query_cache.cache_result(
+                QueryType.PROJECT_STATUS, status_data, repo_id=cache_repo_id
+            )
 
         return status_data
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting server status: {e}", exc_info=True)
         return {
@@ -1868,7 +2076,7 @@ async def reindex(
     request: Request,
     path: Optional[str] = None,
     current_user: User = Depends(require_permission(Permission.EXECUTE)),
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """Triggers manual reindexing of files.
 
     Args:
@@ -1882,35 +2090,107 @@ async def reindex(
         logger.error("Reindex requested but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
 
+    selector = request.headers.get("X-Repo-Id") or request.query_params.get("repository")
+    readiness = None
+    if repo_resolver is not None:
+        target = selector if selector is not None else str(Path.cwd())
+        try:
+            readiness = repo_resolver.classify(target)
+        except Exception as exc:
+            raise HTTPException(503, detail=_repository_unavailable_detail(str(target))) from exc
+
+    if readiness is not None and not readiness.ready:
+        if path and readiness.state in _RECOVERABLE_REINDEX_STATES:
+            raise HTTPException(
+                409,
+                detail={
+                    "error": "Full repository rebuild required",
+                    "code": "full_rebuild_required",
+                    "readiness": readiness.to_dict(),
+                    "mutation_performed": False,
+                },
+            )
+        if not path and readiness.state in _RECOVERABLE_REINDEX_STATES:
+            if git_index_manager is None or readiness.repository_id is None:
+                raise HTTPException(503, detail="Staged repository reindex is unavailable")
+            sync_result = git_index_manager.rebuild_repository_index(readiness.repository_id)
+            if sync_result.action != "full_index":
+                raise HTTPException(
+                    409,
+                    detail={
+                        "error": "Reindex failed",
+                        "code": sync_result.code or "reindex_failed",
+                        "mutation_performed": False,
+                    },
+                )
+            return {
+                "status": "completed",
+                "mode": "staged_full",
+                "indexed_files": sync_result.files_processed,
+                "commit": sync_result.commit,
+                "readiness": sync_result.readiness,
+            }
+        raise HTTPException(503, detail=_repository_unavailable_detail(str(target)))
+
     ctx = get_repo_ctx(request)
     try:
         logger.info(f"Manual reindex requested for path: {path or 'all'}")
-        # Since dispatcher has index_file method, we can use it for reindexing
         if path:
-            # Reindex specific path
-            target_path = Path(path)
-            if not target_path.exists():
-                raise HTTPException(404, f"Path not found: {path}")
+            workspace_root = ctx.workspace_root.expanduser().resolve(strict=True)
+            candidate = Path(path).expanduser()
+            if not candidate.is_absolute():
+                candidate = workspace_root / candidate
+            try:
+                target_path = candidate.resolve(strict=True)
+            except FileNotFoundError as exc:
+                raise HTTPException(404, f"Path not found: {path}") from exc
+
+            try:
+                target_path.relative_to(workspace_root)
+            except ValueError as exc:
+                raise HTTPException(
+                    403,
+                    detail={
+                        "error": "Reindex path is outside the selected repository",
+                        "code": "path_outside_selected_repository",
+                        "repository_id": ctx.repo_id,
+                    },
+                ) from exc
+
+            guard = _get_path_guard()
+            if guard is not None:
+                try:
+                    guard.normalize_and_check(target_path)
+                except PathTraversalError as exc:
+                    raise HTTPException(
+                        403,
+                        detail={
+                            "error": "Reindex path is outside MCP_ALLOWED_ROOTS",
+                            "code": "path_outside_allowed_roots",
+                        },
+                    ) from exc
 
             indexed_count = 0
             if target_path.is_file():
-                # Single file
                 dispatcher.index_file(ctx, target_path)
                 indexed_count = 1
             else:
-                # Directory - find all supported files
                 active_plugins = dispatcher.plugins()
                 for file_path in target_path.rglob("*"):
                     if file_path.is_file():
                         try:
-                            # Check if any plugin supports this file
+                            resolved_file = file_path.resolve(strict=True)
+                            resolved_file.relative_to(workspace_root)
+                            if guard is not None:
+                                guard.normalize_and_check(resolved_file)
                             for plugin in active_plugins:
-                                if plugin.supports(file_path):
-                                    dispatcher.index_file(ctx, file_path)
+                                if plugin.supports(resolved_file):
+                                    dispatcher.index_file(ctx, resolved_file)
                                     indexed_count += 1
                                     break
+                        except (OSError, ValueError, PathTraversalError) as e:
+                            logger.warning(f"Skipped unsafe reindex path {file_path}: {e}")
                         except Exception as e:
-                            # Log but continue with other files
                             logger.warning(f"Failed to index {file_path}: {e}")
 
             logger.info(f"Successfully reindexed {indexed_count} files in {path}")
@@ -1919,37 +2199,33 @@ async def reindex(
                 "message": f"Reindexed {indexed_count} files in {path}",
             }
         else:
-            # Reindex all supported files
-            indexed_count = 0
-            indexed_by_type = {}
-            active_plugins = dispatcher.plugins()
-
-            # Find all files and check if any plugin supports them
-            for file_path in Path(".").rglob("*"):
-                if file_path.is_file():
-                    try:
-                        # Check if any plugin supports this file
-                        for plugin in active_plugins:
-                            if plugin.supports(file_path):
-                                dispatcher.index_file(ctx, file_path)
-                                indexed_count += 1
-
-                                # Track by file type
-                                suffix = file_path.suffix.lower()
-                                indexed_by_type[suffix] = indexed_by_type.get(suffix, 0) + 1
-                                break
-                    except Exception as e:
-                        # Log but continue with other files
-                        logger.warning(f"Failed to index {file_path}: {e}")
-
-            # Build summary message
-            type_summary = ", ".join(
-                [f"{count} {ext} files" for ext, count in indexed_by_type.items()]
-            )
-            logger.info(f"Successfully reindexed {indexed_count} files: {type_summary}")
+            if ctx.repo_id == _FALLBACK_REPO_ID or git_index_manager is None:
+                raise HTTPException(
+                    503,
+                    detail={
+                        "error": "Staged repository reindex is unavailable",
+                        "code": "staged_reindex_unavailable",
+                        "repository_id": ctx.repo_id,
+                    },
+                )
+            sync_result = git_index_manager.rebuild_repository_index(ctx.repo_id)
+            if sync_result.action != "full_index":
+                raise HTTPException(
+                    409,
+                    detail={
+                        "error": "Staged repository reindex was refused",
+                        "code": sync_result.code or "reindex_failed",
+                        "readiness": sync_result.readiness,
+                        "message": sync_result.error,
+                    },
+                )
             return {
                 "status": "completed",
-                "message": f"Reindexed {indexed_count} files ({type_summary})",
+                "mode": "staged_full",
+                "message": f"Reindexed {sync_result.files_processed} files",
+                "indexed_files": sync_result.files_processed,
+                "commit": sync_result.commit,
+                "recovery": sync_result.readiness,
             }
     except HTTPException:
         raise

@@ -232,8 +232,8 @@ class TestRepoResolver:
         nested = repo_path / "pkg"
         nested.mkdir()
 
-        assert resolver.classify(repo_path).state.value == "index_empty"
-        assert resolver.classify(nested).state.value == "index_empty"
+        assert resolver.classify(repo_path).state.value == "missing_schema"
+        assert resolver.classify(nested).state.value == "missing_schema"
 
     def test_classify_unregistered_git_repo_and_path_outside_git(self, tmp_path):
         registry = RepositoryRegistry(tmp_path / "registry.json")
@@ -255,3 +255,153 @@ class TestRepoResolver:
 
         assert resolver.classify(worktree).state.value == "unsupported_worktree"
         assert resolver.resolve(worktree) is None
+
+    def test_resolve_exact_id(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        ctx = resolver.resolve(repo_id)
+        assert ctx is not None
+        assert ctx.repo_id == repo_id
+
+    def test_resolve_exact_name(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        ctx = resolver.resolve("myrepo")
+        assert ctx is not None
+        assert ctx.repo_id == repo_id
+
+    def test_resolve_ambiguity_duplicate_names(self, tmp_path):
+        repo_path1 = make_git_repo(tmp_path / "repo1")
+        repo_path2 = make_git_repo(tmp_path / "repo2")
+
+        registry_file = tmp_path / "registry.json"
+        registry = RepositoryRegistry(registry_file)
+
+        # Manually register two repos with the same name "duplicate_name"
+        from datetime import datetime
+
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+        repo_info1 = RepositoryInfo(
+            repository_id="id1",
+            name="duplicate_name",
+            path=repo_path1,
+            index_path=repo_path1 / ".mcp-index" / "current.db",
+            language_stats={},
+            total_files=0,
+            total_symbols=0,
+            indexed_at=datetime.now(),
+            current_commit=None,
+            last_indexed_commit=None,
+            last_indexed=None,
+            current_branch=None,
+            url=None,
+            auto_sync=True,
+            artifact_enabled=True,
+            active=True,
+            priority=0,
+        )
+        repo_info2 = RepositoryInfo(
+            repository_id="id2",
+            name="duplicate_name",
+            path=repo_path2,
+            index_path=repo_path2 / ".mcp-index" / "current.db",
+            language_stats={},
+            total_files=0,
+            total_symbols=0,
+            indexed_at=datetime.now(),
+            current_commit=None,
+            last_indexed_commit=None,
+            last_indexed=None,
+            current_branch=None,
+            url=None,
+            auto_sync=True,
+            artifact_enabled=True,
+            active=True,
+            priority=0,
+        )
+        registry.register(repo_info1)
+        registry.register(repo_info2)
+
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        readiness = resolver.classify("duplicate_name")
+        assert readiness.state.value == "ambiguous_selector"
+        assert resolver.resolve("duplicate_name") is None
+
+    def test_resolve_nonexistent_relative_path(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        readiness = resolver.classify("nonexistent_repo_selector")
+        assert readiness.state.value == "unregistered_repository"
+        assert resolver.resolve("nonexistent_repo_selector") is None
+
+    def test_resolve_existing_bare_relative_path(self, tmp_path, monkeypatch):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
+        repo_info = registry.get(repo_id)
+        assert repo_info is not None
+        repo_info.name = "registered-name"
+        registry.register(repo_info)
+        resolver = make_resolver(registry, make_store_registry(registry))
+        monkeypatch.chdir(tmp_path)
+
+        ctx = resolver.resolve("myrepo")
+
+        assert ctx is not None
+        assert ctx.repo_id == repo_id
+
+    def test_resolve_path_like_name(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry_file = tmp_path / "registry.json"
+        registry = RepositoryRegistry(registry_file)
+
+        from datetime import datetime
+
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+        # Register a repository with a name that contains a slash
+        repo_info = RepositoryInfo(
+            repository_id="path-like-id",
+            name="nested/repo-name",
+            path=repo_path,
+            index_path=repo_path / ".mcp-index" / "current.db",
+            language_stats={},
+            total_files=0,
+            total_symbols=0,
+            indexed_at=datetime.now(),
+            current_commit=None,
+            last_indexed_commit=None,
+            last_indexed=None,
+            current_branch=None,
+            url=None,
+            auto_sync=True,
+            artifact_enabled=True,
+            active=True,
+            priority=0,
+        )
+        registry.register(repo_info)
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        ctx = resolver.resolve("nested/repo-name")
+        assert ctx is not None
+        assert ctx.repo_id == "path-like-id"
+
+    def test_resolve_symlink(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        # Create a symlink pointing to the repository
+        symlink_path = tmp_path / "myrepo_symlink"
+        symlink_path.symlink_to(repo_path, target_is_directory=True)
+
+        ctx = resolver.resolve(symlink_path)
+        assert ctx is not None
+        assert ctx.repo_id == repo_id

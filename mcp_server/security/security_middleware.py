@@ -2,14 +2,15 @@
 
 import logging
 import re
-from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Literal, Optional
+from typing import Awaitable, Callable, Dict, List, Literal, Optional, cast
 from urllib.parse import unquote
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
+from starlette.routing import Match
 
 from .auth_manager import (
     AuthManager,
@@ -24,6 +25,7 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 class SecurityHeaders:
@@ -56,11 +58,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with rate limiting."""
+        auth_manager = getattr(request.app.state, "auth_manager", None) or self.auth_manager
+        if auth_manager is None:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "Authentication unavailable"},
+            )
         client_ip = self._get_client_ip(request)
 
         # Check rate limiting
-        if self.auth_manager.rate_limiter.is_rate_limited(client_ip):
-            await self.auth_manager._log_security_event(
+        if auth_manager.rate_limiter.is_rate_limited(client_ip):
+            await auth_manager._log_security_event(
                 "rate_limit_exceeded",
                 ip_address=client_ip,
                 user_agent=request.headers.get("user-agent"),
@@ -79,14 +87,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Check for forwarded headers first
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return str(forwarded_for.split(",")[0].strip())
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
         # Fallback to client IP
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -113,7 +121,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: FastAPI,
-        auth_manager: AuthManager,
+        auth_manager: Optional[AuthManager] = None,
         excluded_paths: Optional[List[str]] = None,
     ):
         super().__init__(app)
@@ -123,6 +131,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json",
             "/health",
+            "/ready",
+            "/liveness",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
@@ -134,6 +144,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         if self._is_excluded_path(request.url.path):
             return await call_next(request)
 
+        auth_manager = getattr(request.app.state, "auth_manager", None) or self.auth_manager
+        if auth_manager is None:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "Authentication unavailable"},
+            )
+
         # Extract and verify token
         token = self._extract_token(request)
         if not token:
@@ -142,7 +159,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Missing authentication token"},
             )
 
-        token_data = await self.auth_manager.verify_token(token)
+        token_data = await auth_manager.verify_token(token)
         if not token_data:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -157,7 +174,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         request.state.token_data = token_data
 
         # Log authentication
-        await self.auth_manager._log_security_event(
+        await auth_manager._log_security_event(
             "request_authenticated",
             user_id=token_data.user_id,
             username=token_data.username,
@@ -169,7 +186,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     def _is_excluded_path(self, path: str) -> bool:
         """Check if path is excluded from authentication."""
-        return any(path.startswith(excluded) for excluded in self.excluded_paths)
+        return any(
+            path == excluded or path.startswith(excluded.rstrip("/") + "/")
+            for excluded in self.excluded_paths
+        )
 
     def _extract_token(self, request: Request) -> Optional[str]:
         """Extract Bearer token from Authorization header."""
@@ -180,25 +200,25 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         if not auth_header.startswith("Bearer "):
             return None
 
-        return auth_header[7:]  # Remove "Bearer " prefix
+        return str(auth_header[7:])  # Remove "Bearer " prefix
 
     def _get_client_ip(self, request: Request) -> str:
         """Extract client IP address from request."""
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return str(forwarded_for.split(",")[0].strip())
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
 
 class AuthorizationMiddleware(BaseHTTPMiddleware):
     """Authorization middleware."""
 
-    def __init__(self, app: FastAPI, auth_manager: AuthManager):
+    def __init__(self, app: FastAPI, auth_manager: Optional[AuthManager] = None):
         super().__init__(app)
         self.auth_manager = auth_manager
 
@@ -207,6 +227,18 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         # Skip authorization if not authenticated
         if not hasattr(request.state, "user_id"):
             return await call_next(request)
+
+        # Let the router preserve its 404/405 contract. A real route without an
+        # access rule still reaches the default-deny branch below.
+        if not any(route.matches(request.scope)[0] == Match.FULL for route in request.app.routes):
+            return await call_next(request)
+
+        auth_manager = getattr(request.app.state, "auth_manager", None) or self.auth_manager
+        if auth_manager is None:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "Authentication unavailable"},
+            )
 
         # Determine operation from HTTP method
         operation = self._get_operation_from_method(request.method)
@@ -225,9 +257,9 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         )
 
         # Check authorization
-        is_authorized = await self.auth_manager.authorize_request(access_request)
+        is_authorized = await auth_manager.authorize_request(access_request)
         if not is_authorized:
-            await self.auth_manager._log_security_event(
+            await auth_manager._log_security_event(
                 "authorization_denied",
                 user_id=request.state.user_id,
                 username=request.state.username,
@@ -245,7 +277,7 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
             )
 
         # Log successful authorization
-        await self.auth_manager._log_security_event(
+        await auth_manager._log_security_event(
             "authorization_granted",
             user_id=request.state.user_id,
             username=request.state.username,
@@ -276,13 +308,13 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         """Extract client IP address from request."""
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return str(forwarded_for.split(",")[0].strip())
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -305,7 +337,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         # Validate content type for POST/PUT requests
         if request.method in ["POST", "PUT", "PATCH"]:
             content_type = request.headers.get("content-type", "")
-            if not self._is_valid_content_type(content_type):
+            if content_type and not self._is_valid_content_type(content_type):
                 return JSONResponse(
                     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                     content={"detail": "Unsupported media type"},
@@ -358,39 +390,44 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
 # Dependency functions for FastAPI
 
 
-def get_current_user(request: Request) -> TokenData:
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
+) -> TokenData:
     """Get current user from request state."""
     if hasattr(request.state, "token_data"):
-        return request.state.token_data
+        return cast(TokenData, request.state.token_data)
 
-    # Fallback for runtimes where middleware registration occurred too late
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    auth_manager = cast(Optional[AuthManager], getattr(request.app.state, "auth_manager", None))
+    if auth_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication unavailable",
+        )
+
+    if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    token = auth_header.split(" ", 1)[1].strip()
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    token_data = await auth_manager.verify_token(credentials.credentials)
+    if token_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
 
-    logger.warning(
-        "Using fallback auth path from Authorization header because request.state.token_data is missing"
-    )
-    now = datetime.utcnow()
-    return TokenData(
-        user_id="fallback-user",
-        username="fallback",
-        role=UserRole.ADMIN,
-        permissions=list(Permission),
-        issued_at=now,
-        expires_at=now + timedelta(hours=1),
-    )
+    request.state.user_id = token_data.user_id
+    request.state.username = token_data.username
+    request.state.user_role = token_data.role
+    request.state.user_permissions = token_data.permissions
+    request.state.token_data = token_data
+    return token_data
 
 
-def get_current_active_user(request: Request) -> User:
+async def get_current_active_user(
+    request: Request,
+    token_data: TokenData = Security(get_current_user),
+) -> User:
     """Get current active user."""
-    token_data = get_current_user(request)
-    # In a real implementation, you'd fetch the user from the database
-    # For now, we'll create a user object from token data
     user = User(
         id=token_data.user_id,
         username=token_data.username,
@@ -401,10 +438,12 @@ def get_current_active_user(request: Request) -> User:
     return user
 
 
-def require_permission(permission: Permission):
+def require_permission(permission: Permission) -> Callable[..., Awaitable[User]]:
     """Decorator to require specific permission."""
 
-    def permission_checker(current_user: User = Depends(get_current_active_user)):
+    async def permission_checker(
+        current_user: User = Security(get_current_active_user),
+    ) -> User:
         if permission not in current_user.permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -415,10 +454,10 @@ def require_permission(permission: Permission):
     return permission_checker
 
 
-def require_role(role: UserRole):
+def require_role(role: UserRole) -> Callable[..., Awaitable[User]]:
     """Decorator to require specific role or higher."""
 
-    def role_checker(current_user: User = Depends(get_current_active_user)):
+    async def role_checker(current_user: User = Security(get_current_active_user)) -> User:
         role_hierarchy = [
             UserRole.GUEST,
             UserRole.READONLY,
@@ -449,7 +488,9 @@ _SCOPE_TO_PERMISSION: Dict[str, Permission] = {
 }
 
 
-def require_auth(scope: Literal["metrics", "admin", "tools"]) -> Callable[..., User]:
+def require_auth(
+    scope: Literal["metrics", "admin", "tools"],
+) -> Callable[..., Awaitable[User]]:
     """FastAPI dep that delegates to require_permission after scope→permission mapping."""
     permission = _SCOPE_TO_PERMISSION[scope]
     return require_permission(permission)

@@ -32,6 +32,7 @@ from ..graph import (
     GraphNode,
     XRefAdapter,
 )
+from ..indexing.source_metadata import extract_matching_source_metadata
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.generic_treesitter_plugin import GenericTreeSitterPlugin
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
@@ -59,7 +60,6 @@ from .result_aggregator import (
     RankingCriteria,
     ResultAggregator,
 )
-from ..indexing.source_metadata import extract_matching_source_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +134,8 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/security/test_p24_sandbox_degradation.py": (
         "exact_test_p24_sandbox_degradation_rebound"
     ),
-    "tests/test_p24_plugin_availability.py": (
-        "exact_test_p24_plugin_availability_rebound"
-    ),
-    "tests/test_dispatcher_extension_gating.py": (
-        "exact_test_dispatcher_extension_gating_rebound"
-    ),
+    "tests/test_p24_plugin_availability.py": ("exact_test_p24_plugin_availability_rebound"),
+    "tests/test_dispatcher_extension_gating.py": ("exact_test_dispatcher_extension_gating_rebound"),
     "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
     "scripts/migrate_large_index_to_multi_repo.py": "exact_migrate_large_index_to_multi_repo_rebound",
     "scripts/check_index_languages.py": "exact_check_index_languages_rebound",
@@ -147,25 +143,17 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "scripts/ensure_test_repos_indexed.py": "exact_ensure_test_repos_indexed_rebound",
     "scripts/index_missing_repos_semantic.py": "exact_index_missing_repos_semantic_rebound",
     "scripts/identify_working_indexes.py": "exact_identify_working_indexes_rebound",
-    "scripts/utilities/prepare_index_for_upload.py": (
-        "exact_prepare_index_for_upload_rebound"
-    ),
+    "scripts/utilities/prepare_index_for_upload.py": ("exact_prepare_index_for_upload_rebound"),
     "scripts/utilities/verify_tool_usage.py": "exact_verify_tool_usage_rebound",
     "scripts/map_repos_to_qdrant.py": "exact_map_repos_to_qdrant_rebound",
-    "scripts/create_claude_code_aware_report.py": (
-        "exact_create_claude_code_aware_report_rebound"
-    ),
+    "scripts/create_claude_code_aware_report.py": ("exact_create_claude_code_aware_report_rebound"),
     "scripts/execute_optimized_analysis.py": "exact_execute_optimized_analysis_rebound",
     "scripts/index-artifact-upload-v2.py": "exact_index_artifact_upload_v2_rebound",
     "scripts/analyze_claude_code_edits.py": "exact_analyze_claude_code_edits_rebound",
     "scripts/verify_mcp_retrieval.py": "exact_verify_mcp_retrieval_rebound",
     "scripts/run_comprehensive_query_test.py": "exact_run_comprehensive_query_test_rebound",
-    "scripts/index_all_repos_semantic_full.py": (
-        "exact_index_all_repos_semantic_full_rebound"
-    ),
-    "scripts/real_strategic_recommendations.py": (
-        "exact_real_strategic_recommendations_rebound"
-    ),
+    "scripts/index_all_repos_semantic_full.py": ("exact_index_all_repos_semantic_full_rebound"),
+    "scripts/real_strategic_recommendations.py": ("exact_real_strategic_recommendations_rebound"),
     "scripts/migrate_to_centralized.py": "exact_migrate_to_centralized_rebound",
     "scripts/reindex_current_repository.py": "exact_reindex_current_repository_rebound",
     "scripts/demo_centralized_indexes.py": "exact_demo_centralized_indexes_rebound",
@@ -182,13 +170,9 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/docs/test_gaclose_evidence_closeout.py": "exact_gaclose_docs_contract_rebound",
     "tests/docs/test_p8_deployment_security.py": "exact_p8_security_docs_contract_rebound",
     "tests/docs/test_semincr_contract.py": "exact_semincr_docs_contract_rebound",
-    "tests/docs/test_gabase_ga_readiness_contract.py": (
-        "exact_gabase_docs_contract_rebound"
-    ),
+    "tests/docs/test_gabase_ga_readiness_contract.py": ("exact_gabase_docs_contract_rebound"),
     "tests/docs/test_garc_rc_soak_contract.py": "exact_garc_docs_contract_rebound",
-    "tests/docs/test_garel_ga_release_contract.py": (
-        "exact_garel_docs_contract_rebound"
-    ),
+    "tests/docs/test_garel_ga_release_contract.py": ("exact_garel_docs_contract_rebound"),
     "tests/docs/test_p23_doc_truth.py": "exact_p23_docs_truth_rebound",
     "tests/docs/test_semdogfood_evidence_contract.py": (
         "exact_semdogfood_evidence_contract_rebound"
@@ -226,6 +210,7 @@ def _get_lexical_timeout_seconds() -> float:
         return max(float(raw), 1.0)
     except ValueError:
         return 20.0
+
 
 # Path segment penalties for lexical (BM25/fuzzy) results.
 # FTS5 scores are negative; adding a positive penalty degrades rank.
@@ -815,6 +800,40 @@ class EnhancedDispatcher:
         """Return all loaded legacy plugins."""
         return list(self._legacy_plugins)
 
+    def _managed_plugin_count(self, repo_id: str) -> int:
+        """Read managed worker count without requiring newer test doubles."""
+        loaded_count = getattr(self._plugin_set_registry, "loaded_count", None)
+        if callable(loaded_count):
+            try:
+                count = loaded_count(repo_id)
+                if isinstance(count, int):
+                    return count
+            except Exception as exc:
+                logger.warning("Per-repo plugin count failed: %s", exc)
+        snapshot_fn = getattr(self._plugin_set_registry, "resource_snapshot", None)
+        if callable(snapshot_fn):
+            try:
+                reserved = getattr(snapshot_fn(), "reserved_workers", None)
+                if isinstance(reserved, int):
+                    return reserved
+            except Exception as exc:
+                logger.warning("Plugin resource snapshot failed: %s", exc)
+        return len(self._plugin_set_registry.plugins_for(repo_id))
+
+    def shutdown(self) -> None:
+        """Close managed plugin workers and any explicitly injected adapters."""
+        if hasattr(self._plugin_set_registry, "shutdown"):
+            self._plugin_set_registry.shutdown()
+        for plugin in self._legacy_plugins:
+            close = getattr(plugin, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as exc:
+                    logger.warning("Legacy plugin close failed: %s", exc)
+        self._legacy_plugins.clear()
+        self._lang_cache.clear()
+
     def supported_languages(self) -> List[str]:
         """Get list of all supported languages (loaded and available)."""
         if self._use_factory:
@@ -846,43 +865,53 @@ class EnhancedDispatcher:
         except OSError:
             return True
 
-    def _match_plugin(self, path: Path) -> IPlugin:
+    def _match_plugin(self, ctx: Union[RepoContext, Path], path: Optional[Path] = None) -> IPlugin:
         """Match a plugin for the given file path."""
+        repo_ctx: Optional[RepoContext]
+        if path is None:
+            repo_ctx = None
+            target_path = Path(ctx)  # type: ignore[arg-type]
+        else:
+            repo_ctx = ctx  # type: ignore[assignment]
+            target_path = path
+
         # Check explicitly-registered legacy plugins first
         for p in self._legacy_plugins:
-            if p.supports(path):
+            if p.supports(target_path):
                 return p
 
-        # Fall back to lazy loading via factory
-        if self._lazy_load and self._use_factory:
-            plugin = self._ensure_plugin_for_file(path)
-            if plugin:
-                return plugin
+        if repo_ctx is not None:
+            managed = self._plugin_set_registry.plugins_for_file(repo_ctx, target_path)
+            if managed:
+                return managed[0][0]
+            language = get_language_by_extension(target_path.suffix.lower())
+            if language:
+                availability = PluginFactory.get_plugin_availability(language)
+                if availability.get("state") != "enabled":
+                    compatibility_plugin = self._ensure_plugin_loaded(language)
+                    if compatibility_plugin:
+                        return compatibility_plugin
 
         # Use advanced routing if available
         if self._enable_advanced and self._router:
-            route_result = self._router.get_best_plugin(path)
+            route_result = self._router.get_best_plugin(target_path)
             if route_result:
                 return route_result.plugin
 
-        raise RuntimeError(f"No plugin for {path}")
+        raise RuntimeError(f"No plugin for {target_path}")
 
     def get_plugins_for_file(self, ctx: RepoContext, path: Path) -> List[Tuple[IPlugin, float]]:
         """Get all plugins that can handle a file with confidence scores."""
-        # Ensure plugin is loaded if using lazy loading
-        if self._lazy_load and self._use_factory:
-            self._ensure_plugin_for_file(path)
-
-        if self._enable_advanced and self._router:
+        if self._legacy_plugins and self._enable_advanced and self._router:
             route_results = self._router.route_file(path)
             return [(result.plugin, result.confidence) for result in route_results]
-        else:
-            # Basic fallback
-            matching_plugins = []
+        if self._legacy_plugins:
+            matching_plugins: List[Tuple[IPlugin, float]] = []
             for plugin in self._legacy_plugins:
                 if plugin.supports(path):
                     matching_plugins.append((plugin, 1.0))
             return matching_plugins
+        return self._plugin_set_registry.plugins_for_file(ctx, path)
 
     def lookup(self, ctx: RepoContext, symbol: str, limit: int = 20) -> Optional[SymbolDef]:
         """Look up symbol definition within ctx.repo_id."""
@@ -1305,6 +1334,8 @@ class EnhancedDispatcher:
 
     def _get_semantic_indexer(self, ctx: RepoContext) -> Optional[SemanticIndexer]:
         """Return the SemanticIndexer for ctx.repo_id, or local fallback for legacy contexts."""
+        if not getattr(self, "_semantic_enabled", True):
+            return None
         if self._semantic_registry is not None:
             try:
                 return self._semantic_registry.get(ctx.repo_id)
@@ -1419,7 +1450,7 @@ class EnhancedDispatcher:
             },
             "plugins": {
                 "status": "available",
-                "loaded": len(self._plugin_set_registry.plugins_for(ctx.repo_id)),
+                "loaded": self._managed_plugin_count(ctx.repo_id),
             },
             "cross_repo": {
                 "status": "available" if self._cross_repo_coordinator else "unavailable",
@@ -1546,7 +1577,9 @@ class EnhancedDispatcher:
 
             # Prefer direct SQLite lexical search for non-semantic queries so the
             # server remains useful even when plugin in-memory indexes are cold.
-            if sqlite_store and (not semantic or (_semantic_indexer is None and not strict_semantic_route)):
+            if sqlite_store and (
+                not semantic or (_semantic_indexer is None and not strict_semantic_route)
+            ):
                 # Symbol routing: bypass BM25 for explicit symbol-pattern queries.
                 intent, sym_name, kind_hint = classify_query_intent(query)
                 if intent == QueryIntent.SYMBOL:
@@ -1700,9 +1733,7 @@ class EnhancedDispatcher:
                                 "language": result.get("metadata", {}).get("language", "unknown"),
                                 "semantic_source": result.get("semantic_source", "semantic"),
                                 "semantic_profile_id": result.get("semantic_profile_id"),
-                                "semantic_collection_name": result.get(
-                                    "semantic_collection_name"
-                                ),
+                                "semantic_collection_name": result.get("semantic_collection_name"),
                             }
                         )
                     # Re-sort by adjusted score so penalties take effect before reranking.
@@ -1719,16 +1750,12 @@ class EnhancedDispatcher:
                     if strict_semantic_route:
                         raise SemanticSearchFailure(
                             f"Semantic search failed for registered repository: {e}",
-                            profile_id=getattr(_semantic_indexer.semantic_profile, "profile_id", None),
+                            profile_id=getattr(
+                                _semantic_indexer.semantic_profile, "profile_id", None
+                            ),
                             collection_name=getattr(_semantic_indexer, "collection", None),
                         ) from e
                     logger.warning(f"Semantic indexer search failed, falling back to plugins: {e}")
-
-            # For search, we may need to search across all languages
-            # Load all plugins if using lazy loading
-            if self._lazy_load and self._use_factory and len(repo_plugins) == 0:
-                self._load_all_plugins()
-                repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
             # If still no plugins, try hybrid or BM25 search directly
             if len(repo_plugins) == 0 and sqlite_store:
@@ -1758,9 +1785,7 @@ class EnhancedDispatcher:
                                 "language": result.get("metadata", {}).get("language", "unknown"),
                                 "semantic_source": result.get("semantic_source", "semantic"),
                                 "semantic_profile_id": result.get("semantic_profile_id"),
-                                "semantic_collection_name": result.get(
-                                    "semantic_collection_name"
-                                ),
+                                "semantic_collection_name": result.get("semantic_collection_name"),
                             }
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
@@ -2140,7 +2165,7 @@ class EnhancedDispatcher:
                 shard = bounded_jsonl_shard
             else:
                 # Find the appropriate plugin
-                plugin = self._match_plugin(path)
+                plugin = self._match_plugin(ctx, path)
                 plugin_language = plugin.language
                 plugin_lang = plugin.lang
 
@@ -2437,7 +2462,7 @@ class EnhancedDispatcher:
             )
 
         try:
-            plugin = self._match_plugin(path)
+            plugin = self._match_plugin(ctx, path)
         except RuntimeError as e:
             return IndexResult(
                 status=IndexResultStatus.ERROR,
@@ -2600,16 +2625,12 @@ class EnhancedDispatcher:
             qdrant_client=None,
             summarization_config=summarization_config,
         )
-        semantic_stage_timeout_seconds = max(
-            60, settings.semantic_preflight_timeout_seconds * 12
-        )
+        semantic_stage_timeout_seconds = max(60, settings.semantic_preflight_timeout_seconds * 12)
         # Keep each summary pass bounded enough to make durable progress inside
         # the per-pass timeout instead of attempting the entire repo backlog at once.
         summary_limit = min(512, max(64, len(normalized_paths)))
         min_summary_limit = 1
-        max_summary_passes = (
-            _REPO_SCOPE_SUMMARY_PASS_BUDGET if len(normalized_paths) > 1 else None
-        )
+        max_summary_passes = _REPO_SCOPE_SUMMARY_PASS_BUDGET if len(normalized_paths) > 1 else None
         remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
         summary_missing_ids: List[str] = []
         previous_missing = remaining_missing
@@ -2915,7 +2936,9 @@ class EnhancedDispatcher:
         if not isinstance(sqlite_store, SQLiteStore):
             return
 
-        repo_path = Path(getattr(ctx.registry_entry, "path", ctx.workspace_root) or ctx.workspace_root)
+        repo_path = Path(
+            getattr(ctx.registry_entry, "path", ctx.workspace_root) or ctx.workspace_root
+        )
         repo_name = getattr(ctx.registry_entry, "name", None) or repo_path.name
         repository_row = sqlite_store.ensure_repository_row(repo_path, name=repo_name)
         try:
@@ -2974,7 +2997,17 @@ class EnhancedDispatcher:
                 )
                 sqlite_store._store_trigrams(conn, cursor.lastrowid, str(name))
 
-            for index, chunk in enumerate(shard.get("chunks", []) if isinstance(shard, dict) else []):
+            shard_chunks = shard.get("chunks") if isinstance(shard, dict) else None
+            if shard_chunks is None:
+                try:
+                    from chunker import chunk_text
+
+                    shard_chunks = [chunk.__dict__ for chunk in chunk_text(content, language)]
+                except Exception as exc:
+                    logger.debug("Host chunk derivation failed for %s: %s", path, exc)
+                    shard_chunks = []
+
+            for index, chunk in enumerate(shard_chunks):
                 if not isinstance(chunk, dict):
                     continue
                 chunk_content = str(chunk.get("content") or "")
@@ -3023,7 +3056,7 @@ class EnhancedDispatcher:
                        updated_at=CURRENT_TIMESTAMP""",
                     (
                         file_id,
-                        chunk.get("symbol_id"),
+                        None,
                         chunk_content,
                         start,
                         end,
@@ -3053,7 +3086,9 @@ class EnhancedDispatcher:
                 )
 
             conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
-            conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id))
+            conn.execute(
+                "INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id)
+            )
 
     def _clear_file_index_rows(
         self,
@@ -3222,7 +3257,11 @@ class EnhancedDispatcher:
             exact_bounded_jsonl = GenericTreeSitterPlugin.uses_exact_bounded_jsonl_path(
                 path, directory
             )
-            if size > get_max_file_size_bytes() and not exact_bounded_json and not exact_bounded_jsonl:
+            if (
+                size > get_max_file_size_bytes()
+                and not exact_bounded_json
+                and not exact_bounded_jsonl
+            ):
                 logger.warning("skipping oversized file: %s (%d bytes)", path, size)
                 stats["ignored_files"] = stats.get("ignored_files", 0) + 1
                 continue
@@ -3279,7 +3318,9 @@ class EnhancedDispatcher:
                             else:
                                 stats["failed_files"] += 1
                                 if mutation.error:
-                                    stats.setdefault("errors", []).append(f"{path}: {mutation.error}")
+                                    stats.setdefault("errors", []).append(
+                                        f"{path}: {mutation.error}"
+                                    )
                                 if self._is_storage_lock_error(mutation.error):
                                     self._record_low_level_blocker(
                                         ctx,
@@ -3311,9 +3352,7 @@ class EnhancedDispatcher:
                     ctx,
                     stats,
                     code="lexical_file_timeout",
-                    message=(
-                        f"Lexical indexing timed out while processing {path.name}"
-                    ),
+                    message=(f"Lexical indexing timed out while processing {path.name}"),
                     path=path,
                     stage="blocked_file_timeout",
                 )
@@ -3562,7 +3601,7 @@ class EnhancedDispatcher:
             "components": {
                 "dispatcher": {
                     "status": "healthy",
-                    "plugins_loaded": len(self._plugin_set_registry.plugins_for(ctx.repo_id)),
+                    "plugins_loaded": self._managed_plugin_count(ctx.repo_id),
                     "languages_supported": len(self.supported_languages()),
                     "factory_enabled": self._use_factory,
                     "lazy_loading": self._lazy_load,
@@ -3633,9 +3672,7 @@ class EnhancedDispatcher:
                     invalidation = ctx.sqlite_store.plan_semantic_invalidation(
                         relative_path,
                         repository_id=self._sqlite_repository_id(ctx),
-                        profile_id=(
-                            _sem.semantic_profile.profile_id if _sem is not None else None
-                        ),
+                        profile_id=(_sem.semantic_profile.profile_id if _sem is not None else None),
                     )
                     removed = ctx.sqlite_store.remove_file(
                         relative_path, repository_id=self._sqlite_repository_id(ctx)
@@ -3673,7 +3710,7 @@ class EnhancedDispatcher:
 
             # Remove from plugin fuzzy index if available
             try:
-                plugin = self._match_plugin(path)
+                plugin = self._match_plugin(ctx, path)
                 if plugin and hasattr(plugin, "_indexer") and plugin._indexer:
                     plugin._indexer.remove_file(path)
             except Exception as e:

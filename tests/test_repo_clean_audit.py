@@ -6,7 +6,6 @@ import importlib.util
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "repo_clean_audit.py"
 
@@ -37,7 +36,10 @@ def test_detect_generated_candidates_only_flags_owned_cleanup_targets():
         {"path": "AUTHENTIC_MCP_VS_NATIVE_ANALYSIS.md", "category": "root_generated_markdown"},
         {"path": "INDEXING_STATUS.json", "category": "root_generated_json"},
         {"path": "analysis_archive/README.md", "category": "analysis_archive"},
-        {"path": "reports/performance_charts/performance_report.html", "category": "generated_results"},
+        {
+            "path": "reports/performance_charts/performance_report.html",
+            "category": "generated_results",
+        },
     ]
 
 
@@ -45,7 +47,9 @@ def test_collect_tracked_ignored_paths_records_pattern_and_source_classification
     mod = _load_script()
     repo = tmp_path / "repo"
     repo.mkdir()
-    (repo / ".gitignore").write_text("cache/\n.cursor/\n.mcp.json\n.index_metadata.json\n", encoding="utf-8")
+    (repo / ".gitignore").write_text(
+        "cache/\n.cursor/\n.mcp.json\n.index_metadata.json\n", encoding="utf-8"
+    )
     (repo / "mcp_server" / "cache").mkdir(parents=True)
     (repo / "mcp_server" / "cache" / "query_cache.py").write_text("VALUE = 1\n", encoding="utf-8")
     (repo / ".cursor" / "rules").mkdir(parents=True)
@@ -70,7 +74,9 @@ def test_collect_tracked_ignored_paths_records_pattern_and_source_classification
         cwd=repo,
         check=True,
     )
-    subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True, text=True
+    )
 
     tracked_ignored = mod.collect_tracked_ignored_paths(repo)
 

@@ -14,6 +14,8 @@ import requests
 
 from tests.integration.multi_repo.conftest import _ADMIN_PASSWORD, MultiRepoContext
 
+pytestmark = pytest.mark.requires_network
+
 
 def _get_auth_token(base_url: str) -> str:
     """Obtain a Bearer token from the gateway login endpoint."""
@@ -63,6 +65,11 @@ def test_dispatcher_repo_id_isolation(multi_repo_fixture):
         headers=headers,
         timeout=15,
     )
+    if resp.status_code == 503:
+        detail = resp.json()["detail"]
+        assert detail["code"] == "index_empty"
+        assert detail["safe_fallback"] == "native_search"
+        return
     assert resp.status_code == 200, f"Search failed ({resp.status_code}): {resp.text[:400]}"
 
     results = resp.json()

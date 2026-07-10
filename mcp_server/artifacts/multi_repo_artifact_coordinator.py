@@ -104,7 +104,8 @@ class MultiRepoArtifactCoordinator:
         if not metadata_path.exists():
             return {}
         try:
-            return json.loads(metadata_path.read_text(encoding="utf-8"))
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
         except Exception as exc:
             record_handled_error(__name__, exc)
             return {}

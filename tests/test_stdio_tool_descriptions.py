@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from mcp_server.cli.stdio_runner import _SERVER_INSTRUCTIONS, _build_tool_list
 
-
 EXPECTED_TOOL_ORDER = [
     "symbol_lookup",
     "search_code",

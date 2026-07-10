@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 from mcp_server.config.settings import Settings
 from mcp_server.setup.semantic_preflight import (
-    bootstrap_active_profile_collection,
     ServiceStatus,
+    bootstrap_active_profile_collection,
     check_embedding_smoke,
     check_enrichment_chat,
     check_openai_compatible,

@@ -38,7 +38,9 @@ class TestP7SchemaAlignment:
 
     def test_repository_description_verbatim(self):
         """Assert repository description matches verbatim across all path-accepting tools."""
-        expected_description = "Repository ID, path, or git URL. Defaults to current repository."
+        expected_description = (
+            "Exact registered repository ID, registered name, or registered path."
+        )
         path_tools = [
             "search_code",
             "symbol_lookup",

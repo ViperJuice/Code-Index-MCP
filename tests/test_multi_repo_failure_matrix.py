@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 from mcp_server.artifacts.multi_repo_artifact_coordinator import MultiRepoArtifactCoordinator
 from mcp_server.cli import tool_handlers
+from mcp_server.indexing.summarization import SummaryGenerationResult
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager
 from mcp_server.watcher.ref_poller import RefPoller
 from tests.fixtures.multi_repo import (
@@ -38,6 +39,12 @@ def _assert_secondary_refusal(payload: dict, state: str, tool: str) -> None:
         assert payload["mutation_performed"] is False
     else:
         assert payload["persisted"] is False
+
+
+def _assert_reindex_rebuild_required(payload: dict, state: str) -> None:
+    assert payload["code"] == "full_rebuild_required"
+    assert payload["readiness"]["state"] == state
+    assert payload["mutation_performed"] is False
 
 
 def _sqlite_symbol_paths(server, repo_id: str, symbol: str) -> list[str]:
@@ -157,13 +164,19 @@ def test_wrong_branch_stale_commit_and_missing_index_refuse_secondary_tools(
         server.registry.update_git_state(matrix.alpha.repo_id)
         for tool in ("reindex", "write_summaries", "summarize_sample"):
             payload = server.call_tool(tool, {"repository": str(matrix.alpha.path)})
-            _assert_secondary_refusal(payload, "stale_commit", tool)
+            if tool == "reindex":
+                _assert_reindex_rebuild_required(payload, "stale_commit")
+            else:
+                _assert_secondary_refusal(payload, "stale_commit", tool)
 
         server.seed_repo_index(matrix.alpha.repo_id, matrix.alpha.path)
         Path(matrix.alpha.path / ".mcp-index" / "current.db").unlink()
         for tool in ("reindex", "write_summaries", "summarize_sample"):
             payload = server.call_tool(tool, {"repository": str(matrix.alpha.path)})
-            _assert_secondary_refusal(payload, "missing_index", tool)
+            if tool == "reindex":
+                _assert_reindex_rebuild_required(payload, "missing_index")
+            else:
+                _assert_secondary_refusal(payload, "missing_index", tool)
 
 
 def test_unregistered_repository_refuses_secondary_tools(tmp_path: Path):
@@ -250,7 +263,9 @@ def test_summarize_sample_explicit_path_scope_matrix(tmp_path: Path):
         lazy_summarizer.can_summarize.return_value = True
         lazy_summarizer._get_model_name.return_value = "test-model"
         batch_summarizer = MagicMock()
-        batch_summarizer.summarize_file_chunks = AsyncMock(return_value=[])
+        batch_summarizer.summarize_file_chunks = AsyncMock(
+            return_value=SummaryGenerationResult(files_attempted=1, files_summarized=1)
+        )
 
         with patch(
             "mcp_server.indexing.summarization.FileBatchSummarizer",

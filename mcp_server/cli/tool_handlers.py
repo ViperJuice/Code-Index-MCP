@@ -12,14 +12,14 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 import mcp.types as types
 
-from mcp_server.client import ClientValidationError, build_search_options, execute_search_service
 from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, validate_index
 from mcp_server.cli.task_reindex import run_reindex_task
 from mcp_server.cli.task_write_summaries import run_write_summaries_task
+from mcp_server.client import ClientValidationError, build_search_options, execute_search_service
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.dispatcher_enhanced import SemanticSearchFailure
@@ -29,14 +29,24 @@ from mcp_server.health.repository_readiness import (
     RepositoryReadiness,
     RepositoryReadinessState,
 )
-from mcp_server.indexing.source_metadata import (
-    FRICTION_CATEGORIES,
-    normalize_friction_category,
-)
+from mcp_server.indexing.source_metadata import normalize_friction_category
+
+if TYPE_CHECKING:
+    from mcp_server.storage.git_index_manager import GitAwareIndexManager
 
 logger = logging.getLogger(__name__)
 
 DEBUG_MODE = os.getenv("MCP_DEBUG", "0") == "1"
+_RECOVERABLE_REINDEX_STATES = frozenset(
+    {
+        RepositoryReadinessState.MISSING_INDEX,
+        RepositoryReadinessState.INDEX_EMPTY,
+        RepositoryReadinessState.STALE_COMMIT,
+        RepositoryReadinessState.CORRUPT_SQLITE,
+        RepositoryReadinessState.MISSING_SCHEMA,
+        RepositoryReadinessState.MISSING_PROVENANCE,
+    }
+)
 
 
 def _looks_like_path(x: str) -> bool:
@@ -53,6 +63,28 @@ def _looks_like_path(x: str) -> bool:
         return Path(x).exists()
     except Exception:
         return False
+
+
+def _is_exact_registered_selector(readiness: Optional[RepositoryReadiness]) -> bool:
+    return bool(
+        readiness is not None
+        and readiness.repository_id is not None
+        and readiness.requested_path is None
+    )
+
+
+def _repository_selector_path(
+    repository: Optional[str],
+    readiness: Optional[RepositoryReadiness],
+) -> Optional[Path]:
+    """Return only selectors that need filesystem sandbox validation."""
+    if not repository or not _looks_like_path(repository):
+        return None
+    if _is_exact_registered_selector(readiness):
+        return None
+    if readiness is not None and readiness.state == RepositoryReadinessState.AMBIGUOUS_SELECTOR:
+        return None
+    return Path(repository)
 
 
 def _ensure_response(data: Any) -> str:
@@ -130,17 +162,21 @@ def _resolve_ctx(
 ) -> Optional[RepoContext]:
     """Resolve a RepoContext from path_arg or MCP_WORKSPACE_ROOT fallback."""
     readiness = _classify_ctx(repo_resolver, path_arg)
-    if readiness is not None and readiness.state in {
-        RepositoryReadinessState.UNREGISTERED_REPOSITORY,
-        RepositoryReadinessState.UNSUPPORTED_WORKTREE,
-    }:
+    if readiness is not None and not readiness.ready:
         return None
 
-    target = path_arg or os.environ.get("MCP_WORKSPACE_ROOT", "")
-    if not target:
-        target = str(Path.cwd())
+    if path_arg:
+        target = path_arg
+    else:
+        target = os.environ.get("MCP_WORKSPACE_ROOT", "")
+        if not target:
+            target = str(Path.cwd())
     try:
-        return repo_resolver.resolve(Path(target))
+        return (
+            repo_resolver.resolve_ready(target)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(target)
+        )
     except Exception as exc:
         logger.debug("RepoResolver.resolve(%s) failed: %s", target, exc)
         return None
@@ -151,17 +187,24 @@ def _classify_ctx(
     path_arg: Optional[str],
 ) -> Optional[RepositoryReadiness]:
     """Classify a tool repository/path target when the resolver supports it."""
-    target = path_arg or os.environ.get("MCP_WORKSPACE_ROOT", "")
-    if not target:
-        target = str(Path.cwd())
+    if path_arg:
+        target = path_arg
+    else:
+        target = os.environ.get("MCP_WORKSPACE_ROOT", "")
+        if not target:
+            target = str(Path.cwd())
     classifier = getattr(repo_resolver, "classify", None)
     if not callable(classifier):
         return None
     try:
-        readiness = classifier(Path(target))
+        readiness = classifier(target)
     except Exception as exc:
         logger.debug("RepoResolver.classify(%s) failed: %s", target, exc)
-        return None
+        return RepositoryReadiness(
+            state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            requested_path=str(target),
+            remediation="Provide a valid registered repository ID, name, or path.",
+        )
     return readiness if isinstance(readiness, RepositoryReadiness) else None
 
 
@@ -199,6 +242,19 @@ def _index_unavailable_response(
     return _json_text_response(response)
 
 
+def _resolution_transition_response(tool: str) -> list[types.TextContent]:
+    return _json_text_response(
+        {
+            "error": "Index unavailable",
+            "code": "index_unavailable",
+            "tool": tool,
+            "safe_fallback": "native_search",
+            "mutation_performed": False,
+            "remediation": "Re-check repository readiness and rebuild or refresh the index.",
+        }
+    )
+
+
 def _secondary_readiness_refusal_response(
     readiness: RepositoryReadiness,
     tool: str,
@@ -223,7 +279,7 @@ def _semantic_not_ready_response(
     *,
     query: str,
 ) -> list[types.TextContent]:
-    response = {
+    response: dict[str, Any] = {
         "results": [],
         "code": "semantic_not_ready",
         "query": query,
@@ -251,7 +307,7 @@ def _semantic_failure_response(
         profile_id = error.profile_id or profile_id
         collection_name = error.collection_name or collection_name
 
-    response = {
+    response: dict[str, Any] = {
         "results": [],
         "code": "semantic_search_failed",
         "query": query,
@@ -272,6 +328,7 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     if active_store is None:
         return 0
 
+    workspace_root = workspace_root.expanduser().resolve(strict=True)
     repo_row = active_store.ensure_repository_row(workspace_root)
     if target_path.is_file():
         paths = [target_path]
@@ -285,16 +342,17 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     recorded = 0
     for file_path in paths:
         try:
-            relative_path = file_path.relative_to(workspace_root).as_posix()
-        except ValueError:
-            relative_path = file_path.name
+            resolved_file = file_path.expanduser().resolve(strict=True)
+            relative_path = resolved_file.relative_to(workspace_root).as_posix()
+        except (OSError, ValueError):
+            continue
         try:
             active_store.store_file(
                 repo_row,
-                path=file_path,
+                path=resolved_file,
                 relative_path=relative_path,
                 language=file_path.suffix.lstrip(".") or None,
-                size=file_path.stat().st_size,
+                size=resolved_file.stat().st_size,
             )
             recorded += 1
         except Exception as exc:
@@ -321,24 +379,27 @@ async def handle_symbol_lookup(
         ]
 
     repository = (arguments or {}).get("repository")
-    if repository and _looks_like_path(repository):
+    readiness = _classify_ctx(repo_resolver, repository)
+    repository_path = _repository_selector_path(repository, readiness)
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return _json_text_response(
                 {
                     "error": "Path outside allowed roots",
                     "code": "path_outside_allowed_roots",
-                    "path": str(Path(repository).resolve()),
+                    "path": str(repository_path.resolve()),
                     "allowed_roots": [str(r) for r in allowed],
                     "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                 }
             )
 
-    readiness = _classify_ctx(repo_resolver, repository)
     if readiness is not None and not readiness.ready:
         return _index_unavailable_response(readiness, "symbol_lookup", symbol=symbol)
 
     ctx = _resolve_ctx(repo_resolver, repository)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("symbol_lookup")
 
     try:
         if ctx is not None:
@@ -426,10 +487,12 @@ async def handle_search_code(
         ]
 
     repository = (arguments or {}).get("repository")
+    selector_readiness = _classify_ctx(repo_resolver, repository)
 
-    if repository and _looks_like_path(repository):
+    repository_path = _repository_selector_path(repository, selector_readiness)
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -437,7 +500,7 @@ async def handle_search_code(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -456,9 +519,7 @@ async def handle_search_code(
             friction_categories=(arguments or {}).get("friction_categories"),
             history_labels=(arguments or {}).get("history_labels"),
             history_repos=(arguments or {}).get("history_repos"),
-            include_source_metadata=bool(
-                (arguments or {}).get("include_source_metadata", False)
-            ),
+            include_source_metadata=bool((arguments or {}).get("include_source_metadata", False)),
         )
     except ClientValidationError as exc:
         payload = {"error": exc.error, "details": exc.details}
@@ -557,7 +618,9 @@ async def handle_search_code(
                 "semantic_fallback_status": "refused_not_ready",
                 "semantic_readiness": semantic_readiness,
                 "message": result.message,
-                "remediation": semantic_readiness.get("remediation") if semantic_readiness else None,
+                "remediation": (
+                    semantic_readiness.get("remediation") if semantic_readiness else None
+                ),
             }
         )
     if result.code == "semantic_search_failed":
@@ -619,6 +682,7 @@ async def handle_search_code(
             or history_repos
             or include_source_metadata
         )
+        search_response: dict[str, Any] | list[dict[str, Any]]
         if semantic or filtered_or_enriched:
             search_response = {
                 "results": results_data,
@@ -667,12 +731,8 @@ async def handle_search_code(
         if semantic:
             response_data["semantic_requested"] = True
             response_data["semantic_source"] = "semantic"
-            response_data["semantic_profile_id"] = (
-                result.semantic_profile_id
-            )
-            response_data["semantic_collection_name"] = (
-                result.semantic_collection_name
-            )
+            response_data["semantic_profile_id"] = result.semantic_profile_id
+            response_data["semantic_collection_name"] = result.semantic_collection_name
             response_data["semantic_fallback_status"] = "not_attempted"
         if source_type:
             response_data["source_type"] = source_type
@@ -712,13 +772,19 @@ def _build_repositories(repo_resolver: Any, dispatcher: Any = None) -> list:
         semantic_readiness = None
         if dispatcher is not None and hasattr(dispatcher, "get_runtime_feature_status"):
             try:
-                ctx = repo_resolver.resolve(info.path)
-                if ctx is not None:
-                    features = dispatcher.get_runtime_feature_status(ctx)
-                    semantic_readiness = ReadinessClassifier.classify_semantic_registered(
-                        ctx.registry_entry,
-                        ctx.sqlite_store,
+                readiness = _classify_ctx(repo_resolver, str(info.path))
+                if readiness is not None and readiness.ready:
+                    ctx = (
+                        repo_resolver.resolve_ready(info.path)
+                        if isinstance(repo_resolver, RepoResolver)
+                        else repo_resolver.resolve(info.path)
                     )
+                    if ctx is not None:
+                        features = dispatcher.get_runtime_feature_status(ctx)
+                        semantic_readiness = ReadinessClassifier.classify_semantic_registered(
+                            ctx.registry_entry,
+                            ctx.sqlite_store,
+                        )
             except Exception:
                 features = None
         rows.append(
@@ -795,16 +861,21 @@ async def handle_get_status(
         ),
     }
     if _is_enhanced:
-        semantic_active = bool(
-            getattr(dispatcher, "_semantic_registry", None)
-            or getattr(dispatcher, "_semantic_indexer_fallback", None)
-        )
+        semantic_configured = bool(getattr(dispatcher, "_semantic_enabled", False))
+        semantic_active = False
+        if ctx is not None and hasattr(dispatcher, "get_runtime_feature_status"):
+            try:
+                runtime_features = dispatcher.get_runtime_feature_status(ctx)  # type: ignore[call-arg]
+                semantic_active = runtime_features.get("semantic", {}).get("status") == "available"
+            except Exception:
+                semantic_active = False
         features.update(
             {
                 "dynamic_loading": getattr(dispatcher, "_use_factory", False),
                 "lazy_loading": getattr(dispatcher, "_lazy_load", False),
                 "advanced_features": getattr(dispatcher, "_enable_advanced", False),
-                "semantic_search_enabled": getattr(dispatcher, "_semantic_enabled", False),
+                "semantic_search_configured": semantic_configured,
+                "semantic_search_enabled": semantic_active,
                 "semantic_indexer_active": semantic_active,
             }
         )
@@ -920,14 +991,17 @@ async def handle_reindex(
     sqlite_store: Any = None,
     request_experimental: Any = None,
     task_registry: Any = None,
+    git_index_manager: Optional["GitAwareIndexManager"] = None,
 ) -> Sequence[types.TextContent] | types.CreateTaskResult:
     path = (arguments or {}).get("path")
     repository = (arguments or {}).get("repository")
+    repository_readiness = _classify_ctx(repo_resolver, repository) if repository else None
 
     # Sandbox check for repository when it looks like a path
-    if repository and _looks_like_path(repository):
+    repository_path = _repository_selector_path(repository, repository_readiness)
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -935,7 +1009,7 @@ async def handle_reindex(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -945,12 +1019,14 @@ async def handle_reindex(
 
     # Conflict detection: both path and repository provided but resolve to different repos
     if path and repository:
-        ctx_from_path = _resolve_ctx(repo_resolver, str(path))
-        ctx_from_repo = _resolve_ctx(repo_resolver, repository)
+        readiness_from_path = _classify_ctx(repo_resolver, str(path))
+        readiness_from_repo = repository_readiness
         if (
-            ctx_from_path is not None
-            and ctx_from_repo is not None
-            and ctx_from_path.repo_id != ctx_from_repo.repo_id
+            readiness_from_path is not None
+            and readiness_from_repo is not None
+            and readiness_from_path.repository_id is not None
+            and readiness_from_repo.repository_id is not None
+            and readiness_from_path.repository_id != readiness_from_repo.repository_id
         ):
             return _json_text_response(
                 {
@@ -963,18 +1039,82 @@ async def handle_reindex(
             )
 
     scope_arg = repository or (str(path) if path else None)
-    readiness = _classify_ctx(repo_resolver, scope_arg)
+    readiness = repository_readiness if repository else _classify_ctx(repo_resolver, scope_arg)
+    alias_bypasses_sandbox = path is None and _is_exact_registered_selector(readiness)
     if readiness is not None and not readiness.ready:
-        return _secondary_readiness_refusal_response(readiness, "reindex")
+        if readiness.state not in _RECOVERABLE_REINDEX_STATES:
+            return _secondary_readiness_refusal_response(readiness, "reindex")
+
+        registered_path = (
+            Path(readiness.registered_path).expanduser() if readiness.registered_path else None
+        )
+        recovery_target = Path(path).expanduser() if path else registered_path
+        allowed = _allowed_roots()
+        whole_repository = (
+            registered_path is not None
+            and recovery_target is not None
+            and recovery_target.resolve(strict=False) == registered_path.resolve(strict=False)
+            and not recovery_target.is_file()
+        )
+        if recovery_target is None or not recovery_target.exists():
+            return _json_text_response(
+                {"error": "Path not found", "path": str(recovery_target or scope_arg)}
+            )
+        if not alias_bypasses_sandbox and not _path_within_allowed(recovery_target, allowed):
+            return _json_text_response(
+                {
+                    "error": "Path outside allowed roots",
+                    "code": "path_outside_allowed_roots",
+                    "path": str(recovery_target.resolve()),
+                    "allowed_roots": [str(root) for root in allowed],
+                    "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+                }
+            )
+        if git_index_manager is None or not whole_repository or readiness.repository_id is None:
+            return _json_text_response(
+                {
+                    "error": "Full repository rebuild required",
+                    "code": "full_rebuild_required",
+                    "readiness": readiness.to_dict(),
+                    "mutation_performed": False,
+                    "hint": "Reindex the registered repository without a file or nested path scope.",
+                }
+            )
+        sync_result = git_index_manager.rebuild_repository_index(readiness.repository_id)
+        if sync_result.action != "full_index":
+            return _json_text_response(
+                {
+                    "error": "Reindex failed",
+                    "code": sync_result.code or "reindex_failed",
+                    "details": sync_result.error,
+                    "readiness": sync_result.readiness,
+                    "mutation_performed": False,
+                }
+            )
+        return _json_text_response(
+            {
+                "path": str(recovery_target),
+                "mode": "staged_full",
+                "indexed_files": sync_result.files_processed,
+                "mutation_performed": True,
+                "commit": sync_result.commit,
+                "recovery": sync_result.readiness,
+                "semantic": sync_result.semantic,
+            }
+        )
 
     # Resolve ctx — repository takes precedence when both are set and consistent
     ctx = _resolve_ctx(repo_resolver, scope_arg)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("reindex")
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     allowed = _allowed_roots()
     # Determine target_path: prefer ctx.workspace_root when ctx resolved, else path
     if path:
         target_path = Path(path).expanduser()
+        if ctx is not None and not target_path.is_absolute():
+            target_path = ctx.workspace_root / target_path
     elif ctx is not None:
         target_path = ctx.workspace_root
     else:
@@ -983,7 +1123,9 @@ async def handle_reindex(
     if not target_path.exists():
         return _json_text_response({"error": "Path not found", "path": str(target_path)})
 
-    if not _path_within_allowed(target_path, allowed):
+    target_path = target_path.resolve(strict=True)
+
+    if not alias_bypasses_sandbox and not _path_within_allowed(target_path, allowed):
         return _json_text_response(
             {
                 "error": "Path outside allowed roots",
@@ -991,6 +1133,50 @@ async def handle_reindex(
                 "path": str(target_path.resolve()),
                 "allowed_roots": [str(r) for r in allowed],
                 "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+            }
+        )
+
+    if ctx is not None:
+        workspace_root = ctx.workspace_root.expanduser().resolve(strict=True)
+        try:
+            target_path.relative_to(workspace_root)
+        except ValueError:
+            return _json_text_response(
+                {
+                    "error": "Reindex path is outside the selected repository",
+                    "code": "path_outside_selected_repository",
+                    "repository_id": ctx.repo_id,
+                    "path": str(target_path),
+                    "mutation_performed": False,
+                }
+            )
+
+    whole_repository = (
+        ctx is not None
+        and target_path.resolve(strict=False) == ctx.workspace_root.resolve(strict=False)
+        and not target_path.is_file()
+    )
+    if git_index_manager is not None and whole_repository and ctx is not None:
+        sync_result = git_index_manager.rebuild_repository_index(ctx.repo_id)
+        if sync_result.action != "full_index":
+            return _json_text_response(
+                {
+                    "error": "Reindex failed",
+                    "code": sync_result.code or "reindex_failed",
+                    "details": sync_result.error,
+                    "readiness": sync_result.readiness,
+                    "mutation_performed": False,
+                }
+            )
+        return _json_text_response(
+            {
+                "path": str(target_path),
+                "mode": "staged_full",
+                "indexed_files": sync_result.files_processed,
+                "mutation_performed": True,
+                "commit": sync_result.commit,
+                "recovery": sync_result.readiness,
+                "semantic": sync_result.semantic,
             }
         )
 
@@ -1133,10 +1319,12 @@ async def handle_write_summaries(
     from mcp_server.indexing.summarization import ComprehensiveChunkWriter
 
     repository = (arguments or {}).get("repository")
+    readiness = _classify_ctx(repo_resolver, repository)
+    repository_path = _repository_selector_path(repository, readiness)
 
-    if repository and _looks_like_path(repository):
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -1144,7 +1332,7 @@ async def handle_write_summaries(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -1152,11 +1340,12 @@ async def handle_write_summaries(
                 )
             ]
 
-    readiness = _classify_ctx(repo_resolver, repository)
     if readiness is not None and not readiness.ready:
         return _secondary_readiness_refusal_response(readiness, "write_summaries")
 
     ctx = _resolve_ctx(repo_resolver, repository)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("write_summaries")
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
@@ -1250,10 +1439,15 @@ async def handle_summarize_sample(
     from mcp_server.indexing.summarization import FileBatchSummarizer
 
     repository = (arguments or {}).get("repository")
+    paths_arg = (arguments or {}).get("paths")
+    repository_readiness = (
+        _classify_ctx(repo_resolver, repository) if repository or not paths_arg else None
+    )
+    repository_path = _repository_selector_path(repository, repository_readiness)
 
-    if repository and _looks_like_path(repository):
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -1261,7 +1455,7 @@ async def handle_summarize_sample(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -1269,13 +1463,8 @@ async def handle_summarize_sample(
                 )
             ]
 
-    paths_arg = (arguments or {}).get("paths")
     n_arg = int((arguments or {}).get("n", 3))
     persist_flag = bool((arguments or {}).get("persist", False))
-
-    repository_readiness = (
-        _classify_ctx(repo_resolver, repository) if repository or not paths_arg else None
-    )
 
     if paths_arg:
         allowed = _allowed_roots()
@@ -1344,6 +1533,8 @@ async def handle_summarize_sample(
         scope_arg = str(paths_arg[0])
 
     ctx = _resolve_ctx(repo_resolver, scope_arg)
+    if ctx is None and isinstance(repo_resolver, RepoResolver):
+        return _resolution_transition_response("summarize_sample")
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
@@ -1428,7 +1619,7 @@ async def handle_summarize_sample(
         )
 
         try:
-            summaries = await summarizer.summarize_file_chunks(
+            summary_result = await summarizer.summarize_file_chunks(
                 file_id=file_id,
                 file_path=file_path,
                 file_content=file_content,
@@ -1440,6 +1631,7 @@ async def handle_summarize_sample(
             file_results.append({"file_path": file_path, "error": str(_e)})
             continue
 
+        summaries = summary_result.summaries
         chunk_meta = {c["chunk_id"]: c for c in chunks}
         summary_list = []
         for s in summaries:
@@ -1453,11 +1645,18 @@ async def handle_summarize_sample(
                 }
             )
 
-        total_chunks += len(summaries)
+        total_chunks += summary_result.summaries_written
         file_results.append(
             {
                 "file_path": file_path,
                 "chunk_count": len(summaries),
+                "chunks_attempted": summary_result.chunks_attempted,
+                "summaries_written": summary_result.summaries_written,
+                "authoritative_chunks": summary_result.authoritative_chunks,
+                "missing_chunk_ids": list(summary_result.missing_chunk_ids),
+                "remaining_chunks": summary_result.remaining_chunks,
+                "scope_drained": summary_result.scope_drained,
+                "blocked_call_reason": summary_result.blocked_call_reason,
                 "summaries": summary_list,
             }
         )

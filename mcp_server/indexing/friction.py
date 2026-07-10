@@ -18,9 +18,7 @@ class FrictionPatternConfig:
 
 def _compile_marker(marker: str) -> re.Pattern[str]:
     escaped = re.escape(marker)
-    return re.compile(
-        rf"(?i)\b{escaped}\b(?:\s*[:\-]\s*|\s+)?(?P<description>.*)$"
-    )
+    return re.compile(rf"(?i)\b{escaped}\b(?:\s*[:\-]\s*|\s+)?(?P<description>.*)$")
 
 
 FRICTION_PATTERN_CONFIGS: tuple[FrictionPatternConfig, ...] = (

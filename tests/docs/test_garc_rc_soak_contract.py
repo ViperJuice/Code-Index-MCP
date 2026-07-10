@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
-ACTIVE_STABLE_TAG = "v1.3.0"
+ACTIVE_STABLE_TAG = "v1.3.1"
 
 GA_CHECKLIST = REPO / "docs" / "validation" / "ga-readiness-checklist.md"
 GA_GOVERNANCE = REPO / "docs" / "validation" / "ga-governance-evidence.md"
@@ -52,12 +52,9 @@ def test_rc8_contract_surfaces_are_frozen():
 
     workflow = _read(RELEASE_WORKFLOW)
     assert f"default: '{ACTIVE_STABLE_TAG}'" in workflow
-    assert "release_type=custom" in "\n".join(
-        [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
-    )
-    assert "auto_merge=false" in "\n".join(
-        [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
-    )
+    assert "default: 'prepare'" in workflow
+    assert "inputs.mode == 'publish' && github.ref == 'refs/heads/main'" in workflow
+    assert "auto_merge=false" in "\n".join([_read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)])
 
 
 def test_public_surfaces_preserve_rc_only_channel_posture():

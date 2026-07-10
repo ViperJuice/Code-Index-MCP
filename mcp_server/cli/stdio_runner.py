@@ -79,6 +79,7 @@ _indexing_total_files: int = 0
 _indexing_started_at: Optional[float] = None
 _repo_resolver: Any = None
 _store_registry: Any = None
+_git_index_manager: Any = None
 _local_ctx: Any = None  # RepoContext for the local repo, built by initialize_services()
 _task_registry: MCPTaskRegistry | None = None
 
@@ -98,7 +99,7 @@ class _LocalRepoResolver:
         return _local_ctx
 
 
-_REPOSITORY_DESCRIPTION = "Repository ID, path, or git URL. Defaults to current repository."
+_REPOSITORY_DESCRIPTION = "Exact registered repository ID, registered name, or registered path."
 _PATH_OUTSIDE_ALLOWED_ROOTS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -476,9 +477,7 @@ def _build_tool_list() -> list[types.Tool]:
                                         "last_indexed": {"type": ["string", "null"]},
                                         "semantic_source": {"type": ["string", "null"]},
                                         "semantic_profile_id": {"type": ["string", "null"]},
-                                        "semantic_collection_name": {
-                                            "type": ["string", "null"]
-                                        },
+                                        "semantic_collection_name": {"type": ["string", "null"]},
                                         "source_metadata": {"type": ["object", "null"]},
                                         "_usage_hint": {"type": "string"},
                                     },
@@ -876,9 +875,10 @@ async def _graceful_shutdown(
     ref_poller: Any,
     store_registry: Any,
     exporter: Any,
+    dispatcher: Any = None,
     timeout: float = 5.0,
 ) -> None:
-    """Stop watcher -> poller -> store -> exporter in order, each bounded by timeout."""
+    """Stop watcher, poller, dispatcher, store, and exporter with bounded waits."""
     global _shutdown_called
     if _shutdown_called:
         logger.debug("_graceful_shutdown: already called, skipping")
@@ -904,6 +904,16 @@ async def _graceful_shutdown(
             logger.warning("RefPoller.stop timed out after %.1fs", timeout)
         except Exception as exc:
             logger.warning("RefPoller.stop error: %s", exc)
+
+    if dispatcher is not None:
+        try:
+            logger.info("Shutting down dispatcher plugin workers...")
+            await asyncio.wait_for(asyncio.to_thread(dispatcher.shutdown), timeout=timeout)
+            logger.info("Dispatcher plugin workers shut down")
+        except asyncio.TimeoutError:
+            logger.warning("Dispatcher.shutdown timed out after %.1fs", timeout)
+        except Exception as exc:
+            logger.warning("Dispatcher.shutdown error: %s", exc)
 
     if store_registry is not None:
         try:
@@ -1067,7 +1077,11 @@ async def initialize_services() -> None:
 
                 from mcp_server.core.repo_context import RepoContext
                 from mcp_server.storage.multi_repo_manager import RepositoryInfo
-                from mcp_server.storage.repo_identity import compute_repo_id
+                from mcp_server.storage.repo_identity import (
+                    _run_git,
+                    compute_repo_id,
+                    resolve_tracked_branch,
+                )
 
                 _repo_id_result = compute_repo_id(current_dir)
                 _repo_id = (
@@ -1075,6 +1089,10 @@ async def initialize_services() -> None:
                     if hasattr(_repo_id_result, "repo_id")
                     else str(_repo_id_result)
                 )
+                _git_common_dir = getattr(_repo_id_result, "git_common_dir", None)
+                _current_commit = _run_git(["rev-parse", "HEAD"], current_dir)
+                _current_branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], current_dir)
+                _tracked_branch = resolve_tracked_branch(_git_common_dir)
                 _reg_entry = RepositoryInfo(
                     repository_id=_repo_id,
                     name=current_dir.name,
@@ -1084,45 +1102,20 @@ async def initialize_services() -> None:
                     total_files=0,
                     total_symbols=0,
                     indexed_at=_dt.now(),
-                    tracked_branch="",
+                    current_commit=_current_commit,
+                    current_branch=_current_branch,
+                    tracked_branch=_tracked_branch,
+                    git_common_dir=(str(_git_common_dir) if _git_common_dir else None),
                 )
                 _local_ctx = RepoContext(
                     repo_id=_repo_id,
                     sqlite_store=sqlite_store,
                     workspace_root=current_dir,
-                    tracked_branch="",
+                    tracked_branch=_tracked_branch,
                     registry_entry=_reg_entry,
                 )
             except Exception as _ctx_err:
                 logger.debug(f"Could not build local RepoContext (non-fatal): {_ctx_err}")
-
-        # Pre-create plugins with sqlite_store so BM25 indexing persists via ctx.repo_id lookup
-        # This ensures _match_plugin finds a store-aware plugin before lazy-loading a bare one.
-        if (
-            _local_ctx is not None
-            and isinstance(dispatcher, EnhancedDispatcher)
-            and sqlite_store is not None
-        ):
-            try:
-                from mcp_server.plugins.plugin_factory import PluginFactory as _PF
-
-                _languages_to_preload = ["python", "javascript", "typescript", "go", "rust", "java"]
-                for _lang in _languages_to_preload:
-                    try:
-                        # Only pre-load if not already in _legacy_plugins
-                        _already = any(
-                            getattr(_p, "lang", None) == _lang
-                            or getattr(_p, "lang_id", None) == _lang
-                            for _p in getattr(dispatcher, "_legacy_plugins", [])
-                        )
-                        if not _already:
-                            _store_plugin = _PF.create_plugin(_lang, sqlite_store=sqlite_store)
-                            if _store_plugin is not None:
-                                dispatcher._legacy_plugins.insert(0, _store_plugin)
-                    except Exception:
-                        pass
-            except Exception as _inj_err:
-                logger.debug(f"Plugin preload with store failed (non-fatal): {_inj_err}")
 
         if isinstance(dispatcher, EnhancedDispatcher) and not (
             getattr(dispatcher, "_semantic_registry", None)
@@ -1204,6 +1197,18 @@ async def initialize_services() -> None:
                                     pass
                     if _captured_store:
                         _captured_store.rebuild_fts_code()
+                    if (
+                        _captured_ctx is not None
+                        and _captured_ctx.registry_entry.current_commit
+                        and int(stats.get("failed_files", stats.get("failed", 0)) or 0) == 0
+                    ):
+                        _captured_ctx.registry_entry.last_indexed_commit = (
+                            _captured_ctx.registry_entry.current_commit
+                        )
+                        _captured_ctx.registry_entry.last_indexed_branch = (
+                            _captured_ctx.registry_entry.current_branch
+                        )
+                        _captured_ctx.registry_entry.last_indexed = _dt.now()
                     logger.info(f"Background initial index complete: {stats}")
                 except Exception as _idx_err:
                     logger.error(f"Background initial index failed: {_idx_err}")
@@ -1245,6 +1250,34 @@ async def call_tool(
 ) -> types.CallToolResult | types.CreateTaskResult:
     global _lazy_summarizer, _init_lock, _gate
 
+    # Authenticate before request-scoped setup or any lazy service side effects.
+    if _gate is None:
+        _gate = HandshakeGate()
+        if not _gate.enabled:
+            logger.warning("running unauthenticated \u2014 MCP_CLIENT_SECRET not set")
+    gate_error = _gate.check(name, arguments or {})
+    if gate_error is not None:
+        return _to_call_tool_result(
+            [types.TextContent(type="text", text=tool_handlers._ensure_response(gate_error))]
+        )
+
+    if name == "handshake":
+        logger.info("=== MCP Tool Call: handshake args=%s ===", {"secret": "[REDACTED]"})
+        start_time = time.time()
+        secret = (arguments or {}).get("secret", "")
+        payload: dict[str, Any]
+        if _gate.verify(secret):
+            payload = {"authenticated": True}
+            tool_status = "success"
+        else:
+            payload = {"error": "Invalid secret.", "code": "handshake_required"}
+            tool_status = "error"
+        record_tool_call(name, tool_status)
+        logger.info("=== MCP Tool Response: handshake (%.2fs) ===", time.time() - start_time)
+        return _to_call_tool_result(
+            [types.TextContent(type="text", text=tool_handlers._ensure_response(payload))]
+        )
+
     _current_session = None
     _client_name = None
     _request_experimental = None
@@ -1260,11 +1293,11 @@ async def call_tool(
         logger.debug("request_ctx not available: %s", _e)
 
     # Lazy initialize on first call
-    if sqlite_store is None and initialization_error is None:
+    if dispatcher is None and sqlite_store is None and initialization_error is None:
         if _init_lock is None:
             _init_lock = asyncio.Lock()
         async with _init_lock:
-            if sqlite_store is None and initialization_error is None:
+            if dispatcher is None and sqlite_store is None and initialization_error is None:
                 await initialize_services()
 
     if initialization_error:
@@ -1304,22 +1337,7 @@ async def call_tool(
     elif _lazy_summarizer is not None and _current_session is not None:
         _lazy_summarizer.update_session(_current_session)
 
-    # Gate check before logging to avoid leaking the handshake secret.
-    if _gate is None:
-        _gate = HandshakeGate()
-        if not _gate.enabled:
-            logger.warning("running unauthenticated \u2014 MCP_CLIENT_SECRET not set")
-    _gate_err = _gate.check(name, arguments or {})
-    if _gate_err is not None:
-        return _to_call_tool_result(
-            [types.TextContent(type="text", text=tool_handlers._ensure_response(_gate_err))]
-        )
-
-    log_arguments = arguments
-    if name == "handshake" and arguments is not None:
-        log_arguments = {"secret": "[REDACTED]"}
-
-    logger.info("=== MCP Tool Call: %s args=%s ===", name, log_arguments)
+    logger.info("=== MCP Tool Call: %s args=%s ===", name, arguments)
     start_time = time.time()
 
     _effective_resolver = (
@@ -1338,27 +1356,7 @@ async def call_tool(
         tool_def = next((tool for tool in _build_tool_list() if tool.name == name), None)
         if _request_experimental is not None and tool_def is not None:
             _request_experimental.validate_for_tool(tool_def)
-        if name == "handshake":
-            _secret = (arguments or {}).get("secret", "")
-            if _gate.verify(_secret):
-                response = [
-                    types.TextContent(
-                        type="text", text=tool_handlers._ensure_response({"authenticated": True})
-                    )
-                ]
-            else:
-                response = [
-                    types.TextContent(
-                        type="text",
-                        text=tool_handlers._ensure_response(
-                            {
-                                "error": "Invalid secret.",
-                                "code": "handshake_required",
-                            }
-                        ),
-                    )
-                ]
-        elif name == "symbol_lookup":
+        if name == "symbol_lookup":
             response = await tool_handlers.handle_symbol_lookup(
                 **common_kwargs,
                 sqlite_store=sqlite_store,
@@ -1395,6 +1393,7 @@ async def call_tool(
                 sqlite_store=sqlite_store,
                 request_experimental=_request_experimental,
                 task_registry=_task_registry,
+                git_index_manager=_git_index_manager,
             )
         elif name == "write_summaries":
             response = await tool_handlers.handle_write_summaries(
@@ -1487,6 +1486,7 @@ async def call_tool(
 async def _serve(registry_path=None) -> None:
     """Set up and run the MCP stdio server."""
     global _shutdown_called, _gate, _repo_resolver, _store_registry, _task_registry
+    global _git_index_manager, dispatcher
 
     _shutdown_called = False
 
@@ -1517,6 +1517,8 @@ async def _serve(registry_path=None) -> None:
     )
     _repo_resolver = repo_resolver
     _store_registry = store_registry
+    _git_index_manager = git_index_manager
+    dispatcher = _disp
 
     # Start Prometheus metrics exporter
     exporter = PrometheusExporter()
@@ -1556,7 +1558,14 @@ async def _serve(registry_path=None) -> None:
     def _handle_signal() -> None:
         logger.info("Signal received — initiating graceful shutdown")
         task = asyncio.create_task(
-            _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
+            _graceful_shutdown(
+                multi_watcher,
+                ref_poller,
+                store_registry,
+                exporter,
+                dispatcher=_disp,
+                timeout=5.0,
+            )
         )
         _shutdown_tasks.append(task)
 
@@ -1602,7 +1611,14 @@ async def _serve(registry_path=None) -> None:
                 raise_exceptions=True,
             )
     finally:
-        await _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
+        await _graceful_shutdown(
+            multi_watcher,
+            ref_poller,
+            store_registry,
+            exporter,
+            dispatcher=_disp,
+            timeout=5.0,
+        )
 
 
 def run() -> None:

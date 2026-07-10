@@ -33,6 +33,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+pytestmark = pytest.mark.requires_network
+
 
 def _find_repo_root(start: Path) -> Path:
     """Walk upward until a directory containing `mcp_server/__init__.py` is found.

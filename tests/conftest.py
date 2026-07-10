@@ -8,6 +8,7 @@ operations, and plugin functionality.
 
 import asyncio
 import os
+import socket
 from pathlib import Path
 from typing import Dict, List
 from unittest.mock import MagicMock, Mock
@@ -36,6 +37,7 @@ except Exception as exc:  # pragma: no cover - optional for non-API tests
     gateway_import_error = exc
 from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+from mcp_server.security import AuthManager, SecurityConfig, User, UserRole
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.watcher import FileWatcher
 
@@ -328,12 +330,40 @@ def file_watcher(temp_code_directory: Path, dispatcher_with_plugins: Dispatcher)
 
 # API client fixtures
 @pytest.fixture
-def test_client() -> TestClient:
+def test_client(tmp_path: Path, monkeypatch) -> TestClient:
     """Create a test client for the FastAPI app."""
     if app is None:
         pytest.skip(f"FastAPI app unavailable: {gateway_import_error}")
-    # Include a bearer token so the fallback auth path in get_current_user grants access
-    return TestClient(app, headers={"Authorization": "Bearer test-token"})
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MCP_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setenv("MCP_INDEX_STORAGE_PATH", str(tmp_path / ".indexes"))
+    monkeypatch.setenv("MCP_REPO_REGISTRY", str(tmp_path / "repository_registry.json"))
+    with TestClient(app) as client:
+        auth_mgr = getattr(client.app.state, "auth_manager", None)
+        if auth_mgr is None:
+            auth_mgr = AuthManager(
+                SecurityConfig(
+                    jwt_secret_key=os.environ["JWT_SECRET_KEY"],
+                    jwt_algorithm="HS256",
+                    access_token_expire_minutes=30,
+                )
+            )
+            client.app.state.auth_manager = auth_mgr
+
+        admin_user = asyncio.run(auth_mgr.get_user_by_username("pytest_admin"))
+        if admin_user is None:
+            admin_user = asyncio.run(
+                auth_mgr.create_user(
+                    username="pytest_admin",
+                    password="PytestAdminPass123!",
+                    email="pytest_admin@test.local",
+                    role=UserRole.ADMIN,
+                )
+            )
+
+        token = asyncio.run(auth_mgr.create_access_token(admin_user))
+        client.headers.update({"Authorization": f"Bearer {token}"})
+        yield client
 
 
 @pytest.fixture
@@ -407,7 +437,7 @@ def sample_search_results() -> List[SearchResult]:
 
 # Environment fixtures
 @pytest.fixture(autouse=True)
-def test_environment(monkeypatch):
+def test_environment(monkeypatch, tmp_path):
     """Set up test environment variables."""
     monkeypatch.setenv("MCP_TEST_MODE", "1")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -415,7 +445,8 @@ def test_environment(monkeypatch):
     monkeypatch.setenv("MCP_SKIP_PLUGIN_PREINDEX", "true")
     # Prevent tests from loading the local 3.6GB production vector store.
     # The dispatcher skips Qdrant init when QDRANT_PATH doesn't exist.
-    monkeypatch.setenv("QDRANT_PATH", "/tmp/_qdrant_test_no_such_dir_")
+    monkeypatch.setenv("QDRANT_PATH", str(tmp_path / "qdrant-not-created"))
+    monkeypatch.setenv("SEMANTIC_SEARCH_ENABLED", "false")
     # Clear .env.native workspace-specific vars that cause /workspaces permission errors
     for _var in (
         "MCP_REPO_REGISTRY",
@@ -423,6 +454,33 @@ def test_environment(monkeypatch):
         "MCP_WORKSPACE_ROOT",
     ):
         monkeypatch.delenv(_var, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def block_unmarked_network(request, monkeypatch):
+    """Fail tests that open TCP connections without an explicit marker."""
+    if request.node.get_closest_marker("requires_network") is not None:
+        return
+
+    original_connect = socket.socket.connect
+    original_connect_ex = socket.socket.connect_ex
+
+    def deny_connect(sock, address):
+        if sock.family == socket.AF_UNIX:
+            return original_connect(sock, address)
+        raise OSError(f"Unmarked test attempted a network connection to {address!r}")
+
+    def deny_connect_ex(sock, address):
+        if sock.family == socket.AF_UNIX:
+            return original_connect_ex(sock, address)
+        raise OSError(f"Unmarked test attempted a network connection to {address!r}")
+
+    def deny_create_connection(address, *args, **kwargs):
+        raise OSError(f"Unmarked test attempted a network connection to {address!r}")
+
+    monkeypatch.setattr(socket.socket, "connect", deny_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", deny_connect_ex)
+    monkeypatch.setattr(socket, "create_connection", deny_create_connection)
 
 
 # CWD fixtures

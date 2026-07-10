@@ -417,6 +417,10 @@ class TestMultiRepositoryManager:
         so we also stub ``sqlite3.connect`` and ``ConnectionPool`` to prevent
         that pre-open from raising ``OperationalError: unable to open database``.
         """
+        repo_path = manager.central_index_path.parent / "connection-cache-repo"
+        repo_path.mkdir()
+        mock_repo_info.path = repo_path
+        mock_repo_info.index_path = repo_path / ".mcp-index" / "index.db"
         manager.registry.register(mock_repo_info)
 
         with (

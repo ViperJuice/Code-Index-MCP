@@ -15,6 +15,7 @@ def test_history_ingest_wires_filters_and_prints_metadata_only_summary(monkeypat
         "mcp_server.cli.history_commands.get_command_availability",
         lambda _command: SimpleNamespace(available=True, resolved_path="/usr/bin/gh"),
     )
+
     def _fake_fetch(options):
         captured["options"] = options
         return []

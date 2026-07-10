@@ -57,7 +57,7 @@ def select_best_target_commit(artifacts: List[Dict[str, Any]]) -> Optional[str]:
     )
     for artifact in sorted_artifacts:
         if artifact.get("target_commit"):
-            return artifact["target_commit"]
+            return str(artifact["target_commit"])
         if artifact.get("commit"):
-            return artifact["commit"]
+            return str(artifact["commit"])
     return None

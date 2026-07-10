@@ -1,0 +1,817 @@
+{
+  "schema_version": "mypy_baseline.v1",
+  "command": [
+    "python",
+    "-m",
+    "mypy",
+    "mcp_server"
+  ],
+  "total_errors": 1562,
+  "counts": {
+    "mcp_server/artifacts/artifact_download.py": {
+      "arg-type": 2
+    },
+    "mcp_server/artifacts/multi_repo_artifact_coordinator.py": {
+      "arg-type": 1
+    },
+    "mcp_server/artifacts/providers/github_actions.py": {
+      "assignment": 2
+    },
+    "mcp_server/artifacts/publisher.py": {
+      "assignment": 1
+    },
+    "mcp_server/artifacts/secure_export.py": {
+      "arg-type": 2
+    },
+    "mcp_server/benchmarks/benchmark_runner.py": {
+      "arg-type": 1,
+      "assignment": 2,
+      "attr-defined": 13,
+      "call-arg": 1,
+      "index": 4,
+      "no-any-return": 1
+    },
+    "mcp_server/benchmarks/benchmark_suite.py": {
+      "arg-type": 11,
+      "assignment": 3,
+      "attr-defined": 2,
+      "index": 4,
+      "no-any-return": 3,
+      "return-value": 1
+    },
+    "mcp_server/benchmarks/mcp_comparison_benchmark.py": {
+      "arg-type": 3,
+      "attr-defined": 14,
+      "call-arg": 2
+    },
+    "mcp_server/benchmarks/quick_comparison.py": {
+      "assignment": 1,
+      "attr-defined": 4,
+      "var-annotated": 1
+    },
+    "mcp_server/benchmarks/run_baseline.py": {
+      "attr-defined": 6
+    },
+    "mcp_server/benchmarks/run_benchmarks.py": {
+      "attr-defined": 3
+    },
+    "mcp_server/cache/backends.py": {
+      "assignment": 1,
+      "misc": 1,
+      "no-any-return": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/cache/query_cache.py": {
+      "assignment": 4,
+      "attr-defined": 4,
+      "misc": 2
+    },
+    "mcp_server/cli/artifact_commands.py": {
+      "arg-type": 1,
+      "call-arg": 1
+    },
+    "mcp_server/cli/bootstrap.py": {
+      "arg-type": 2,
+      "assignment": 2,
+      "no-redef": 8
+    },
+    "mcp_server/cli/index_commands.py": {
+      "arg-type": 1,
+      "assignment": 5,
+      "attr-defined": 5,
+      "override": 5,
+      "var-annotated": 2
+    },
+    "mcp_server/cli/index_management.py": {
+      "arg-type": 1,
+      "call-arg": 2
+    },
+    "mcp_server/cli/preflight_commands.py": {
+      "arg-type": 1
+    },
+    "mcp_server/cli/stdio_runner.py": {
+      "arg-type": 22,
+      "assignment": 7,
+      "union-attr": 1
+    },
+    "mcp_server/cli/task_reindex.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/cli/task_write_summaries.py": {
+      "arg-type": 1,
+      "assignment": 1,
+      "return-value": 1
+    },
+    "mcp_server/cli/tool_handlers.py": {
+      "arg-type": 4,
+      "assignment": 1,
+      "no-any-return": 3,
+      "operator": 1
+    },
+    "mcp_server/client.py": {
+      "arg-type": 2,
+      "union-attr": 1
+    },
+    "mcp_server/config/index_paths.py": {
+      "assignment": 4,
+      "return-value": 1
+    },
+    "mcp_server/config/settings.py": {
+      "arg-type": 66,
+      "import-untyped": 1,
+      "no-any-return": 1,
+      "union-attr": 19
+    },
+    "mcp_server/core/ignore_patterns.py": {
+      "assignment": 3
+    },
+    "mcp_server/core/mcp_config_propagator.py": {
+      "no-any-return": 2
+    },
+    "mcp_server/core/preflight_validator.py": {
+      "arg-type": 1,
+      "attr-defined": 25,
+      "index": 24
+    },
+    "mcp_server/dependency_graph/aggregator.py": {
+      "attr-defined": 1
+    },
+    "mcp_server/dispatcher/cross_repo_coordinator.py": {
+      "arg-type": 2,
+      "assignment": 2,
+      "attr-defined": 6,
+      "call-arg": 1,
+      "index": 1,
+      "misc": 1,
+      "no-any-return": 1,
+      "return-value": 1,
+      "union-attr": 2
+    },
+    "mcp_server/dispatcher/dispatcher_enhanced.py": {
+      "arg-type": 12,
+      "assignment": 10,
+      "attr-defined": 4,
+      "call-overload": 1,
+      "index": 2,
+      "misc": 6,
+      "no-any-return": 6,
+      "operator": 30,
+      "return-value": 3,
+      "typeddict-item": 4,
+      "typeddict-unknown-key": 3,
+      "union-attr": 1,
+      "var-annotated": 3
+    },
+    "mcp_server/dispatcher/plugin_router.py": {
+      "var-annotated": 2
+    },
+    "mcp_server/dispatcher/result_aggregator.py": {
+      "arg-type": 6,
+      "attr-defined": 4,
+      "has-type": 4,
+      "misc": 2,
+      "operator": 7,
+      "return-value": 2,
+      "typeddict-item": 3
+    },
+    "mcp_server/dispatcher/simple_dispatcher.py": {
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/document_processing/base_document_plugin.py": {
+      "attr-defined": 3,
+      "override": 4,
+      "return-value": 2,
+      "typeddict-unknown-key": 1,
+      "var-annotated": 3
+    },
+    "mcp_server/document_processing/chunk_optimizer.py": {
+      "abstract": 1,
+      "var-annotated": 6
+    },
+    "mcp_server/document_processing/contextual_embeddings.py": {
+      "assignment": 1,
+      "misc": 1,
+      "no-any-return": 2,
+      "valid-type": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/document_processing/document_interfaces.py": {
+      "assignment": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/document_processing/metadata_extractor.py": {
+      "arg-type": 2,
+      "assignment": 2,
+      "import-untyped": 2,
+      "no-any-return": 2,
+      "no-redef": 1
+    },
+    "mcp_server/document_processing/semantic_chunker.py": {
+      "no-any-return": 1,
+      "var-annotated": 2
+    },
+    "mcp_server/gateway.py": {
+      "arg-type": 13,
+      "attr-defined": 5,
+      "index": 1,
+      "no-any-return": 1,
+      "return-value": 2,
+      "union-attr": 3,
+      "var-annotated": 2
+    },
+    "mcp_server/graph/context_selector.py": {
+      "assignment": 1,
+      "attr-defined": 2,
+      "no-any-return": 1
+    },
+    "mcp_server/health/repo_status.py": {
+      "arg-type": 1,
+      "no-any-return": 2
+    },
+    "mcp_server/indexer/bm25_indexer.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/indexer/hybrid_search.py": {
+      "arg-type": 1,
+      "assignment": 6,
+      "attr-defined": 4,
+      "index": 7,
+      "no-any-return": 3,
+      "return-value": 1,
+      "union-attr": 3,
+      "var-annotated": 2
+    },
+    "mcp_server/indexer/index_engine.py": {
+      "assignment": 1,
+      "misc": 1,
+      "no-any-return": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/indexer/reranker.py": {
+      "arg-type": 2,
+      "attr-defined": 16,
+      "method-assign": 1,
+      "no-any-return": 33,
+      "override": 5,
+      "return-value": 3,
+      "union-attr": 7
+    },
+    "mcp_server/indexing/baml_client/baml_client/async_client.py": {
+      "no-any-return": 2
+    },
+    "mcp_server/indexing/baml_client/baml_client/runtime.py": {
+      "assignment": 1,
+      "call-arg": 4,
+      "syntax": 1
+    },
+    "mcp_server/indexing/baml_client/baml_client/sync_client.py": {
+      "no-any-return": 2
+    },
+    "mcp_server/indexing/baml_client/baml_client/type_builder.py": {
+      "syntax": 6
+    },
+    "mcp_server/indexing/github_issues.py": {
+      "typeddict-item": 1
+    },
+    "mcp_server/indexing/incremental_indexer.py": {
+      "arg-type": 6,
+      "assignment": 2,
+      "no-any-return": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/indexing/lock_registry.py": {
+      "return-value": 1
+    },
+    "mcp_server/indexing/source_metadata.py": {
+      "return-value": 2,
+      "typeddict-item": 17
+    },
+    "mcp_server/interfaces/api_gateway_interfaces.py": {
+      "assignment": 2,
+      "metaclass": 1,
+      "misc": 1
+    },
+    "mcp_server/interfaces/cache_interfaces.py": {
+      "assignment": 7,
+      "metaclass": 1,
+      "misc": 1
+    },
+    "mcp_server/interfaces/dispatcher_interfaces.py": {
+      "assignment": 2,
+      "metaclass": 1,
+      "misc": 1
+    },
+    "mcp_server/interfaces/indexing_interfaces.py": {
+      "assignment": 6
+    },
+    "mcp_server/interfaces/metrics_interfaces.py": {
+      "assignment": 9
+    },
+    "mcp_server/interfaces/security_interfaces.py": {
+      "assignment": 6
+    },
+    "mcp_server/interfaces/shared_interfaces.py": {
+      "assignment": 17
+    },
+    "mcp_server/interfaces/storage_interfaces.py": {
+      "assignment": 28,
+      "metaclass": 3,
+      "misc": 3
+    },
+    "mcp_server/metrics/__init__.py": {
+      "assignment": 2,
+      "valid-type": 1
+    },
+    "mcp_server/metrics/health_check.py": {
+      "return-value": 1
+    },
+    "mcp_server/metrics/middleware.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/metrics/prometheus_exporter.py": {
+      "assignment": 2,
+      "misc": 1,
+      "no-redef": 1
+    },
+    "mcp_server/plugin_base_enhanced.py": {
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/plugin_system/cli.py": {
+      "arg-type": 1,
+      "attr-defined": 1,
+      "import-untyped": 2,
+      "union-attr": 4
+    },
+    "mcp_server/plugin_system/config.py": {
+      "arg-type": 3,
+      "assignment": 2,
+      "import-untyped": 1,
+      "union-attr": 10
+    },
+    "mcp_server/plugin_system/discovery.py": {
+      "assignment": 3,
+      "import-untyped": 1,
+      "no-any-return": 3,
+      "return-value": 1
+    },
+    "mcp_server/plugin_system/loader.py": {
+      "arg-type": 1,
+      "assignment": 6,
+      "attr-defined": 13,
+      "call-arg": 1,
+      "misc": 1,
+      "return-value": 1
+    },
+    "mcp_server/plugin_system/models.py": {
+      "import-untyped": 1
+    },
+    "mcp_server/plugin_system/plugin_manager.py": {
+      "call-arg": 1,
+      "no-any-return": 2,
+      "override": 1
+    },
+    "mcp_server/plugins/bm25_adapter_plugin.py": {
+      "override": 1,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/plugins/c_plugin/__init__.py": {
+      "assignment": 2
+    },
+    "mcp_server/plugins/c_plugin/plugin.py": {
+      "return-value": 7,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/c_plugin/plugin_semantic.py": {
+      "attr-defined": 4,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/plugins/cpp_plugin/__init__.py": {
+      "assignment": 2
+    },
+    "mcp_server/plugins/cpp_plugin/plugin.py": {
+      "assignment": 1,
+      "attr-defined": 5,
+      "override": 1,
+      "return-value": 1,
+      "typeddict-item": 2,
+      "typeddict-unknown-key": 1,
+      "var-annotated": 3
+    },
+    "mcp_server/plugins/cpp_plugin/plugin_semantic.py": {
+      "attr-defined": 4,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/plugins/csharp_plugin/namespace_resolver.py": {
+      "assignment": 1,
+      "attr-defined": 1,
+      "dict-item": 3,
+      "index": 1,
+      "union-attr": 10,
+      "valid-type": 4,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/csharp_plugin/nuget_integration.py": {
+      "assignment": 8,
+      "index": 1,
+      "no-any-return": 1,
+      "return-value": 1,
+      "union-attr": 9,
+      "var-annotated": 3
+    },
+    "mcp_server/plugins/csharp_plugin/plugin.py": {
+      "misc": 2,
+      "no-any-return": 2,
+      "typeddict-item": 4,
+      "typeddict-unknown-key": 4
+    },
+    "mcp_server/plugins/csharp_plugin/type_analyzer.py": {
+      "assignment": 9,
+      "index": 1,
+      "return-value": 2,
+      "union-attr": 2,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/dart_plugin/__init__.py": {
+      "assignment": 2
+    },
+    "mcp_server/plugins/dart_plugin/plugin.py": {
+      "override": 1,
+      "return-value": 1,
+      "typeddict-unknown-key": 1,
+      "var-annotated": 3
+    },
+    "mcp_server/plugins/dart_plugin/plugin_semantic.py": {
+      "attr-defined": 4,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/plugins/generic_treesitter_plugin.py": {
+      "return-value": 1
+    },
+    "mcp_server/plugins/go_plugin/interface_checker.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/plugins/go_plugin/module_resolver.py": {
+      "union-attr": 2
+    },
+    "mcp_server/plugins/go_plugin/plugin.py": {
+      "return-value": 1,
+      "typeddict-item": 2,
+      "typeddict-unknown-key": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/html_css_plugin/__init__.py": {
+      "assignment": 2
+    },
+    "mcp_server/plugins/html_css_plugin/plugin.py": {
+      "arg-type": 12,
+      "attr-defined": 7,
+      "call-arg": 3,
+      "override": 1,
+      "return-value": 1,
+      "typeddict-item": 2,
+      "typeddict-unknown-key": 1,
+      "union-attr": 1,
+      "var-annotated": 4
+    },
+    "mcp_server/plugins/html_css_plugin/plugin_semantic.py": {
+      "attr-defined": 4,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/plugins/java_plugin/build_system.py": {
+      "assignment": 1,
+      "union-attr": 6,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/java_plugin/import_resolver.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/plugins/java_plugin/plugin.py": {
+      "arg-type": 1,
+      "attr-defined": 7,
+      "no-any-return": 2,
+      "override": 3,
+      "return-value": 3,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/java_plugin/type_analyzer.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/plugins/js_plugin/__init__.py": {
+      "assignment": 2
+    },
+    "mcp_server/plugins/js_plugin/plugin.py": {
+      "assignment": 2,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 2,
+      "union-attr": 3,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/js_plugin/plugin_semantic.py": {
+      "arg-type": 3,
+      "assignment": 3,
+      "misc": 1,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1,
+      "union-attr": 3
+    },
+    "mcp_server/plugins/kotlin_plugin/coroutines_analyzer.py": {
+      "assignment": 6,
+      "operator": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/kotlin_plugin/java_interop.py": {
+      "assignment": 6,
+      "attr-defined": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/kotlin_plugin/null_safety.py": {
+      "assignment": 3,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/kotlin_plugin/plugin.py": {
+      "assignment": 2,
+      "attr-defined": 3,
+      "misc": 1,
+      "no-any-return": 2,
+      "return-value": 1,
+      "union-attr": 4,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/language_registry.py": {
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/markdown_plugin/chunk_strategies.py": {
+      "var-annotated": 8
+    },
+    "mcp_server/plugins/markdown_plugin/document_parser.py": {
+      "attr-defined": 6,
+      "dict-item": 3,
+      "index": 3,
+      "misc": 1,
+      "union-attr": 1,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/markdown_plugin/frontmatter_parser.py": {
+      "arg-type": 1,
+      "assignment": 1,
+      "attr-defined": 1,
+      "import-untyped": 2,
+      "no-redef": 2,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/markdown_plugin/plugin.py": {
+      "arg-type": 1,
+      "assignment": 1,
+      "no-any-return": 2,
+      "override": 2,
+      "typeddict-unknown-key": 2,
+      "var-annotated": 4
+    },
+    "mcp_server/plugins/markdown_plugin/section_extractor.py": {
+      "no-any-return": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/plaintext_plugin/nlp_processor.py": {
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/plaintext_plugin/paragraph_detector.py": {
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/plaintext_plugin/plugin.py": {
+      "arg-type": 1,
+      "assignment": 1,
+      "attr-defined": 2,
+      "override": 2,
+      "return-value": 3,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/plaintext_plugin/sentence_splitter.py": {
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/plaintext_plugin/topic_extractor.py": {
+      "assignment": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/plugin_factory.py": {
+      "arg-type": 1,
+      "assignment": 4,
+      "call-overload": 22
+    },
+    "mcp_server/plugins/python_plugin/__init__.py": {
+      "assignment": 2
+    },
+    "mcp_server/plugins/python_plugin/plugin.py": {
+      "return-value": 3,
+      "union-attr": 2
+    },
+    "mcp_server/plugins/python_plugin/plugin_semantic.py": {
+      "attr-defined": 11,
+      "no-any-return": 1,
+      "return-value": 1,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1,
+      "union-attr": 2
+    },
+    "mcp_server/plugins/repository_plugin_loader.py": {
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/rust_plugin/cargo_integration.py": {
+      "assignment": 6,
+      "import-untyped": 1,
+      "no-any-return": 2,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/rust_plugin/plugin.py": {
+      "attr-defined": 3,
+      "no-any-return": 1,
+      "typeddict-item": 4,
+      "typeddict-unknown-key": 5,
+      "var-annotated": 4
+    },
+    "mcp_server/plugins/rust_plugin/trait_analyzer.py": {
+      "valid-type": 3
+    },
+    "mcp_server/plugins/simple_text_plugin.py": {
+      "assignment": 2,
+      "attr-defined": 1,
+      "call-arg": 2,
+      "override": 3,
+      "return-value": 5,
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 2
+    },
+    "mcp_server/plugins/specialized_plugin_base.py": {
+      "override": 4,
+      "return-value": 1,
+      "typeddict-unknown-key": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/swift_plugin/module_analyzer.py": {
+      "assignment": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/swift_plugin/objc_bridge.py": {
+      "assignment": 3,
+      "attr-defined": 3
+    },
+    "mcp_server/plugins/swift_plugin/plugin.py": {
+      "assignment": 1,
+      "typeddict-unknown-key": 1,
+      "union-attr": 2,
+      "var-annotated": 2
+    },
+    "mcp_server/plugins/swift_plugin/protocol_checker.py": {
+      "assignment": 5,
+      "attr-defined": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/typescript_plugin/declaration_handler.py": {
+      "no-any-return": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/typescript_plugin/plugin.py": {
+      "arg-type": 3,
+      "assignment": 2,
+      "misc": 1,
+      "typeddict-item": 2,
+      "typeddict-unknown-key": 3,
+      "var-annotated": 1
+    },
+    "mcp_server/plugins/typescript_plugin/tsconfig_parser.py": {
+      "no-any-return": 6
+    },
+    "mcp_server/plugins/typescript_plugin/type_system.py": {
+      "arg-type": 3,
+      "assignment": 1,
+      "index": 2,
+      "no-any-return": 2,
+      "return-value": 4,
+      "union-attr": 2
+    },
+    "mcp_server/sandbox/worker_main.py": {
+      "arg-type": 2,
+      "assignment": 1,
+      "attr-defined": 3,
+      "no-any-return": 3
+    },
+    "mcp_server/setup/semantic_preflight.py": {
+      "arg-type": 2
+    },
+    "mcp_server/storage/git_index_manager.py": {
+      "arg-type": 1,
+      "assignment": 1,
+      "no-any-return": 1,
+      "var-annotated": 1
+    },
+    "mcp_server/storage/index_manager.py": {
+      "no-any-return": 4
+    },
+    "mcp_server/storage/multi_repo_manager.py": {
+      "assignment": 2,
+      "attr-defined": 5,
+      "index": 1,
+      "operator": 2,
+      "union-attr": 12,
+      "var-annotated": 1
+    },
+    "mcp_server/storage/repository_registry.py": {
+      "var-annotated": 1
+    },
+    "mcp_server/storage/sqlite_store.py": {
+      "arg-type": 3,
+      "attr-defined": 3,
+      "index": 2,
+      "list-item": 1,
+      "no-any-return": 13,
+      "union-attr": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/storage/store_registry.py": {
+      "misc": 1
+    },
+    "mcp_server/utils/chunker_adapter.py": {
+      "typeddict-item": 1,
+      "typeddict-unknown-key": 1
+    },
+    "mcp_server/utils/direct_searcher.py": {
+      "assignment": 2,
+      "attr-defined": 6,
+      "no-any-return": 1
+    },
+    "mcp_server/utils/embedding_providers.py": {
+      "return-value": 1
+    },
+    "mcp_server/utils/fuzzy_indexer.py": {
+      "assignment": 1,
+      "misc": 1,
+      "union-attr": 1
+    },
+    "mcp_server/utils/index_discovery.py": {
+      "assignment": 6,
+      "call-arg": 1,
+      "index": 1,
+      "no-any-return": 9,
+      "union-attr": 5,
+      "var-annotated": 1
+    },
+    "mcp_server/utils/mcp_client_wrapper.py": {
+      "arg-type": 1,
+      "attr-defined": 2,
+      "var-annotated": 1
+    },
+    "mcp_server/utils/mcp_health_check.py": {
+      "arg-type": 1,
+      "assignment": 1,
+      "attr-defined": 24,
+      "index": 20,
+      "return-value": 1
+    },
+    "mcp_server/utils/semantic_discovery.py": {
+      "arg-type": 1,
+      "attr-defined": 5,
+      "return-value": 1
+    },
+    "mcp_server/utils/semantic_indexer.py": {
+      "arg-type": 4,
+      "assignment": 7,
+      "attr-defined": 5,
+      "no-any-return": 2,
+      "union-attr": 1,
+      "var-annotated": 2
+    },
+    "mcp_server/utils/sub_agent_helper.py": {
+      "var-annotated": 2
+    },
+    "mcp_server/utils/token_counter.py": {
+      "index": 2
+    },
+    "mcp_server/utils/treesitter_wrapper.py": {
+      "no-any-return": 1
+    },
+    "mcp_server/watcher/file_watcher.py": {
+      "arg-type": 10,
+      "call-arg": 5
+    },
+    "mcp_server/watcher_multi_repo.py": {
+      "arg-type": 1,
+      "index": 1,
+      "no-any-return": 1,
+      "var-annotated": 4
+    }
+  }
+}

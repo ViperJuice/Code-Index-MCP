@@ -44,7 +44,9 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     }
 
     @classmethod
-    def _exact_bounded_legacy_codex_phase_loop_json_reason(cls, normalized_path: str) -> Optional[str]:
+    def _exact_bounded_legacy_codex_phase_loop_json_reason(
+        cls, normalized_path: str
+    ) -> Optional[str]:
         parts = Path(normalized_path).parts
         if len(parts) < 3 or parts[0] != ".codex" or parts[1] != "phase-loop":
             return None

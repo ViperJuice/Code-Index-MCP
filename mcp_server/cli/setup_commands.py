@@ -138,8 +138,7 @@ def setup_semantic(
         click.echo("=" * 22)
         click.echo(f"Overall ready: {'yes' if report.overall_ready else 'no'}")
         click.echo(
-            "Can write semantic vectors: "
-            + ("yes" if report.can_write_semantic_vectors else "no")
+            "Can write semantic vectors: " + ("yes" if report.can_write_semantic_vectors else "no")
         )
         click.echo(f"Strict mode: {'on' if report.strict_mode else 'off'}")
         click.echo(f"Profile check: {report.profiles.status.value} ({report.profiles.message})")

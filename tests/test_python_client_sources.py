@@ -48,9 +48,13 @@ def test_direct_client_supports_friction_filters(tmp_path: Path):
             treesitter_file_id="seed.py",
         )
         with store._get_connection() as conn:
-            conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", ("TODO", file_row[0]))
+            conn.execute(
+                "INSERT INTO fts_code (content, file_id) VALUES (?, ?)", ("TODO", file_row[0])
+            )
 
-        with open_client(workspace_root=repo_path, registry_path=tmp_path / "registry.json") as client:
+        with open_client(
+            workspace_root=repo_path, registry_path=tmp_path / "registry.json"
+        ) as client:
             result = client.search_code(
                 ClientSearchOptions(
                     query="ignored",
@@ -78,7 +82,9 @@ def test_direct_client_supports_history_filters(tmp_path: Path):
             [_history_record(repo="owner/repo", issue_number=1, labels=["reflection"])],
         )
 
-        with open_client(workspace_root=repo_path, registry_path=tmp_path / "registry.json") as client:
+        with open_client(
+            workspace_root=repo_path, registry_path=tmp_path / "registry.json"
+        ) as client:
             result = client.search_code(
                 ClientSearchOptions(
                     query="ignored",

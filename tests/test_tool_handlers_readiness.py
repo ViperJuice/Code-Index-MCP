@@ -166,11 +166,90 @@ def test_get_status_repository_rows_include_readiness(tmp_path):
     )
 
     repos = _parsed(result)["repositories"]
-    assert repos[0]["readiness"] == "index_empty"
+    assert repos[0]["readiness"] == "missing_schema"
     assert repos[0]["ready"] is False
-    assert repos[0]["readiness_code"] == "index_empty"
+    assert repos[0]["readiness_code"] == "missing_schema"
     assert repos[0]["semantic_readiness"] == "enrichment_unavailable"
     assert repos[0]["semantic_ready"] is False
+
+
+def test_summarize_sample_consumes_named_result_fields(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_summarize_sample
+    from mcp_server.indexing.summarization import (
+        FileBatchSummarizer,
+        GeneratedSummary,
+        SummaryGenerationResult,
+    )
+    from mcp_server.storage.sqlite_store import SQLiteStore
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    source = tmp_path / "sample.py"
+    source.write_text("def sample():\n    return 1\n", encoding="utf-8")
+    store = SQLiteStore(str(tmp_path / "index.db"))
+    repository_row = store.ensure_repository_row(tmp_path, name="repo")
+    file_id = store.store_file(
+        repository_row,
+        path=source,
+        relative_path="sample.py",
+        language="python",
+    )
+    store.store_chunk(
+        file_id=file_id,
+        content=source.read_text(encoding="utf-8"),
+        content_start=0,
+        content_end=27,
+        line_start=1,
+        line_end=2,
+        chunk_id="chunk-1",
+        node_id="node-1",
+        treesitter_file_id="tree-1",
+        language="python",
+        node_type="function_definition",
+    )
+    readiness = RepositoryReadiness(
+        state=RepositoryReadinessState.READY,
+        repository_id="repo-1",
+        registered_path=str(tmp_path),
+        requested_path=str(source),
+    )
+    resolver = MagicMock()
+    resolver.classify.return_value = readiness
+    resolver.resolve.return_value = SimpleNamespace(
+        repo_id="repo-1",
+        sqlite_store=store,
+        workspace_root=tmp_path,
+    )
+    lazy_summarizer = MagicMock()
+    lazy_summarizer.can_summarize.return_value = True
+    lazy_summarizer._get_model_name.return_value = "fake-model"
+
+    async def fake_summarize(*_args, **_kwargs):
+        return SummaryGenerationResult(
+            chunks_attempted=2,
+            summaries_written=1,
+            authoritative_chunks=1,
+            missing_chunk_ids=("chunk-2",),
+            remaining_chunks=1,
+            scope_drained=False,
+            summaries=(GeneratedSummary("chunk-1", "Generated summary"),),
+        )
+
+    monkeypatch.setattr(FileBatchSummarizer, "summarize_file_chunks", fake_summarize)
+
+    result = _run(
+        handle_summarize_sample(
+            arguments={"paths": [str(source)]},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            lazy_summarizer=lazy_summarizer,
+        )
+    )
+
+    payload = _parsed(result)
+    assert payload["total_chunks"] == 1
+    assert payload["files"][0]["summaries_written"] == 1
+    assert payload["files"][0]["missing_chunk_ids"] == ["chunk-2"]
+    assert payload["files"][0]["scope_drained"] is False
 
 
 def test_search_code_semantic_not_ready_returns_semantic_metadata(tmp_path, monkeypatch):
@@ -234,9 +313,7 @@ def test_search_code_semantic_not_ready_returns_semantic_metadata(tmp_path, monk
     dispatcher.search.assert_not_called()
 
 
-def test_search_code_semantic_not_ready_preserves_state_specific_metadata(
-    tmp_path, monkeypatch
-):
+def test_search_code_semantic_not_ready_preserves_state_specific_metadata(tmp_path, monkeypatch):
     import mcp_server.health.repository_readiness as readiness_module
     from mcp_server.cli.tool_handlers import handle_search_code
 
@@ -404,7 +481,11 @@ def test_search_code_semantic_ready_returns_metadata_envelope(tmp_path, monkeypa
 
     result = _run(
         handle_search_code(
-            arguments={"query": "class SemanticIndexer", "repository": str(worktree), "semantic": True},
+            arguments={
+                "query": "class SemanticIndexer",
+                "repository": str(worktree),
+                "semantic": True,
+            },
             dispatcher=dispatcher,
             repo_resolver=resolver,
         )
@@ -484,7 +565,11 @@ def test_search_code_semantic_runtime_failure_returns_explicit_failure(tmp_path,
 
     result = _run(
         handle_search_code(
-            arguments={"query": "class SemanticIndexer", "repository": str(worktree), "semantic": True},
+            arguments={
+                "query": "class SemanticIndexer",
+                "repository": str(worktree),
+                "semantic": True,
+            },
             dispatcher=dispatcher,
             repo_resolver=resolver,
         )
@@ -694,7 +779,9 @@ def test_write_summaries_remains_summary_only(tmp_path, monkeypatch):
 
         async def process_scope(self, limit=500):
             del limit
-            return SimpleNamespace(summaries_written=3, chunks_attempted=4, missing_chunk_ids=["c4"])
+            return SimpleNamespace(
+                summaries_written=3, chunks_attempted=4, missing_chunk_ids=["c4"]
+            )
 
     monkeypatch.setattr("mcp_server.indexing.summarization.ComprehensiveChunkWriter", FakeWriter)
     lazy_summarizer = MagicMock()

@@ -291,9 +291,6 @@ def delete_releases_older_than(
                     f"gh release delete {ref.tag_name} failed (403): {stderr}"
                 )
             if "429" in stderr:
-                _respect_rate_limit(
-                    {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(int(time.time()) + 60)}
-                )
                 raise TransientArtifactError(
                     f"gh release delete {ref.tag_name} rate-limited (429): {stderr}"
                 )

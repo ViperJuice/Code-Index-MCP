@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[2]
 SEMANTIC_ONBOARDING = REPO / "docs" / "guides" / "semantic-onboarding.md"
 CLI_SETUP_REFERENCE = REPO / "docs" / "tools" / "cli-setup-reference.md"

@@ -39,6 +39,18 @@ class PluginSetRegistryProtocol(Protocol):
         """Invalidate and release the plugin set for ``repo_id``."""
         ...
 
+    def resource_snapshot(self):
+        """Return worker resource telemetry without allocating plugins."""
+        ...
+
+    def loaded_count(self, repo_id: str) -> int:
+        """Return the loaded adapter count for one repository."""
+        ...
+
+    def shutdown(self) -> None:
+        """Close every plugin worker owned by the registry manager."""
+        ...
+
 
 class PluginSetRegistry:
     """Per-repo plugin registry backed by MemoryAwarePluginManager.
@@ -49,10 +61,10 @@ class PluginSetRegistry:
     ``supports(path)`` method returns True.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, manager: Optional[object] = None) -> None:
         self._cache: Dict[str, List["IPlugin"]] = {}
         self._lock = threading.RLock()
-        self._manager: Optional[object] = None
+        self._manager: Optional[object] = manager
 
     def _get_manager(self):
         if self._manager is None:
@@ -61,51 +73,29 @@ class PluginSetRegistry:
             self._manager = get_memory_aware_manager()
         return self._manager
 
+    def _sync_loaded(self, repo_id: str) -> List["IPlugin"]:
+        """Drop registry references evicted by the lifecycle manager."""
+        plugins = self.plugins_for(repo_id)
+        active = self._get_manager().loaded_plugins_for(repo_id)
+        active_ids = {id(plugin) for plugin in active}
+        plugins[:] = [plugin for plugin in plugins if id(plugin) in active_ids]
+        return plugins
+
     def plugins_for(self, repo_id: str) -> List["IPlugin"]:
         """Return a stable, per-repo plugin list.
 
         The same list instance is returned on every call for the same
-        repo_id (identity guarantee). The list is built on first access and
-        cached until :meth:`evict` is called.
+        repo_id (identity guarantee). It contains only plugins already requested
+        for that repository and never allocates merely to answer a status read.
         """
         with self._lock:
             if repo_id in self._cache:
                 return self._cache[repo_id]
 
-            plugins = self._build_plugin_list(repo_id)
+            manager = self._get_manager()
+            plugins = list(manager.loaded_plugins_for(repo_id))
             self._cache[repo_id] = plugins
             return plugins
-
-    def _build_plugin_list(self, repo_id: str) -> List["IPlugin"]:
-        """Construct the plugin list for a repo_id via the memory manager."""
-        from mcp_server.plugins.plugin_factory import PluginFactory, PluginUnavailableError
-
-        languages = PluginFactory.get_supported_languages()
-        result: List["IPlugin"] = []
-
-        # Build a lightweight ctx-like object so the manager keys by (repo_id, lang)
-        class _Ctx:
-            pass
-
-        ctx = _Ctx()
-        ctx.repo_id = repo_id  # type: ignore[attr-defined]
-
-        manager = self._get_manager()
-        for lang in languages:
-            try:
-                plugin = manager.get_plugin(lang, ctx)
-                if plugin is not None:
-                    result.append(plugin)
-            except PluginUnavailableError as exc:
-                logger.info(
-                    "Skipping unavailable plugin for %s: %s",
-                    lang,
-                    exc.state,
-                )
-            except Exception:
-                logger.exception("Unexpected error loading plugin for %s", lang)
-
-        return result
 
     def plugins_for_file(self, ctx: "RepoContext", path: Path) -> List[Tuple["IPlugin", float]]:
         """Return (plugin, score) pairs for plugins that can handle ``path``.
@@ -113,17 +103,66 @@ class PluginSetRegistry:
         Score is 1.0 for a positive ``supports()`` match. Only matching plugins
         are returned.
         """
+        from mcp_server.plugins.language_registry import get_language_by_extension
+        from mcp_server.plugins.memory_aware_manager import PluginBackpressureError
+
         plugins = self.plugins_for(ctx.repo_id)
+        language = get_language_by_extension(path.suffix.lower())
+        if language is not None:
+            try:
+                plugin = self._get_manager().get_plugin(language, ctx)
+            except PluginBackpressureError:
+                raise
+            except Exception as exc:
+                logger.info("Plugin %s unavailable for %s: %s", language, path, exc)
+                plugin = None
+            if plugin is not None:
+                bind = getattr(plugin, "bind", None)
+                if callable(bind):
+                    bind(ctx)
+                if all(existing is not plugin for existing in plugins):
+                    confirm_started = getattr(self._get_manager(), "confirm_plugin_started", None)
+                    if callable(confirm_started):
+                        try:
+                            confirm_started(language, ctx)
+                        finally:
+                            plugins = self._sync_loaded(ctx.repo_id)
+                    plugins.append(plugin)
+
         result: List[Tuple["IPlugin", float]] = []
         for plugin in plugins:
             try:
                 if plugin.supports(str(path)):
+                    confirm_started = getattr(self._get_manager(), "confirm_plugin_started", None)
+                    if callable(confirm_started):
+                        try:
+                            confirm_started(language or getattr(plugin, "language", ""), ctx)
+                        finally:
+                            plugins = self._sync_loaded(ctx.repo_id)
                     result.append((plugin, 1.0))
-            except Exception:
-                pass
+            except PluginBackpressureError:
+                raise
+            except Exception as exc:
+                logger.warning("Plugin support probe failed for %s: %s", path, exc)
         return result
 
     def evict(self, repo_id: str) -> None:
         """Invalidate the cached plugin set for ``repo_id`` only."""
         with self._lock:
             self._cache.pop(repo_id, None)
+            self._get_manager().evict_repo(repo_id)
+
+    def resource_snapshot(self):
+        """Return worker resource telemetry without creating adapters."""
+        return self._get_manager().resource_snapshot()
+
+    def loaded_count(self, repo_id: str) -> int:
+        """Return a per-repository adapter count without allocating."""
+        with self._lock:
+            return len(self._sync_loaded(repo_id))
+
+    def shutdown(self) -> None:
+        """Close every manager-owned plugin and clear registry references."""
+        with self._lock:
+            self._cache.clear()
+            self._get_manager().shutdown()

@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 import requests
 
+pytestmark = pytest.mark.requires_network
+
 
 @pytest.mark.skipif(sys.platform == "win32", reason="pkill not available on Windows")
 def test_mcp_server_startup():

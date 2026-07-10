@@ -16,10 +16,12 @@ from pathlib import Path
 from unittest.mock import ANY, Mock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 from mcp_server.client_types import ClientSearchMatch, ClientSearchResult
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.plugin_base import SearchResult, SymbolDef
+from mcp_server.security import AuthManager, SecurityConfig, UserRole
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 # ---------------------------------------------------------------------------
@@ -35,6 +37,63 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 def dispatcher_with_plugins(sqlite_store: SQLiteStore) -> SimpleDispatcher:
     """Local override: create a SimpleDispatcher compatible with the SL-1 API."""
     return SimpleDispatcher()
+
+
+@pytest.fixture
+def test_client(monkeypatch):
+    """Local override: authenticated client without running gateway startup hooks."""
+    import asyncio
+
+    import mcp_server.gateway as gateway
+
+    original_startup = list(gateway.app.router.on_startup)
+    original_shutdown = list(gateway.app.router.on_shutdown)
+    gateway.app.router.on_startup = []
+    gateway.app.router.on_shutdown = []
+
+    auth_manager = getattr(gateway.app.state, "auth_manager", None)
+    if auth_manager is None:
+        auth_manager = AuthManager(
+            SecurityConfig(
+                jwt_secret_key=os.environ["JWT_SECRET_KEY"],
+                jwt_algorithm="HS256",
+                access_token_expire_minutes=30,
+            )
+        )
+        gateway.app.state.auth_manager = auth_manager
+    auth_manager.rate_limiter.max_requests = 10000
+
+    admin_user = asyncio.run(auth_manager.get_user_by_username("pytest_gateway_admin"))
+    if admin_user is None:
+        admin_user = asyncio.run(
+            auth_manager.create_user(
+                username="pytest_gateway_admin",
+                password="PytestGatewayAdmin123!",
+                email="pytest_gateway_admin@test.local",
+                role=UserRole.ADMIN,
+            )
+        )
+    token = asyncio.run(auth_manager.create_access_token(admin_user))
+
+    client = TestClient(gateway.app, headers={"Authorization": f"Bearer {token}"})
+    try:
+        yield client
+    finally:
+        client.close()
+        gateway.app.router.on_startup = original_startup
+        gateway.app.router.on_shutdown = original_shutdown
+
+
+@pytest.fixture
+def startup_test_client():
+    """Client that keeps the gateway startup/shutdown lifecycle intact."""
+    import mcp_server.gateway as gateway
+
+    client = TestClient(gateway.app)
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 @pytest.fixture
@@ -94,7 +153,7 @@ class TestGatewayStartupShutdown:
         mock_store,
         mock_run_preflight,
         mock_format_preflight,
-        test_client,
+        startup_test_client,
     ):
         """Test successful server startup."""
         mock_run_preflight.return_value = type(
@@ -102,7 +161,7 @@ class TestGatewayStartupShutdown:
         )()
         mock_format_preflight.return_value = ["warning"]
         # Trigger startup event
-        with test_client:
+        with startup_test_client:
             # Verify components were initialized
             mock_run_preflight.assert_called_once()
             mock_store.assert_called_once()
@@ -110,25 +169,28 @@ class TestGatewayStartupShutdown:
             mock_watcher.assert_called_once()
 
     @patch("mcp_server.gateway.SQLiteStore")
-    def test_startup_failure(self, mock_store, test_client):
+    def test_startup_failure(self, mock_store, startup_test_client):
         """Test server startup with initialization failure."""
         mock_store.side_effect = Exception("Database error")
 
         with pytest.raises(Exception, match="Database error"):
-            with test_client:
+            with startup_test_client:
                 pass
 
     @patch("mcp_server.gateway.EnhancedDispatcher")
     @patch("mcp_server.gateway.MultiRepositoryWatcher")
     def test_shutdown_stops_watcher(
-        self, mock_watcher_class, mock_dispatcher_class, test_client_with_dispatcher
+        self, mock_watcher_class, mock_dispatcher_class, startup_test_client, monkeypatch
     ):
         """Test that shutdown stops the multi-repo watcher."""
+        import mcp_server.gateway as gateway
+
         mock_watcher = Mock()
         mock_watcher_class.return_value = mock_watcher
+        monkeypatch.setattr(gateway, "dispatcher", SimpleDispatcher())
 
         # Trigger startup+shutdown via context manager
-        with test_client_with_dispatcher:
+        with startup_test_client:
             pass
 
         # stop_watching_all should have been called during shutdown
@@ -392,6 +454,7 @@ class TestSearchEndpoint:
 
         assert response.status_code == 200
         for _, params in fake_cache.get_calls + fake_cache.cache_calls:
+            assert params["repo_id"] == "default"
             assert params["source_type"] == "friction"
             assert params["friction_categories"] == ("todo",)
             assert params["history_labels"] == ()
@@ -643,38 +706,67 @@ class TestReindexEndpoint:
     """Test /reindex endpoint."""
 
     @pytest.mark.asyncio
-    async def test_reindex_all(self, test_client_with_dispatcher, temp_code_directory):
-        """Test reindexing all files."""
-        # Mock index_file method and plugins() (via public Protocol method)
-        mock_plugin = Mock()
-        mock_plugin.supports.side_effect = lambda p: Path(p).suffix == ".py"
-        test_client_with_dispatcher.app.state.dispatcher.plugins = Mock(return_value=[mock_plugin])
+    async def test_reindex_all(self, test_client_with_dispatcher, temp_code_directory, monkeypatch):
+        """Whole-repository reindex uses the staged Git-aware manager."""
+        import mcp_server.gateway as gateway
+
+        ctx = Mock(repo_id="repo-a", workspace_root=temp_code_directory)
+        result = Mock(
+            action="full_index",
+            files_processed=2,
+            commit="abc123",
+            readiness={"state": "ready"},
+        )
+        manager = Mock()
+        manager.rebuild_repository_index.return_value = result
+        monkeypatch.setattr(gateway, "get_repo_ctx", lambda _request: ctx)
+        monkeypatch.setattr(gateway, "git_index_manager", manager)
+
+        response = test_client_with_dispatcher.post("/reindex")
+
+        assert response.status_code == 200
+        assert response.json()["mode"] == "staged_full"
+        manager.rebuild_repository_index.assert_called_once_with("repo-a")
+
+    def test_reindex_nonready_scoped_path_refuses_before_store_resolution(
+        self, test_client_with_dispatcher, tmp_path, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        target = tmp_path / "sample.py"
+        target.write_text("pass", encoding="utf-8")
+        resolver = Mock()
+        resolver.classify.return_value = RepositoryReadiness(
+            state=RepositoryReadinessState.MISSING_SCHEMA,
+            repository_id="repo-a",
+            registered_path=str(tmp_path),
+        )
+        resolver.resolve.side_effect = AssertionError("must not open the store")
+        monkeypatch.setattr(gateway, "repo_resolver", resolver)
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
 
-        # Change to temp directory for testing
-        original_cwd = Path.cwd()
-        try:
-            os.chdir(temp_code_directory)
+        response = test_client_with_dispatcher.post(f"/reindex?repository=repo-a&path={target}")
 
-            response = test_client_with_dispatcher.post("/reindex")
-
-            assert response.status_code == 200
-            data = response.json()
-            assert data["status"] == "completed"
-            assert "Reindexed" in data["message"]
-            # endpoint formats as ".py files", not "Python files"
-            assert ".py files" in data["message"]
-
-            # Verify index_file was called for Python files
-            assert test_client_with_dispatcher.app.state.dispatcher.index_file.call_count >= 2
-        finally:
-            os.chdir(original_cwd)
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "full_rebuild_required"
+        resolver.resolve.assert_not_called()
+        test_client_with_dispatcher.app.state.dispatcher.index_file.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_reindex_specific_file(self, test_client_with_dispatcher, temp_code_directory):
+    async def test_reindex_specific_file(
+        self, test_client_with_dispatcher, temp_code_directory, monkeypatch
+    ):
         """Test reindexing a specific file."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
         file_path = temp_code_directory / "sample.py"
+        import mcp_server.gateway as gateway
+
+        ctx = Mock(repo_id="repo-a", workspace_root=temp_code_directory)
+        monkeypatch.setattr(gateway, "get_repo_ctx", lambda _request: ctx)
 
         response = test_client_with_dispatcher.post(f"/reindex?path={file_path}")
 
@@ -688,7 +780,9 @@ class TestReindexEndpoint:
         )
 
     @pytest.mark.asyncio
-    async def test_reindex_directory(self, test_client_with_dispatcher, temp_code_directory):
+    async def test_reindex_directory(
+        self, test_client_with_dispatcher, temp_code_directory, monkeypatch
+    ):
         """Test reindexing a directory."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
 
@@ -696,6 +790,10 @@ class TestReindexEndpoint:
         mock_plugin = Mock()
         mock_plugin.supports.side_effect = lambda p: p.suffix == ".py"
         test_client_with_dispatcher.app.state.dispatcher.plugins = Mock(return_value=[mock_plugin])
+        import mcp_server.gateway as gateway
+
+        ctx = Mock(repo_id="repo-a", workspace_root=temp_code_directory)
+        monkeypatch.setattr(gateway, "get_repo_ctx", lambda _request: ctx)
 
         response = test_client_with_dispatcher.post(f"/reindex?path={temp_code_directory}")
 
@@ -728,7 +826,7 @@ class TestReindexEndpoint:
         assert "Dispatcher not ready" in response.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_reindex_error(self, test_client_with_dispatcher, tmp_path):
+    async def test_reindex_error(self, test_client_with_dispatcher, tmp_path, monkeypatch):
         """Test reindex with internal error."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock(
             side_effect=Exception("Index error")
@@ -736,11 +834,51 @@ class TestReindexEndpoint:
         # Create a real file so the existence check passes
         test_file = tmp_path / "test.py"
         test_file.write_text("def foo(): pass")
+        import mcp_server.gateway as gateway
+
+        ctx = Mock(repo_id="repo-a", workspace_root=tmp_path)
+        monkeypatch.setattr(gateway, "get_repo_ctx", lambda _request: ctx)
 
         response = test_client_with_dispatcher.post(f"/reindex?path={test_file}")
 
         assert response.status_code == 500
         assert "Reindexing failed" in response.json()["detail"]
+
+    def test_reindex_rejects_path_outside_selected_repo(
+        self, test_client_with_dispatcher, tmp_path, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+
+        repo_root = tmp_path / "repo"
+        sibling = tmp_path / "sibling.py"
+        repo_root.mkdir()
+        sibling.write_text("pass")
+        ctx = Mock(repo_id="repo-a", workspace_root=repo_root)
+        monkeypatch.setattr(gateway, "get_repo_ctx", lambda _request: ctx)
+
+        response = test_client_with_dispatcher.post(f"/reindex?path={sibling}")
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "path_outside_selected_repository"
+
+    def test_reindex_rejects_symlink_escape(
+        self, test_client_with_dispatcher, tmp_path, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+
+        repo_root = tmp_path / "repo"
+        outside = tmp_path / "outside.py"
+        repo_root.mkdir()
+        outside.write_text("pass")
+        link = repo_root / "linked.py"
+        link.symlink_to(outside)
+        ctx = Mock(repo_id="repo-a", workspace_root=repo_root)
+        monkeypatch.setattr(gateway, "get_repo_ctx", lambda _request: ctx)
+
+        response = test_client_with_dispatcher.post(f"/reindex?path={link}")
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "path_outside_selected_repository"
 
 
 class TestErrorHandling:
@@ -867,7 +1005,7 @@ class TestRepoCtxResolution:
         )
 
         assert response.status_code == 200
-        fake_resolver.resolve.assert_called_once_with(tmp_path)
+        fake_resolver.resolve.assert_called_once_with(str(tmp_path))
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
             fake_ctx, "test", semantic=False, fuzzy=False, limit=20
         )
@@ -891,10 +1029,100 @@ class TestRepoCtxResolution:
         response = test_client_with_dispatcher.get(f"/search?q=test&repository={tmp_path}")
 
         assert response.status_code == 200
-        fake_resolver.resolve.assert_called_once_with(tmp_path)
+        fake_resolver.resolve.assert_called_once_with(str(tmp_path))
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
             fake_ctx, "test", semantic=False, fuzzy=False, limit=20
         )
+
+    def test_explicit_repository_alias_is_preserved(self, test_client_with_dispatcher, monkeypatch):
+        import mcp_server.gateway as gateway
+        from mcp_server.core import RepoContext
+
+        fake_ctx = Mock(spec=RepoContext)
+        fake_ctx.repo_id = "repo-a"
+        fake_ctx.workspace_root = Path("/repo/a")
+        fake_resolver = Mock()
+        fake_resolver.resolve.return_value = fake_ctx
+        monkeypatch.setattr(gateway, "repo_resolver", fake_resolver)
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
+
+        response = test_client_with_dispatcher.get("/search?q=test&repository=frontend")
+
+        assert response.status_code == 200
+        fake_resolver.resolve.assert_called_once_with("frontend")
+
+    def test_unknown_explicit_repository_fails_closed(
+        self, test_client_with_dispatcher, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        fake_resolver = Mock()
+        fake_resolver.resolve.return_value = None
+        fake_resolver.classify.return_value = RepositoryReadiness(
+            state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            requested_path="missing-repo",
+        )
+        monkeypatch.setattr(gateway, "repo_resolver", fake_resolver)
+
+        response = test_client_with_dispatcher.get("/search?q=test&repository=missing-repo")
+
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "unregistered_repository"
+        fake_resolver.resolve.assert_not_called()
+
+    @pytest.mark.parametrize("endpoint", ["/search?q=test", "/symbol?symbol=test", "/status"])
+    def test_nonready_http_reads_refuse_before_store_resolution(
+        self, endpoint, test_client_with_dispatcher, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        resolver = Mock()
+        resolver.classify.return_value = RepositoryReadiness(
+            state=RepositoryReadinessState.MISSING_SCHEMA,
+            repository_id="repo-a",
+            registered_path="/repo/a",
+        )
+        resolver.resolve.side_effect = AssertionError("must not open the store")
+        monkeypatch.setattr(gateway, "repo_resolver", resolver)
+
+        separator = "&" if "?" in endpoint else "?"
+        response = test_client_with_dispatcher.get(f"{endpoint}{separator}repository=repo-a")
+
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "missing_schema"
+        resolver.resolve.assert_not_called()
+
+    def test_alternate_search_backends_are_scoped_per_repository(self, monkeypatch, tmp_path):
+        import mcp_server.gateway as gateway
+
+        store_a = SQLiteStore(str(tmp_path / "a.db"))
+        store_b = SQLiteStore(str(tmp_path / "b.db"))
+        ctx_a = Mock(repo_id="repo-a", sqlite_store=store_a)
+        ctx_b = Mock(repo_id="repo-b", sqlite_store=store_b)
+        monkeypatch.setattr(gateway, "_repo_search_backends", {})
+
+        try:
+            bm25_a, fuzzy_a, hybrid_a = gateway._search_backends_for_repo(ctx_a)
+            bm25_b, fuzzy_b, hybrid_b = gateway._search_backends_for_repo(ctx_b)
+
+            assert bm25_a is not bm25_b
+            assert fuzzy_a is not fuzzy_b
+            assert hybrid_a is not hybrid_b
+            assert bm25_a.storage is store_a
+            assert bm25_b.storage is store_b
+            assert hybrid_a.storage is store_a
+            assert hybrid_b.storage is store_b
+        finally:
+            store_a.close()
+            store_b.close()
 
     def test_search_falls_back_to_cwd_resolution(
         self, test_client_with_dispatcher, monkeypatch, tmp_path

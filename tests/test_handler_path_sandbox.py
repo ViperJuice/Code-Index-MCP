@@ -101,6 +101,147 @@ class TestLooksLikePath:
         assert _looks_like_path("some/sub/dir") is True
 
 
+class TestSelectorSandboxPrecedence:
+    def test_exact_registered_name_wins_over_existing_relative_path(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import _repository_selector_path
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        registered = tmp_path / "allowed" / "registered"
+        registered.mkdir(parents=True)
+        collision = tmp_path / "registered-name"
+        collision.mkdir()
+        monkeypatch.chdir(tmp_path)
+        readiness = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-id",
+            repository_name="registered-name",
+            registered_path=str(registered),
+            requested_path=None,
+        )
+
+        assert _repository_selector_path("registered-name", readiness) is None
+
+        path_readiness = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-id",
+            repository_name="other-name",
+            registered_path=str(registered),
+            requested_path=str(collision),
+        )
+        assert _repository_selector_path("registered-name", path_readiness) == Path(
+            "registered-name"
+        )
+
+    def test_exact_registered_name_bypasses_path_guard_for_all_repository_tools(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.cli import tool_handlers
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        registered = tmp_path / "allowed" / "repo"
+        registered.mkdir(parents=True)
+        collision = tmp_path / "registered-name"
+        collision.mkdir()
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(registered))
+        readiness = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-id",
+            repository_name="registered-name",
+            registered_path=str(registered),
+            requested_path=None,
+            current_commit="abc",
+            last_indexed_commit="abc",
+        )
+        ctx = SimpleNamespace(
+            repo_id="repo-id",
+            workspace_root=registered,
+            sqlite_store=MagicMock(),
+            registry_entry=SimpleNamespace(),
+        )
+        resolver = MagicMock()
+        resolver.classify.return_value = readiness
+        resolver.resolve.return_value = ctx
+        dispatcher = _mock_dispatcher()
+
+        symbol = _run(
+            tool_handlers.handle_symbol_lookup(
+                arguments={"symbol": "Missing", "repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        search_result = SimpleNamespace(
+            results=[],
+            semantic_requested=False,
+            source_type=None,
+            friction_categories=(),
+            history_labels=(),
+            history_repos=(),
+            include_source_metadata=False,
+            readiness=readiness.to_dict(),
+            semantic_readiness=None,
+            index_unavailable=None,
+            code=None,
+            message="No results found in index",
+        )
+        monkeypatch.setattr(
+            tool_handlers,
+            "execute_search_service",
+            lambda **_kwargs: search_result,
+        )
+        search = _run(
+            tool_handlers.handle_search_code(
+                arguments={"query": "Missing", "repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        index_manager = MagicMock()
+        index_manager.rebuild_repository_index.return_value = SimpleNamespace(
+            action="full_index",
+            files_processed=1,
+            commit="abc",
+            readiness={},
+            semantic={},
+        )
+        reindex = _run(
+            tool_handlers.handle_reindex(
+                arguments={"repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+                git_index_manager=index_manager,
+            )
+        )
+        write_summaries = _run(
+            tool_handlers.handle_write_summaries(
+                arguments={"repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+                lazy_summarizer=None,
+            )
+        )
+        summarize_sample = _run(
+            tool_handlers.handle_summarize_sample(
+                arguments={"repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+                lazy_summarizer=None,
+            )
+        )
+
+        for result in (symbol, search, reindex, write_summaries, summarize_sample):
+            assert "path_outside_allowed_roots" not in json.dumps(_parsed(result))
+
+
 # ---------------------------------------------------------------------------
 # search_code guard
 # ---------------------------------------------------------------------------
@@ -460,6 +601,93 @@ class TestReindexUnchanged:
         dumped = json.dumps(data).lower()
         assert "outside" in dumped or "allowed" in dumped
 
+    def test_reindex_rejects_allowed_sibling_outside_selected_repo(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import handle_reindex
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        repo = tmp_path / "repo"
+        sibling = tmp_path / "sibling.py"
+        repo.mkdir()
+        sibling.write_text("pass\n", encoding="utf-8")
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+
+        ctx = SimpleNamespace(repo_id="repo-1", workspace_root=repo, sqlite_store=MagicMock())
+        ready = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            registered_path=str(repo),
+        )
+        unregistered = RepositoryReadiness(
+            state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            requested_path=str(sibling),
+        )
+        resolver = MagicMock()
+        resolver.classify.side_effect = lambda selector: (
+            ready if selector == "repo" else unregistered
+        )
+        resolver.resolve.return_value = ctx
+        dispatcher = _mock_dispatcher()
+
+        result = _run(
+            handle_reindex(
+                arguments={"repository": "repo", "path": str(sibling)},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        data = _parsed(result)
+        assert data["code"] == "path_outside_selected_repository"
+        assert data["mutation_performed"] is False
+        dispatcher.index_file.assert_not_called()
+        ctx.sqlite_store.store_file.assert_not_called()
+
+    def test_reindex_rejects_symlink_escape_from_selected_repo(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import handle_reindex
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        repo = tmp_path / "repo"
+        outside = tmp_path / "outside.py"
+        repo.mkdir()
+        outside.write_text("pass\n", encoding="utf-8")
+        link = repo / "linked.py"
+        link.symlink_to(outside)
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+
+        ctx = SimpleNamespace(repo_id="repo-1", workspace_root=repo, sqlite_store=MagicMock())
+        ready = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            registered_path=str(repo),
+        )
+        resolver = MagicMock()
+        resolver.classify.return_value = ready
+        resolver.resolve.return_value = ctx
+        dispatcher = _mock_dispatcher()
+
+        result = _run(
+            handle_reindex(
+                arguments={"repository": "repo", "path": str(link)},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        data = _parsed(result)
+        assert data["code"] == "path_outside_selected_repository"
+        assert data["path"] == str(outside)
+        assert data["mutation_performed"] is False
+        dispatcher.index_file.assert_not_called()
+        ctx.sqlite_store.store_file.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # write_summaries — no path args, must not be guarded
@@ -513,3 +741,48 @@ class TestWriteSummariesUnguarded:
         assert "path_outside_allowed_roots" not in json.dumps(
             data
         ), f"write_summaries should not be path-guarded; got: {data}"
+
+
+def test_status_semantic_flags_require_usable_runtime_indexer():
+    from mcp_server.cli.tool_handlers import handle_get_status
+    from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
+    dispatcher = object.__new__(EnhancedDispatcher)
+    dispatcher._semantic_enabled = True
+    dispatcher._use_factory = True
+    dispatcher._lazy_load = True
+    dispatcher._enable_advanced = True
+    dispatcher.get_statistics = MagicMock(
+        return_value={
+            "total_plugins": 0,
+            "loaded_languages": [],
+            "supported_languages": 0,
+            "operations": {},
+            "by_language": {},
+        }
+    )
+    dispatcher.health_check = MagicMock(return_value={"status": "healthy"})
+    dispatcher.get_runtime_feature_status = MagicMock(
+        return_value={
+            "semantic": {
+                "status": "unavailable",
+                "reason": "semantic_indexer_unavailable",
+            }
+        }
+    )
+    resolver = _mock_resolver(ctx=SimpleNamespace())
+    resolver._registry = None
+
+    payload = _parsed(
+        _run(
+            handle_get_status(
+                arguments={},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+    )
+
+    assert payload["features"]["semantic_search_configured"] is True
+    assert payload["features"]["semantic_search_enabled"] is False
+    assert payload["features"]["semantic_indexer_active"] is False

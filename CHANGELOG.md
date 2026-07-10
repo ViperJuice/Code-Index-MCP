@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: # placeholder for post-rc5 work
 
+## [1.3.1] — 2026-07-10 (Unpublished)
+
+### Fixed
+- Enforced the FastAPI JWT boundary independently from the optional local
+  STDIO handshake and removed ambiguous repository-selector fallback.
+- Made staged index recovery atomic and fail closed, unified summarization
+  results, and bounded sandbox worker lifecycle and request handling.
+- Restored deterministic local quality gates, release-critical typing, and
+  hermetic test execution across the supported release matrix.
+- Split release preparation from protected-main publication and pinned every
+  external GitHub Action to an immutable upstream commit.
+
+### Release status
+- Package, runtime, active documentation, installers, and local build artifacts
+  are prepared as `1.3.1` / `v1.3.1`.
+- No tag, GitHub release, container image, attestation, or PyPI package was
+  published by this hardening phase.
+
 ## [1.3.0] — 2026-07-06
 
 ### Added

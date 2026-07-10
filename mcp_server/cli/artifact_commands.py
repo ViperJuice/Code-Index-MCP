@@ -86,7 +86,8 @@ def _load_json_file(path: Path) -> dict | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else None
     except Exception:
         return None
 
@@ -229,7 +230,7 @@ def _run_incremental_reconcile(
         f"indexed={stats.files_indexed}, removed={stats.files_removed}, "
         f"moved={stats.files_moved}, skipped={stats.files_skipped}, errors={stats.errors}"
     )
-    return stats.errors == 0
+    return bool(stats.errors == 0)
 
 
 def _print_reconcile_guidance() -> None:

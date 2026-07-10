@@ -61,9 +61,7 @@ def _print_semantic_evidence(prefix: str, evidence: dict[str, Any]) -> None:
         click.echo(
             f"{prefix}Collection-matched links: {evidence.get('matching_collection_links', 0)}"
         )
-        click.echo(
-            f"{prefix}Collection mismatches: {evidence.get('collection_mismatches', 0)}"
-        )
+        click.echo(f"{prefix}Collection mismatches: {evidence.get('collection_mismatches', 0)}")
 
 
 def _print_sync_semantic_details(prefix: str, semantic: Optional[dict[str, Any]]) -> None:
@@ -92,7 +90,11 @@ def _print_sync_semantic_details(prefix: str, semantic: Optional[dict[str, Any]]
 
 def _archive_tail_pair(repo_path: Path) -> tuple[Path, Path]:
     return (
-        repo_path / "analysis_archive" / "scripts_archive" / "scripts_test_files" / "verify_mcp_fix.py",
+        repo_path
+        / "analysis_archive"
+        / "scripts_archive"
+        / "scripts_test_files"
+        / "verify_mcp_fix.py",
         repo_path / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json",
     )
 
@@ -126,17 +128,11 @@ def _print_force_full_exit_trace(
     if trace.get("blocker_source"):
         click.echo(f"{prefix}Trace blocker source: {trace['blocker_source']}")
     if trace.get("storage_failure_family"):
-        click.echo(
-            f"{prefix}Trace storage failure family: {trace['storage_failure_family']}"
-        )
+        click.echo(f"{prefix}Trace storage failure family: {trace['storage_failure_family']}")
     if trace.get("storage_failure_reason"):
-        click.echo(
-            f"{prefix}Trace storage failure reason: {trace['storage_failure_reason']}"
-        )
+        click.echo(f"{prefix}Trace storage failure reason: {trace['storage_failure_reason']}")
     if trace.get("storage_failure_message"):
-        click.echo(
-            f"{prefix}Trace storage failure message: {trace['storage_failure_message']}"
-        )
+        click.echo(f"{prefix}Trace storage failure message: {trace['storage_failure_message']}")
     if trace.get("current_commit"):
         click.echo(f"{prefix}Trace current commit: {trace['current_commit']}")
     if trace.get("indexed_commit_before") is not None:
@@ -147,10 +143,9 @@ def _print_force_full_exit_trace(
         click.echo(f"{prefix}In-flight path: {trace['in_flight_path']}")
     if repo_path is not None:
         devcontainer_script, devcontainer_json = _devcontainer_tail_pair(repo_path)
-        if (
-            trace.get("last_progress_path") == str(devcontainer_script.resolve())
-            and trace.get("in_flight_path") == str(devcontainer_json.resolve())
-        ):
+        if trace.get("last_progress_path") == str(devcontainer_script.resolve()) and trace.get(
+            "in_flight_path"
+        ) == str(devcontainer_json.resolve()):
             click.echo(
                 f"{prefix}Devcontainer tail pair: exact bounded shell-to-JSON handoff "
                 f"preserved lexical progress into {devcontainer_json.relative_to(repo_path)}"
@@ -165,10 +160,9 @@ def _print_force_full_exit_trace(
                 f"progress beyond {archive_script}"
             )
         optimized_json, optimized_markdown = _optimized_final_report_pair(repo_path)
-        if (
-            trace.get("last_progress_path") == str(optimized_json.resolve())
-            and trace.get("in_flight_path") == str(optimized_markdown.resolve())
-        ):
+        if trace.get("last_progress_path") == str(optimized_json.resolve()) and trace.get(
+            "in_flight_path"
+        ) == str(optimized_markdown.resolve()):
             click.echo(
                 f"{prefix}Optimized-report boundary: exact bounded JSON indexing preserved "
                 f"lexical progress into {optimized_markdown.relative_to(repo_path)}"
@@ -184,7 +178,9 @@ def _print_force_full_exit_trace(
     if trace.get("summary_call_file_path"):
         click.echo(f"{prefix}Timed-out summary file: {trace['summary_call_file_path']}")
     if trace.get("summary_call_chunk_ids"):
-        click.echo(f"{prefix}Timed-out summary chunks: {', '.join(trace['summary_call_chunk_ids'])}")
+        click.echo(
+            f"{prefix}Timed-out summary chunks: {', '.join(trace['summary_call_chunk_ids'])}"
+        )
     if trace.get("summary_call_timeout_seconds") is not None:
         click.echo(f"{prefix}Timed-out summary timeout: {trace['summary_call_timeout_seconds']}")
     if trace.get("runtime_restore_performed"):
@@ -660,9 +656,7 @@ def _print_edit_retrieval_script_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
-def _print_comprehensive_query_full_sync_script_boundary(
-    prefix: str, repo_path: Path
-) -> None:
+def _print_comprehensive_query_full_sync_script_boundary(prefix: str, repo_path: Path) -> None:
     script_paths = (
         repo_path / "scripts" / "run_comprehensive_query_test.py",
         repo_path / "scripts" / "index_all_repos_semantic_full.py",
@@ -861,7 +855,12 @@ def _print_optimized_final_report_boundary(prefix: str, repo_path: Path) -> None
 
 def _print_legacy_codex_phase_loop_boundary(prefix: str, repo_path: Path) -> None:
     legacy_paths = (
-        repo_path / ".codex" / "phase-loop" / "runs" / "20260424T180441Z-01-gagov-execute" / "launch.json",
+        repo_path
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260424T180441Z-01-gagov-execute"
+        / "launch.json",
         repo_path
         / ".codex"
         / "phase-loop"
@@ -1345,13 +1344,12 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Active profile: {effective_config.get('selected_profile')}")
             click.echo(f"  Active collection: {effective_config.get('collection_name')}")
             bootstrap_state = (
-                "reused"
-                if semantic_preflight.get("can_write_semantic_vectors")
-                else "blocked"
+                "reused" if semantic_preflight.get("can_write_semantic_vectors") else "blocked"
             )
             click.echo(f"  Collection bootstrap state: {bootstrap_state}")
         semantic_evidence = (
-            status.get("features", {}).get("semantic", {}).get("readiness", {}).get("evidence") or {}
+            status.get("features", {}).get("semantic", {}).get("readiness", {}).get("evidence")
+            or {}
         )
         if semantic_evidence:
             click.echo("\nSemantic Evidence:")

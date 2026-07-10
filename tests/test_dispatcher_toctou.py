@@ -12,6 +12,7 @@ import pytest
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
+from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -27,14 +28,22 @@ def _make_dispatcher(tmp_path: Path) -> Dispatcher:
     mock_plugin.lang = "python"
     mock_plugin.supports = MagicMock(return_value=True)
     mock_plugin.indexFile = MagicMock(return_value={"symbols": []})
-    dispatcher = Dispatcher([mock_plugin])
+    mock_plugin.language = "python"
+    dispatcher = Dispatcher([mock_plugin], semantic_search_enabled=False)
     return dispatcher, mock_plugin
 
 
-def _make_ctx() -> RepoContext:
-    ctx = MagicMock(spec=RepoContext)
-    ctx.repo_id = "test-repo"
-    return ctx
+def _make_ctx(tmp_path: Path) -> RepoContext:
+    registry_entry = MagicMock(spec=RepositoryInfo)
+    registry_entry.path = tmp_path
+    registry_entry.name = "test-repo"
+    return RepoContext(
+        repo_id="test-repo",
+        sqlite_store=MagicMock(),
+        workspace_root=tmp_path,
+        tracked_branch="main",
+        registry_entry=registry_entry,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +55,7 @@ class TestIndexFileGuarded:
     def test_matching_hash_returns_indexed(self, tmp_path):
         """Matching expected_hash → INDEXED and plugin.indexFile is called."""
         dispatcher, mock_plugin = _make_dispatcher(tmp_path)
-        ctx = _make_ctx()
+        ctx = _make_ctx(tmp_path)
 
         test_file = tmp_path / "test.py"
         content = b"x = 1\n"
@@ -65,7 +74,7 @@ class TestIndexFileGuarded:
     def test_mismatched_hash_returns_skipped_toctou(self, tmp_path):
         """Mismatched hash → SKIPPED_TOCTOU, plugin.indexFile NOT called."""
         dispatcher, mock_plugin = _make_dispatcher(tmp_path)
-        ctx = _make_ctx()
+        ctx = _make_ctx(tmp_path)
 
         test_file = tmp_path / "test.py"
         test_file.write_bytes(b"x = 1\n")
@@ -83,7 +92,7 @@ class TestIndexFileGuarded:
     def test_toctou_emits_log_event(self, tmp_path, caplog):
         """SKIPPED_TOCTOU emits dispatcher.index.toctou_skipped log with path/observed/actual."""
         dispatcher, mock_plugin = _make_dispatcher(tmp_path)
-        ctx = _make_ctx()
+        ctx = _make_ctx(tmp_path)
 
         test_file = tmp_path / "test.py"
         test_file.write_bytes(b"x = 1\n")
@@ -102,7 +111,7 @@ class TestIndexFileGuarded:
     def test_concurrent_writer_yields_skipped_toctou(self, tmp_path):
         """Thread A hashes file; thread B rewrites file; thread A calls guarded → SKIPPED_TOCTOU."""
         dispatcher, mock_plugin = _make_dispatcher(tmp_path)
-        ctx = _make_ctx()
+        ctx = _make_ctx(tmp_path)
 
         test_file = tmp_path / "test.py"
         original_content = b"# original\n"
@@ -142,7 +151,7 @@ class TestIndexFileGuarded:
     def test_unchanged_file_returns_skipped_unchanged(self, tmp_path):
         """File already indexed with same content → SKIPPED_UNCHANGED on second call."""
         dispatcher, mock_plugin = _make_dispatcher(tmp_path)
-        ctx = _make_ctx()
+        ctx = _make_ctx(tmp_path)
 
         test_file = tmp_path / "test.py"
         content = b"x = 1\n"
@@ -160,7 +169,7 @@ class TestIndexFileGuarded:
     def test_missing_file_returns_error(self, tmp_path):
         """Non-existent file → ERROR result."""
         dispatcher, mock_plugin = _make_dispatcher(tmp_path)
-        ctx = _make_ctx()
+        ctx = _make_ctx(tmp_path)
 
         missing = tmp_path / "missing.py"
         result = dispatcher.index_file_guarded(ctx, missing, "deadbeef")

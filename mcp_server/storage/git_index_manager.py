@@ -4,8 +4,8 @@ This module provides index management that's synchronized with git commits,
 supporting incremental updates and artifact management.
 """
 
-import logging
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..artifacts.commit_artifacts import CommitArtifactManager
+from ..core.ignore_patterns import EXCLUDED_DIR_PARTS
 from ..core.path_resolver import PathResolver
 from ..core.repo_context import RepoContext
 from ..core.repo_resolver import RepoResolver
@@ -26,8 +27,13 @@ from ..dispatcher.dispatcher_enhanced import (
     IndexResultStatus,
 )
 from ..health.repo_status import build_health_row
-from ..health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
+from ..health.repository_readiness import (
+    ReadinessClassifier,
+    RepositoryReadiness,
+    RepositoryReadinessState,
+)
 from ..indexing.change_detector import ChangeDetector
+from ..indexing.lock_registry import lock_registry
 from .repository_registry import RepositoryRegistry
 from .sqlite_store import SQLiteStore
 from .store_registry import StoreRegistry
@@ -42,6 +48,24 @@ def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) ->
 
 logger = logging.getLogger(__name__)
 _FORCE_FULL_EXIT_TRACE = "force_full_exit_trace.json"
+_RECOVERABLE_REBUILD_STATES = frozenset(
+    {
+        RepositoryReadinessState.READY,
+        RepositoryReadinessState.MISSING_INDEX,
+        RepositoryReadinessState.INDEX_EMPTY,
+        RepositoryReadinessState.STALE_COMMIT,
+        RepositoryReadinessState.CORRUPT_SQLITE,
+        RepositoryReadinessState.MISSING_SCHEMA,
+        RepositoryReadinessState.MISSING_PROVENANCE,
+    }
+)
+_QUARANTINE_REBUILD_STATES = frozenset(
+    {
+        RepositoryReadinessState.CORRUPT_SQLITE,
+        RepositoryReadinessState.MISSING_SCHEMA,
+        RepositoryReadinessState.MISSING_PROVENANCE,
+    }
+)
 
 # Callback type: (repo_id, current_branch, tracked_branch) -> None
 _DriftCallback = Optional[Any]
@@ -149,6 +173,17 @@ class GitAwareIndexManager:
         self.on_branch_drift: _DriftCallback = None
 
     def sync_repository_index(
+        self, repo_id: str, force_full: bool = False, bypass_branch_guard: bool = False
+    ) -> IndexSyncResult:
+        """Serialize repository synchronization through the shared per-repo lock."""
+        with lock_registry.acquire(repo_id):
+            return self._sync_repository_index_locked(
+                repo_id,
+                force_full=force_full,
+                bypass_branch_guard=bypass_branch_guard,
+            )
+
+    def _sync_repository_index_locked(
         self, repo_id: str, force_full: bool = False, bypass_branch_guard: bool = False
     ) -> IndexSyncResult:
         """Sync index with repository's current git state.
@@ -397,9 +432,7 @@ class GitAwareIndexManager:
                     "summary_call_timed_out": (result.semantic or {}).get(
                         "summary_call_timed_out", False
                     ),
-                    "summary_call_file_path": (result.semantic or {}).get(
-                        "summary_call_file_path"
-                    ),
+                    "summary_call_file_path": (result.semantic or {}).get("summary_call_file_path"),
                     "summary_call_chunk_ids": (result.semantic or {}).get(
                         "summary_call_chunk_ids", []
                     ),
@@ -407,12 +440,8 @@ class GitAwareIndexManager:
                         "summary_call_timeout_seconds"
                     ),
                     "blocker_source": self._trace_blocker_source(result),
-                    "storage_failure_family": (result.semantic or {}).get(
-                        "storage_failure_family"
-                    ),
-                    "storage_failure_reason": (result.semantic or {}).get(
-                        "storage_failure_reason"
-                    ),
+                    "storage_failure_family": (result.semantic or {}).get("storage_failure_family"),
+                    "storage_failure_reason": (result.semantic or {}).get("storage_failure_reason"),
                     "storage_failure_message": (result.semantic or {}).get(
                         "storage_failure_message"
                     ),
@@ -550,6 +579,167 @@ class GitAwareIndexManager:
             semantic=result.semantic,
         )
 
+    def rebuild_repository_index(self, repo_id: str) -> IndexSyncResult:
+        """Build a full sibling index and publish it atomically for one repository."""
+        with lock_registry.acquire(repo_id):
+            return self._rebuild_repository_index_locked(repo_id)
+
+    def _rebuild_repository_index_locked(self, repo_id: str) -> IndexSyncResult:
+        start_time = datetime.now()
+        repo_info = self.registry.get_repository(repo_id)
+        if repo_info is None:
+            return IndexSyncResult(
+                action="failed", commit="", error=f"Repository not found: {repo_id}"
+            )
+
+        git_state = self.registry.update_git_state(repo_id)
+        current_commit = git_state.get("commit") if git_state else None
+        current_branch = git_state.get("branch") if git_state else None
+        if not current_commit:
+            return IndexSyncResult(action="failed", commit="", error="Failed to get current commit")
+        repo_info.current_commit = current_commit
+        if current_branch:
+            repo_info.current_branch = current_branch
+
+        readiness = ReadinessClassifier.classify_registered(repo_info)
+        if readiness.state not in _RECOVERABLE_REBUILD_STATES:
+            return IndexSyncResult(
+                action="refused",
+                commit=current_commit,
+                code=readiness.state.value,
+                readiness=readiness.to_dict(),
+                error=readiness.remediation,
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
+
+        repo_path = Path(repo_info.path).resolve(strict=False)
+        active_path = Path(repo_info.index_path).resolve(strict=False)
+        active_path.parent.mkdir(parents=True, exist_ok=True)
+        stage_dir = Path(
+            tempfile.mkdtemp(prefix=f".{active_path.name}.staging-", dir=active_path.parent)
+        )
+        stage_path = stage_dir / active_path.name
+        stage_store: Optional[SQLiteStore] = None
+        publication_started = False
+
+        try:
+            stage_store = SQLiteStore(
+                str(stage_path),
+                path_resolver=PathResolver(repo_path),
+            )
+            stage_ctx = RepoContext(
+                repo_id=repo_id,
+                sqlite_store=stage_store,
+                workspace_root=repo_path,
+                tracked_branch=getattr(repo_info, "tracked_branch", "") or "",
+                registry_entry=repo_info,
+            )
+            result = self._normalize_update_result(self._full_index(repo_id, stage_ctx))
+            if not result.clean:
+                error = "; ".join(result.errors) or "Staged full index failed"
+                self.registry.update_last_sync_error(repo_id, error)
+                return IndexSyncResult(
+                    action="failed",
+                    commit=current_commit,
+                    files_processed=result.files_processed,
+                    error=error,
+                    semantic=result.semantic,
+                    duration_seconds=(datetime.now() - start_time).total_seconds(),
+                )
+            if not self._index_path_has_durable_rows(stage_path):
+                error = "Staged full index completed without durable SQLite file rows"
+                self.registry.update_last_sync_error(repo_id, error)
+                return IndexSyncResult(
+                    action="failed",
+                    commit=current_commit,
+                    files_processed=result.files_processed,
+                    error=error,
+                    semantic=result.semantic,
+                    duration_seconds=(datetime.now() - start_time).total_seconds(),
+                )
+
+            self._rebuild_checkpoint("before_replacement")
+            stage_store.close()
+            stage_store = None
+            self._release_runtime_handles(repo_id, repo_info, None)
+            quarantine_path = None
+            if readiness.state in _QUARANTINE_REBUILD_STATES:
+                quarantine_path = self._quarantine_active_index(active_path, readiness.state)
+
+            if not self.registry.update_staleness_reason(repo_id, "index_publication_pending"):
+                raise RuntimeError("Index publication could not be marked pending")
+            publication_started = True
+            for suffix in ("-wal", "-shm"):
+                sidecar = Path(f"{active_path}{suffix}")
+                if sidecar.exists():
+                    sidecar.unlink()
+            os.replace(stage_path, active_path)
+            ReadinessClassifier.clear_index_inspection_cache()
+            self._rebuild_checkpoint("after_replacement")
+            if not self._index_path_has_durable_rows(active_path):
+                raise RuntimeError("Published index failed durable-row validation")
+            self._rebuild_checkpoint("before_provenance")
+            persisted_commit = self.registry.update_indexed_commit(
+                repo_id,
+                current_commit,
+                branch=current_branch,
+            )
+            if persisted_commit != current_commit:
+                raise RuntimeError("Published index provenance could not be recorded")
+            repo_info.last_indexed_commit = current_commit
+            repo_info.staleness_reason = None
+            self.registry.update_last_sync_error(repo_id, None)
+            return IndexSyncResult(
+                action="full_index",
+                commit=current_commit,
+                files_processed=result.indexed,
+                readiness={
+                    "previous_state": readiness.state.value,
+                    "quarantine_path": str(quarantine_path) if quarantine_path else None,
+                },
+                semantic=result.semantic,
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
+        except Exception as exc:
+            error = f"Staged rebuild failed: {exc}"
+            if publication_started:
+                self.registry.update_staleness_reason(repo_id, "partial_index_failure")
+            self.registry.update_last_sync_error(repo_id, error)
+            return IndexSyncResult(
+                action="failed",
+                commit=current_commit,
+                error=error,
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
+        finally:
+            if stage_store is not None:
+                stage_store.close()
+            shutil.rmtree(stage_dir, ignore_errors=True)
+
+    def _rebuild_checkpoint(self, stage: str) -> None:
+        """Failure-injection seam used by publication boundary tests."""
+
+    def _quarantine_active_index(
+        self,
+        active_path: Path,
+        state: RepositoryReadinessState,
+    ) -> Optional[Path]:
+        if not active_path.exists():
+            return None
+        quarantine_dir = active_path.parent / "quarantine"
+        quarantine_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
+        quarantine_path = quarantine_dir / f"{active_path.name}.{state.value}.{timestamp}"
+        shutil.copy2(active_path, quarantine_path)
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(f"{active_path}{suffix}")
+            if sidecar.exists():
+                shutil.copy2(sidecar, Path(f"{quarantine_path}{suffix}"))
+        return quarantine_path
+
+    def _index_path_has_durable_rows(self, path: Path) -> bool:
+        return path.exists() and ReadinessClassifier._inspect_index(path) is None
+
     def _resolve_ctx(self, repo_id: str) -> Optional[RepoContext]:
         """Resolve a RepoContext for the registered repository before mutation."""
         repo_info = self.registry.get_repository(repo_id)
@@ -641,14 +831,26 @@ class GitAwareIndexManager:
         """
         changes = ChangeSet(added=[], modified=[], deleted=[], renamed=[])
         for change in ChangeDetector(repo_path).get_changes_since_commit(from_commit, to_commit):
+            path_excluded = any(part in EXCLUDED_DIR_PARTS for part in Path(change.path).parts)
             if change.change_type == "added":
-                changes.added.append(change.path)
+                if not path_excluded:
+                    changes.added.append(change.path)
             elif change.change_type == "modified":
-                changes.modified.append(change.path)
+                if not path_excluded:
+                    changes.modified.append(change.path)
             elif change.change_type == "deleted":
-                changes.deleted.append(change.path)
+                if not path_excluded:
+                    changes.deleted.append(change.path)
             elif change.change_type == "renamed" and change.old_path:
-                changes.renamed.append((change.old_path, change.path))
+                old_excluded = any(
+                    part in EXCLUDED_DIR_PARTS for part in Path(change.old_path).parts
+                )
+                if old_excluded and not path_excluded:
+                    changes.added.append(change.path)
+                elif not old_excluded and path_excluded:
+                    changes.deleted.append(change.old_path)
+                elif not old_excluded and not path_excluded:
+                    changes.renamed.append((change.old_path, change.path))
 
         return changes
 
@@ -953,18 +1155,20 @@ class GitAwareIndexManager:
         # Index the directory
         logger.info(f"Starting full index of {repo_info.name}")
         try:
-            try:
-                stats = self.dispatcher.index_directory(
-                    ctx,
-                    repo_path,
-                    recursive=True,
-                    progress_callback=progress_callback,
-                )
-            except TypeError as exc:
-                if progress_callback is not None and "progress_callback" in str(exc):
+            if progress_callback is None:
+                stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
+            else:
+                try:
+                    stats = self.dispatcher.index_directory(
+                        ctx,
+                        repo_path,
+                        recursive=True,
+                        progress_callback=progress_callback,
+                    )
+                except TypeError as exc:
+                    if "progress_callback" not in str(exc):
+                        raise
                     stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
-                else:
-                    raise
         except Exception as exc:
             result.failed += 1
             result.errors.append(f"Full index failed: {exc}")
@@ -984,9 +1188,7 @@ class GitAwareIndexManager:
                 "summary_passes": stats.get("summary_passes", 0),
                 "summary_remaining_chunks": stats.get("summary_remaining_chunks", 0),
                 "summary_scope_drained": stats.get("summary_scope_drained", True),
-                "summary_continuation_required": stats.get(
-                    "summary_continuation_required", False
-                ),
+                "summary_continuation_required": stats.get("summary_continuation_required", False),
                 "summary_call_timed_out": stats.get("summary_call_timed_out", False),
                 "summary_call_file_path": stats.get("summary_call_file_path"),
                 "summary_call_chunk_ids": stats.get("summary_call_chunk_ids", []),
@@ -1001,14 +1203,13 @@ class GitAwareIndexManager:
                 "storage_failure_reason": stats.get("storage_failure_reason"),
                 "storage_failure_message": stats.get("storage_failure_message"),
                 "storage_diagnostics": stats.get("storage_diagnostics"),
-                "runtime_restore_declined_reason": stats.get(
-                    "runtime_restore_declined_reason"
-                ),
+                "runtime_restore_declined_reason": stats.get("runtime_restore_declined_reason"),
             }
-            if (
-                stats.get("low_level_blocker") is not None
-                or stats.get("lexical_stage") not in {None, "not_run", "completed"}
-            ):
+            if stats.get("low_level_blocker") is not None or stats.get("lexical_stage") not in {
+                None,
+                "not_run",
+                "completed",
+            }:
                 result.low_level = {
                     "lexical_stage": stats.get("lexical_stage"),
                     "lexical_files_attempted": stats.get("lexical_files_attempted", 0),
@@ -1192,11 +1393,11 @@ class GitAwareIndexManager:
         self,
         repo_id: str,
         repo_info: Any,
-        ctx: RepoContext,
+        ctx: Optional[RepoContext],
     ) -> None:
         if self.store_registry is not None:
             self.store_registry.close(repo_id)
-        sqlite_store = getattr(ctx, "sqlite_store", None)
+        sqlite_store = getattr(ctx, "sqlite_store", None) if ctx is not None else None
         if sqlite_store is not None:
             try:
                 sqlite_store.close()
@@ -1298,9 +1499,7 @@ class GitAwareIndexManager:
                     "summary_call_timed_out": snapshot.get("summary_call_timed_out", False),
                     "summary_call_file_path": snapshot.get("summary_call_file_path"),
                     "summary_call_chunk_ids": snapshot.get("summary_call_chunk_ids", []),
-                    "summary_call_timeout_seconds": snapshot.get(
-                        "summary_call_timeout_seconds"
-                    ),
+                    "summary_call_timeout_seconds": snapshot.get("summary_call_timeout_seconds"),
                     "process_id": os.getpid(),
                     "blocker_source": snapshot.get("blocker_source"),
                     "semantic_stage": snapshot.get("semantic_stage"),
@@ -1355,9 +1554,7 @@ class GitAwareIndexManager:
                 "summary_call_timed_out": previous_trace.get("summary_call_timed_out", False),
                 "summary_call_file_path": previous_trace.get("summary_call_file_path"),
                 "summary_call_chunk_ids": previous_trace.get("summary_call_chunk_ids", []),
-                "summary_call_timeout_seconds": previous_trace.get(
-                    "summary_call_timeout_seconds"
-                ),
+                "summary_call_timeout_seconds": previous_trace.get("summary_call_timeout_seconds"),
                 "process_id": previous_trace.get("process_id"),
                 "blocker_source": previous_trace.get("blocker_source") or "process_interrupt",
                 "semantic_stage": previous_trace.get("semantic_stage"),
@@ -1456,9 +1653,7 @@ class GitAwareIndexManager:
                         "summary_call_timed_out": trace.get("summary_call_timed_out", False),
                         "summary_call_file_path": trace.get("summary_call_file_path"),
                         "summary_call_chunk_ids": trace.get("summary_call_chunk_ids", []),
-                        "summary_call_timeout_seconds": trace.get(
-                            "summary_call_timeout_seconds"
-                        ),
+                        "summary_call_timeout_seconds": trace.get("summary_call_timeout_seconds"),
                         "process_id": trace.get("process_id"),
                         "blocker_source": trace.get("blocker_source") or "process_interrupt",
                         "semantic_stage": trace.get("semantic_stage"),

@@ -93,7 +93,9 @@ def test_normalize_github_issue_uses_title_summary_without_persisting_raw_body()
 def test_normalize_github_issue_extracts_body_learnings_only_when_explicit():
     raw_issue = _fixture("phase_complete")
 
-    without_body = normalize_github_issue(raw_issue, repo="owner/repo", include_body_learnings=False)
+    without_body = normalize_github_issue(
+        raw_issue, repo="owner/repo", include_body_learnings=False
+    )
     with_body = normalize_github_issue(raw_issue, repo="owner/repo", include_body_learnings=True)
 
     assert without_body["learnings"] == []
@@ -107,6 +109,8 @@ def test_extract_issue_learnings_handles_direct_and_bullet_forms():
 
 
 def test_issue_history_dedupe_key_is_stable_for_same_normalized_record():
-    record = normalize_github_issue(_fixture("reflection"), repo="owner/repo", include_body_learnings=True)
+    record = normalize_github_issue(
+        _fixture("reflection"), repo="owner/repo", include_body_learnings=True
+    )
 
     assert issue_history_dedupe_key(record) == issue_history_dedupe_key(dict(record))  # type: ignore[arg-type]

@@ -7,10 +7,12 @@ import asyncio
 import importlib.util
 import json
 import os
+import subprocess
 import threading
 from contextlib import ExitStack
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import mcp.types as types
@@ -40,6 +42,10 @@ def _reset_globals(mod):
     mod._file_watcher = None
     mod._indexing_thread = None
     mod._fts_rebuild_thread = None
+    mod._repo_resolver = None
+    mod._store_registry = None
+    mod._git_index_manager = None
+    mod._local_ctx = None
 
 
 # ---------------------------------------------------------------------------
@@ -392,6 +398,15 @@ class TestIndexingInProgressFlag:
         disp._search_results = search_results
         cli.dispatcher = disp
         cli.sqlite_store = MagicMock()
+        readiness = SimpleNamespace(
+            ready=True,
+            repository_id="test-repo",
+            to_dict=lambda: {"state": "ready", "ready": True, "code": None},
+        )
+        resolver = MagicMock()
+        resolver.classify.return_value = readiness
+        resolver.resolve.return_value = MagicMock()
+        cli._repo_resolver = resolver
         return cli
 
     @pytest.mark.asyncio
@@ -465,6 +480,23 @@ class TestFreshRepoEndToEnd:
         # --- Create a tiny real repo ---
         (tmp_path / "greet.py").write_text("def greet_world():\n    return 'hello world'\n")
         (tmp_path / "math_utils.py").write_text("def add_numbers(a, b):\n    return a + b\n")
+        subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Code Index Test",
+                "-c",
+                "user.email=code-index-test@example.invalid",
+                "commit",
+                "-m",
+                "seed test repository",
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("MCP_AUTO_INDEX", "true")

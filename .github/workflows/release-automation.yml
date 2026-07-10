@@ -3,26 +3,22 @@ name: Release Automation
 
 on:
   workflow_dispatch:
-    # Historical GARC soak target: v1.2.0-rc6.
-    # Historical GARC default: 'v1.2.0-rc6'
     inputs:
-      version:
-        description: 'Version to release (e.g., v1.3.0)'
+      mode:
+        description: 'Prepare a release PR or publish an already-merged release'
         required: true
-        default: 'v1.3.0'
-        type: string
-      release_type:
-        description: 'Release type'
-        required: true
-        default: 'custom'
+        default: 'prepare'
         type: choice
         options:
-          - custom
-          - patch
-          - minor
-          - major
+          - prepare
+          - publish
+      version:
+        description: 'Exact version to prepare or publish (e.g., v1.3.1)'
+        required: true
+        default: 'v1.3.1'
+        type: string
       auto_merge:
-        description: 'Automatically merge the release PR'
+        description: 'Enable auto-merge for the prepared release PR'
         required: false
         default: 'false'
         type: choice
@@ -31,412 +27,323 @@ on:
           - 'true'
 
 permissions:
-  contents: write
-  packages: write
-  issues: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 env:
-  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+  RELEASE_VERSION: ${{ inputs.version }}
 
 jobs:
-  preflight-release-gates:
-    name: Preflight Release Gates
+  validate-dispatch:
+    name: Validate release dispatch
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
+      - name: Validate mode, ref, and version syntax
+        env:
+          MODE: ${{ inputs.mode }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ripgrep
-          python -m pip install --upgrade pip uv
-          uv sync --locked --extra dev --extra semantic
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-
-      - name: Validate requested release version
-        run: |
-          VERSION="${{ inputs.version }}"
-          VERSION_NO_V=${VERSION#v}
-          RELEASE_TYPE="${{ inputs.release_type }}"
-          case "$VERSION" in
-            v*) ;;
+          case "$RELEASE_VERSION" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
             *)
-              echo "::error::Release version must start with v, got '$VERSION'"
+              echo "::error::Version must use a v-prefixed semantic version"
               exit 1
               ;;
           esac
-          grep -q "default: 'v1.3.0'" .github/workflows/release-automation.yml
-          # Stable GA dispatch stays on the existing workflow contract:
-          # Stable tags still use release_type=custom for governed dispatch.
-          # gh workflow run "Release Automation" -f version=v1.3.0 -f release_type=custom -f auto_merge=false
-          if [ "$RELEASE_TYPE" = "custom" ]; then
-            grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
-            grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
-          elif [[ "$VERSION_NO_V" == *-* ]]; then
-            echo "::error::Prerelease tags must use release_type=custom"
+
+          if [ "$MODE" = "publish" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Publish mode must be dispatched from protected main"
+            exit 1
+          fi
+          if [ "$MODE" = "prepare" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "::error::Prepare mode must be dispatched from a release feature branch"
             exit 1
           fi
 
-      - name: Run alpha release gates
-        run: |
-          # Covers the LOCALCI contract plus wheel/stdio smoke on a protected manual run.
-          make agent-gate
-          # Container smoke is the final preflight before release mutation jobs.
-          make release-smoke-container
-
-  prepare-release:
-    name: Prepare Release
-    needs: preflight-release-gates
+  prepare-release-pr:
+    name: Validate release preparation
+    needs: validate-dispatch
+    if: inputs.mode == 'prepare'
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.determine_version.outputs.version }}
-      is_prerelease: ${{ steps.release_flags.outputs.is_prerelease }}
-      docker_tags: ${{ steps.release_flags.outputs.docker_tags }}
-      changelog: ${{ steps.generate_changelog.outputs.changelog }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out prepared branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Determine Version
-        id: determine_version
-        run: |
-          if [ "${{ inputs.release_type }}" == "custom" ]; then
-            VERSION="${{ inputs.version }}"
-          else
-            LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-            [ -z "$LATEST_TAG" ] && LATEST_TAG="v0.0.0"
-            VERSION_MAJOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f1)
-            VERSION_MINOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f2)
-            VERSION_PATCH=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f3)
-            case "${{ inputs.release_type }}" in
-              major)
-                VERSION_MAJOR=$((VERSION_MAJOR + 1))
-                VERSION_MINOR=0
-                VERSION_PATCH=0
-                ;;
-              minor)
-                VERSION_MINOR=$((VERSION_MINOR + 1))
-                VERSION_PATCH=0
-                ;;
-              patch)
-                VERSION_PATCH=$((VERSION_PATCH + 1))
-                ;;
-            esac
-            VERSION="v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Version will be: $VERSION"
-
-      - name: Compute Release Flags
-        id: release_flags
-        run: |
-          VERSION="${{ steps.determine_version.outputs.version }}"
-          VERSION_NO_V=${VERSION#v}
-          if [[ "$VERSION_NO_V" == *-* ]]; then
-            IS_PRERELEASE=true
-          else
-            IS_PRERELEASE=false
-          fi
-          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
-          {
-            echo "docker_tags<<EOF"
-            echo "ghcr.io/viperjuice/code-index-mcp:$VERSION"
-            if [ "$IS_PRERELEASE" = "false" ]; then
-              echo "ghcr.io/viperjuice/code-index-mcp:latest"
-            fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Update Version Files
-        run: |
-          VERSION="${{ steps.determine_version.outputs.version }}"
-          VERSION_NO_V=${VERSION#v}
-          sed -i "s/^version = .*/version = \"$VERSION_NO_V\"/" pyproject.toml
-          find . -name "__init__.py" -path "*/mcp_server/*" -exec sed -i "s/__version__ = .*/__version__ = \"$VERSION_NO_V\"/" {} \; 2>/dev/null || true
-
-      - name: Generate Changelog
-        id: generate_changelog
-        run: |
-          VERSION="${{ steps.determine_version.outputs.version }}"
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          {
-            echo "# Changelog for $VERSION"
-            echo ""
-            echo "## What's Changed"
-            echo ""
-            if [ -n "$PREVIOUS_TAG" ]; then
-              git log "${PREVIOUS_TAG}..HEAD" --pretty=format:"- %s (%an)"
-            else
-              echo "Initial release"
-            fi
-          } > RELEASE_NOTES.md
-          printf '\n' >> RELEASE_NOTES.md
-          DELIMITER="release_notes_${RANDOM}_$(date +%s%N)"
-          {
-            echo "changelog<<$DELIMITER"
-            cat RELEASE_NOTES.md
-            echo "$DELIMITER"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Update CHANGELOG.md
-        run: |
-          VERSION="${{ steps.determine_version.outputs.version }}"
-          DATE=$(date +%Y-%m-%d)
-          {
-            echo "# Changelog"
-            echo ""
-            echo "## [$VERSION] - $DATE"
-            tail -n +2 RELEASE_NOTES.md
-            echo ""
-            if [ -f CHANGELOG.md ]; then
-              tail -n +2 CHANGELOG.md
-            fi
-          } > CHANGELOG.tmp
-          mv CHANGELOG.tmp CHANGELOG.md
-
-      - name: Commit Version Changes
-        run: |
-          VERSION="${{ steps.determine_version.outputs.version }}"
-          git add -A
-          git commit -m "chore: bump version to $VERSION" || echo "No changes to commit"
-
-      - name: Create Release Branch
-        run: |
-          VERSION="${{ steps.determine_version.outputs.version }}"
-          BRANCH="release/$VERSION"
-          git checkout -b "$BRANCH"
-          git push origin "$BRANCH"
-
-  run-tests:
-    name: Run Release Tests
-    needs: [preflight-release-gates, prepare-release]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: release/${{ needs.prepare-release.outputs.version }}
+          ref: ${{ github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Validate prepared version
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          test "$GITHUB_REF_NAME" != "main"
+          git fetch origin main
+          git merge-base --is-ancestor origin/main HEAD
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+
+      - name: Run release preparation gates
         run: |
           python -m pip install --upgrade pip uv
-          uv sync --locked --extra dev
+          uv sync --locked --extra dev --extra semantic
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          make agent-gate
+          make release-smoke
+          make release-smoke-container
 
-      - name: Run release smoke tests
-        run: make release-smoke
-
-      - name: Validate version consistency
-        run: |
-          VERSION="${{ needs.prepare-release.outputs.version }}"
-          VERSION_NO_V=${VERSION#v}
-          grep -q "version = \"$VERSION_NO_V\"" pyproject.toml || exit 1
-          grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py || exit 1
-          echo "Version consistency check passed"
-
-  build-artifacts:
-    name: Build Release Artifacts
-    needs: [preflight-release-gates, prepare-release, run-tests]
+  create-release-pr:
+    name: Create release pull request
+    needs: prepare-release-pr
+    if: inputs.mode == 'prepare'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      pr_number: ${{ steps.release_pr.outputs.number }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Create or update release pull request
+        id: release_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          BRANCH="$GITHUB_REF_NAME"
+          TITLE="Release $RELEASE_VERSION"
+          cat > "$RUNNER_TEMP/release-pr.md" <<EOF
+          ## Release $RELEASE_VERSION
+
+          This PR prepares the repo-owned $RELEASE_VERSION package and documentation surface.
+          Publication remains a separate protected-main workflow dispatch after merge.
+
+          - [x] Local release gates passed
+          - [x] Version metadata is exact
+          - [x] No tag or package was published by prepare mode
+          EOF
+          PR_NUMBER=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -z "$PR_NUMBER" ]; then
+            PR_URL=$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/release-pr.md")
+            PR_NUMBER=${PR_URL##*/}
+          else
+            gh pr edit "$PR_NUMBER" --title "$TITLE" --body-file "$RUNNER_TEMP/release-pr.md"
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+
+  enable-release-auto-merge:
+    name: Enable release pull request auto-merge
+    needs: create-release-pr
+    if: inputs.mode == 'prepare' && inputs.auto_merge == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.create-release-pr.outputs.pr_number }}
+        run: gh pr merge "$PR_NUMBER" --auto --merge
+
+  preflight-publish:
+    name: Verify protected main and run release gates
+    needs: validate-dispatch
+    if: inputs.mode == 'publish' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out exact protected-main commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: release/${{ needs.prepare-release.outputs.version }}
+          fetch-depth: 0
+          ref: ${{ github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
-      - name: Build Python package
+      - name: Prove exact protected-main version
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_VERSION"; then
+            test "$(git rev-list -n 1 "$RELEASE_VERSION")" = "${{ github.sha }}"
+          fi
+
+      - name: Run release gates
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev --extra semantic
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          make agent-gate
+          make release-smoke
+          make release-smoke-container
+
+  build-release:
+    name: Build artifacts from protected main
+    needs: preflight-publish
+    if: inputs.mode == 'publish' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Check out exact protected-main commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Build Python distributions
         run: |
           python -m pip install --upgrade pip uv
           uv sync --locked --extra dev
           uv build
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/dockerfiles/Dockerfile.production
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ needs.prepare-release.outputs.docker_tags }}
-          build-args: |
-            VERSION=${{ needs.prepare-release.outputs.version }}
-            BUILD_DATE=${{ github.event.repository.updated_at }}
-            VCS_REF=${{ github.sha }}
-
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           path: .
           format: spdx-json
           output-file: sbom.spdx.json
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
-          name: release-artifacts
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guard protected main before build and push container images
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+
+      - name: Build and push container images
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./docker/dockerfiles/Dockerfile.production
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          tags: |
+            ghcr.io/viperjuice/code-index-mcp:${{ inputs.version }}
+            ${{ !contains(inputs.version, '-') && 'ghcr.io/viperjuice/code-index-mcp:latest' || '' }}
+          labels: |
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-artifacts-${{ github.sha }}
+          if-no-files-found: error
           path: |
             dist/
             sbom.spdx.json
-            RELEASE_NOTES.md
+            CHANGELOG.md
 
-  create-release:
-    name: Create GitHub Release
-    needs: [preflight-release-gates, prepare-release, build-artifacts]
+  publish-release:
+    name: Publish protected-main artifacts
+    needs: build-release
+    if: inputs.mode == 'publish' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out exact protected-main commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: release/${{ needs.prepare-release.outputs.version }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.sha }}
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v8
+      - name: Download exact release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: release-artifacts
+          name: release-artifacts-${{ github.sha }}
+          path: .
+
+      - name: Guard protected main before create and push tag
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
 
       - name: Create and push tag
         run: |
-          VERSION="${{ needs.prepare-release.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$VERSION" -m "Release $VERSION"
-          git push origin "$VERSION"
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_VERSION"; then
+            test "$(git rev-list -n 1 "$RELEASE_VERSION")" = "${{ github.sha }}"
+          else
+            git tag -a "$RELEASE_VERSION" "${{ github.sha }}" -m "Release $RELEASE_VERSION"
+            git push origin "$RELEASE_VERSION"
+          fi
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+      - name: Guard protected main before create github release
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+          test "$(git rev-list -n 1 "$RELEASE_VERSION")" = "${{ github.sha }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
-          tag_name: ${{ needs.prepare-release.outputs.version }}
-          name: Release ${{ needs.prepare-release.outputs.version }}
-          body: ${{ needs.prepare-release.outputs.changelog }}
+          tag_name: ${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Release ${{ inputs.version }}
+          body_path: CHANGELOG.md
           draft: false
-          prerelease: ${{ needs.prepare-release.outputs.is_prerelease }}
+          prerelease: ${{ contains(inputs.version, '-') }}
           files: |
             dist/*
             sbom.spdx.json
-            CHANGELOG.md
-            docs/DEPLOYMENT-GUIDE.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guard protected main before publish to pypi
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+          test "$(git rev-list -n 1 "$RELEASE_VERSION")" = "${{ github.sha }}"
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           packages-dir: dist/
-
-  merge-release:
-    name: Merge Release Branch
-    needs: [preflight-release-gates, prepare-release, create-release]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: release/${{ needs.prepare-release.outputs.version }}
-          base: main
-          title: "Release ${{ needs.prepare-release.outputs.version }}"
-          body: |
-            ## Release ${{ needs.prepare-release.outputs.version }}
-
-            GAREL stable release contract target: v1.3.0
-
-            This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
-
-            ### Checklist
-            - [x] Alpha release gates passed
-            - [x] Version bumped
-            - [x] Changelog updated
-            - [x] Release smoke passed
-            - [x] Docker images built
-            - [x] Release created
-
-            ### Release Notes
-            ${{ needs.prepare-release.outputs.changelog }}
-          labels: |
-            release
-            automated
-
-      - name: Auto-merge PR
-        if: ${{ github.event.inputs.auto_merge == 'true' }}
-        run: |
-          PR_NUMBER=$(gh pr list --base main --head release/${{ needs.prepare-release.outputs.version }} --json number -q '.[0].number')
-          gh pr merge "$PR_NUMBER" --auto --merge
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  post-release:
-    name: Post-Release Tasks
-    needs: [preflight-release-gates, prepare-release, create-release]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Update documentation
-        run: |
-          VERSION="${{ needs.prepare-release.outputs.version }}"
-          echo "No automatic documentation rewrite for $VERSION; release docs are version-gated in source."
-
-      - name: Notify Slack
-        if: env.SLACK_WEBHOOK != ''
-        run: |
-          VERSION="${{ needs.prepare-release.outputs.version }}"
-          curl -X POST "$SLACK_WEBHOOK" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\":\"MCP Server $VERSION has been released.\"}"
-
-      - name: Trigger deployment workflows
-        run: |
-          VERSION="${{ needs.prepare-release.outputs.version }}"
-          if gh workflow view deploy-staging.yml >/dev/null 2>&1; then
-            gh workflow run deploy-staging.yml -f version=$VERSION
-          else
-            echo "deploy-staging.yml not present; skipping staging trigger"
-          fi
-          gh label create deployment --color 1d76db --description "Deployment tracking" 2>/dev/null || true
-          gh label create production --color b60205 --description "Production release work" 2>/dev/null || true
-          gh issue create \
-            --title "Production Deployment: $VERSION" \
-            --body "Please review and approve production deployment for version $VERSION" \
-            --label "deployment,production"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

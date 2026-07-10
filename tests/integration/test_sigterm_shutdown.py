@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+import selectors
 import signal
+import subprocess
+import sys
 import time
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -54,6 +57,14 @@ class FakeExporter:
         self._calls.append("exporter.stop")
 
 
+class FakeDispatcher:
+    def __init__(self, calls: list[str]) -> None:
+        self._calls = calls
+
+    def shutdown(self) -> None:
+        self._calls.append("dispatcher.shutdown")
+
+
 # ---------------------------------------------------------------------------
 # Tests for _graceful_shutdown
 # ---------------------------------------------------------------------------
@@ -73,17 +84,24 @@ class TestGracefulShutdown:
         return _graceful_shutdown
 
     def test_shutdown_calls_components_in_order(self):
-        """Stop order: watcher -> poller -> store -> exporter."""
+        """Stop order includes plugin workers before storage and metrics."""
         calls: list[str] = []
         watcher = FakeWatcher(calls)
         poller = FakePoller(calls)
         store = FakeStoreRegistry(calls)
         exporter = FakeExporter(calls)
+        dispatcher = FakeDispatcher(calls)
 
         shutdown = self._get_shutdown_fn()
-        asyncio.run(shutdown(watcher, poller, store, exporter, timeout=5.0))
+        asyncio.run(shutdown(watcher, poller, store, exporter, dispatcher=dispatcher, timeout=5.0))
 
-        assert calls == ["watcher.stop", "poller.stop", "store.shutdown", "exporter.stop"]
+        assert calls == [
+            "watcher.stop",
+            "poller.stop",
+            "dispatcher.shutdown",
+            "store.shutdown",
+            "exporter.stop",
+        ]
 
     def test_shutdown_with_none_watcher(self):
         """None watcher is tolerated — poller/store/exporter still called."""
@@ -154,6 +172,84 @@ class TestGracefulShutdown:
         assert calls.count("poller.stop") == 1
         assert calls.count("store.shutdown") == 1
         assert calls.count("exporter.stop") == 1
+
+
+_PARENT_DEATH_PROBE = r'''
+import sys
+import time
+
+from mcp_server.sandbox.capabilities import CapabilitySet
+from mcp_server.sandbox.supervisor import SandboxSupervisor
+
+worker_code = """import json
+import sys
+line = sys.stdin.buffer.readline()
+env = json.loads(line.decode('utf-8'))
+env['kind'] = 'result'
+env['payload'] = {'ok': True}
+sys.stdout.write(json.dumps(env) + '\\n')
+sys.stdout.flush()
+sys.stdin.buffer.read()
+"""
+caps = CapabilitySet(fs_read=(), fs_write=(), env_allow=frozenset())
+supervisor = SandboxSupervisor([sys.executable, '-c', worker_code], caps)
+supervisor.call('ping', {}, timeout=5.0)
+print(supervisor.worker_pid, flush=True)
+time.sleep(60)
+'''
+
+
+def _wait_for_pid_exit(pid: int, timeout: float = 5.0) -> bool:
+    import psutil
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            process = psutil.Process(pid)
+            if not process.is_running() or process.status() == psutil.STATUS_ZOMBIE:
+                return True
+        except psutil.NoSuchProcess:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX signals required")
+@pytest.mark.parametrize("parent_signal", [signal.SIGTERM, signal.SIGINT, signal.SIGKILL])
+def test_parent_signal_leaves_no_live_sandbox_worker(parent_signal):
+    """The worker stdin watchdog reaps children after parent death."""
+    parent = subprocess.Popen(
+        [sys.executable, "-c", _PARENT_DEATH_PROBE],
+        cwd=str(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    child_pid = None
+    try:
+        assert parent.stdout is not None
+        selector = selectors.DefaultSelector()
+        selector.register(parent.stdout, selectors.EVENT_READ)
+        try:
+            assert selector.select(10.0), "parent did not report sandbox worker PID"
+            child_pid = int(parent.stdout.readline().strip())
+        finally:
+            selector.close()
+
+        os.kill(parent.pid, parent_signal)
+        parent.wait(timeout=5.0)
+        assert _wait_for_pid_exit(
+            child_pid
+        ), f"sandbox worker {child_pid} survived parent signal {parent_signal}"
+    finally:
+        if parent.poll() is None:
+            parent.kill()
+            parent.wait(timeout=5.0)
+        if child_pid is not None and not _wait_for_pid_exit(child_pid, timeout=0.1):
+            try:
+                os.kill(child_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 # ---------------------------------------------------------------------------

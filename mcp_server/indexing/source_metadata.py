@@ -84,11 +84,7 @@ def _normalize_history_issue_type(issue_type: str) -> HistoryIssueType:
 
 
 def _normalize_string_list(values: Iterable[Any]) -> list[str]:
-    normalized = {
-        str(value).strip()
-        for value in values
-        if str(value).strip()
-    }
+    normalized = {str(value).strip() for value in values if str(value).strip()}
     return sorted(normalized, key=str.lower)
 
 
@@ -220,7 +216,9 @@ def extract_matching_source_metadata(
 
     normalized_categories = None
     if friction_categories is not None:
-        normalized_categories = {normalize_friction_category(category) for category in friction_categories}
+        normalized_categories = {
+            normalize_friction_category(category) for category in friction_categories
+        }
 
     normalized_history_labels = None
     if history_labels is not None:
