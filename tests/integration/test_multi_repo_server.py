@@ -450,18 +450,39 @@ class TestSummarizeSampleScopedToRepo:
             store_b = srv.store_registry.get(repo_id_b)
 
             from mcp_server.cli import tool_handlers
+            from mcp_server.indexing.summarization import (
+                FileBatchSummarizer,
+                GeneratedSummary,
+                SummaryGenerationResult,
+            )
+
+            async def fake_summarize(*_args, **_kwargs):
+                return SummaryGenerationResult(
+                    chunks_attempted=2,
+                    summaries_written=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=("missing-chunk",),
+                    remaining_chunks=1,
+                    scope_drained=False,
+                    summaries=(GeneratedSummary("generated-chunk", "Generated summary"),),
+                )
 
             loop = asyncio.new_event_loop()
             try:
-                result = loop.run_until_complete(
-                    tool_handlers.handle_summarize_sample(
-                        arguments={"repository": str(repo_b), "n": 1},
-                        dispatcher=srv.dispatcher,
-                        repo_resolver=srv.repo_resolver,
-                        sqlite_store=store_b,
-                        lazy_summarizer=mock_lazy_summarizer,
+                with patch.object(
+                    FileBatchSummarizer,
+                    "summarize_file_chunks",
+                    new=fake_summarize,
+                ):
+                    result = loop.run_until_complete(
+                        tool_handlers.handle_summarize_sample(
+                            arguments={"repository": str(repo_b), "n": 1},
+                            dispatcher=srv.dispatcher,
+                            repo_resolver=srv.repo_resolver,
+                            sqlite_store=store_b,
+                            lazy_summarizer=mock_lazy_summarizer,
+                        )
                     )
-                )
             finally:
                 loop.close()
 
@@ -473,3 +494,6 @@ class TestSummarizeSampleScopedToRepo:
                 assert (
                     str(repo_b) in fp
                 ), f"summarize_sample returned file from outside repo_b: {fp}"
+        assert result_data["files"][0]["summaries_written"] == 1
+        assert result_data["files"][0]["missing_chunk_ids"] == ["missing-chunk"]
+        assert result_data["files"][0]["scope_drained"] is False

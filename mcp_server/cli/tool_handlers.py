@@ -1537,7 +1537,7 @@ async def handle_summarize_sample(
         )
 
         try:
-            summaries = await summarizer.summarize_file_chunks(
+            summary_result = await summarizer.summarize_file_chunks(
                 file_id=file_id,
                 file_path=file_path,
                 file_content=file_content,
@@ -1549,6 +1549,7 @@ async def handle_summarize_sample(
             file_results.append({"file_path": file_path, "error": str(_e)})
             continue
 
+        summaries = summary_result.summaries
         chunk_meta = {c["chunk_id"]: c for c in chunks}
         summary_list = []
         for s in summaries:
@@ -1562,11 +1563,18 @@ async def handle_summarize_sample(
                 }
             )
 
-        total_chunks += len(summaries)
+        total_chunks += summary_result.summaries_written
         file_results.append(
             {
                 "file_path": file_path,
                 "chunk_count": len(summaries),
+                "chunks_attempted": summary_result.chunks_attempted,
+                "summaries_written": summary_result.summaries_written,
+                "authoritative_chunks": summary_result.authoritative_chunks,
+                "missing_chunk_ids": list(summary_result.missing_chunk_ids),
+                "remaining_chunks": summary_result.remaining_chunks,
+                "scope_drained": summary_result.scope_drained,
+                "blocked_call_reason": summary_result.blocked_call_reason,
                 "summaries": summary_list,
             }
         )

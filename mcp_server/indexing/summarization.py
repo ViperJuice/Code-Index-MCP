@@ -8,7 +8,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 
 import mcp.types as types
 
@@ -55,13 +55,35 @@ class FileTooLargeError(Exception):
 
 
 @dataclass(frozen=True)
+class GeneratedSummary:
+    """Immutable normalized summary generated for one chunk."""
+
+    chunk_id: str
+    summary: str
+
+
+def _normalize_generated_summaries(items: Sequence[Any]) -> Tuple[GeneratedSummary, ...]:
+    normalized = []
+    for item in items:
+        if isinstance(item, GeneratedSummary):
+            normalized.append(item)
+            continue
+        chunk_id = getattr(item, "chunk_id", None)
+        summary = getattr(item, "summary", None)
+        if not isinstance(chunk_id, str) or not isinstance(summary, str):
+            raise TypeError("Generated summaries require string chunk_id and summary fields")
+        normalized.append(GeneratedSummary(chunk_id=chunk_id, summary=summary))
+    return tuple(normalized)
+
+
+@dataclass(frozen=True)
 class SummaryGenerationResult:
     """Structured result for authoritative summary generation."""
 
     chunks_attempted: int = 0
     summaries_written: int = 0
     authoritative_chunks: int = 0
-    missing_chunk_ids: List[str] = field(default_factory=list)
+    missing_chunk_ids: Tuple[str, ...] = field(default_factory=tuple)
     files_attempted: int = 0
     files_summarized: int = 0
     batches_processed: int = 0
@@ -69,16 +91,15 @@ class SummaryGenerationResult:
     scope_drained: bool = True
     blocked_call_reason: Optional[str] = None
     blocked_call_file_path: Optional[str] = None
-    blocked_call_chunk_ids: List[str] = field(default_factory=list)
+    blocked_call_chunk_ids: Tuple[str, ...] = field(default_factory=tuple)
     blocked_call_timeout_seconds: Optional[float] = None
     cancelled: bool = False
-    summaries: List[Any] = field(default_factory=list)
+    summaries: Tuple[GeneratedSummary, ...] = field(default_factory=tuple)
 
-    def __iter__(self) -> Iterator[Any]:
-        return iter(self.summaries)
-
-    def __len__(self) -> int:
-        return len(self.summaries)
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "missing_chunk_ids", tuple(self.missing_chunk_ids))
+        object.__setattr__(self, "blocked_call_chunk_ids", tuple(self.blocked_call_chunk_ids))
+        object.__setattr__(self, "summaries", _normalize_generated_summaries(self.summaries))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -96,6 +117,10 @@ class SummaryGenerationResult:
             "blocked_call_chunk_ids": list(self.blocked_call_chunk_ids),
             "blocked_call_timeout_seconds": self.blocked_call_timeout_seconds,
             "cancelled": self.cancelled,
+            "summaries": [
+                {"chunk_id": item.chunk_id, "summary": item.summary}
+                for item in self.summaries
+            ],
         }
 
 
@@ -604,14 +629,14 @@ class FileBatchSummarizer(ChunkWriter):
             chunks_attempted=len(selected_chunks),
             summaries_written=0,
             authoritative_chunks=existing_authoritative,
-            missing_chunk_ids=[chunk["chunk_id"] for chunk in remaining_chunks],
+            missing_chunk_ids=tuple(chunk["chunk_id"] for chunk in remaining_chunks),
             files_attempted=1,
             files_summarized=0,
             remaining_chunks=len(remaining_chunks),
             scope_drained=False,
             blocked_call_reason=reason,
             blocked_call_file_path=file_path,
-            blocked_call_chunk_ids=[chunk["chunk_id"] for chunk in selected_chunks],
+            blocked_call_chunk_ids=tuple(chunk["chunk_id"] for chunk in selected_chunks),
             blocked_call_timeout_seconds=timeout_seconds,
         )
 
@@ -620,12 +645,12 @@ class FileBatchSummarizer(ChunkWriter):
         summary_call: Any,
         *,
         timeout_seconds: float,
-    ) -> List[Any]:
+    ) -> Sequence[Any]:
         """Bound the summary call and stop waiting once cancellation has been requested."""
         task = asyncio.create_task(summary_call)
         done, _pending = await asyncio.wait({task}, timeout=timeout_seconds)
         if done:
-            return await task
+            return cast(Sequence[Any], await task)
 
         task.cancel()
         try:
@@ -651,14 +676,16 @@ class FileBatchSummarizer(ChunkWriter):
         warning_prefix: str,
         error: Exception,
         retry_profile_batch: bool = True,
-    ) -> SummaryGenerationResult | List[Any]:
+    ) -> Tuple[GeneratedSummary, ...]:
         logger.warning(
             "%s for %s (%s), falling back to per-chunk path", warning_prefix, file_path, error
         )
         if retry_profile_batch and self.summarization_config.get("base_url"):
             try:
-                return await self._call_profile_batch_api(
-                    file_id, file_path, file_content, chunks, symbol_map
+                return _normalize_generated_summaries(
+                    await self._call_profile_batch_api(
+                        file_id, file_path, file_content, chunks, symbol_map
+                    )
                 )
             except Exception as profile_exc:
                 logger.warning(
@@ -781,7 +808,7 @@ class FileBatchSummarizer(ChunkWriter):
         file_content: str,
         chunks: List[Dict],
         symbol_map: Dict[int, str],
-    ) -> SummaryGenerationResult:
+    ) -> Sequence[Any]:
         """Call BAML SummarizeFileChunks for all chunks in a single request.
 
         Raises ``FileTooLargeError`` when *file_content* exceeds the threshold
@@ -815,7 +842,7 @@ class FileBatchSummarizer(ChunkWriter):
             file_content=file_content,
             chunks=chunk_inputs,
         )
-        return result.summaries
+        return cast(Sequence[Any], result.summaries)
 
     async def _summarize_topological(
         self,
@@ -825,15 +852,14 @@ class FileBatchSummarizer(ChunkWriter):
         chunks: List[Dict],
         symbol_map: Dict[int, str],
         max_chunks: Optional[int] = None,
-    ) -> List[Any]:
+    ) -> Tuple[GeneratedSummary, ...]:
         """Per-chunk fallback: summarize in topological order (leaves first)."""
         order = _topological_order(chunks)
         if max_chunks is not None:
             order = order[:max_chunks]
         chunk_map = {c["chunk_id"]: c for c in chunks}
         stored_summaries: Dict[str, str] = {}
-        results: List[Any] = []
-        missing_chunk_ids: List[str] = []
+        results: List[GeneratedSummary] = []
 
         for chunk_id in order:
             c = chunk_map[chunk_id]
@@ -871,21 +897,11 @@ class FileBatchSummarizer(ChunkWriter):
                 )
                 if summary_text:
                     stored_summaries[chunk_id] = summary_text
-                    results.append(SimpleNamespace(chunk_id=chunk_id, summary=summary_text))
-                else:
-                    missing_chunk_ids.append(chunk_id)
+                    results.append(GeneratedSummary(chunk_id=chunk_id, summary=summary_text))
             except Exception as exc:
                 logger.error("Failed to summarize chunk %s: %s", chunk_id, exc)
-                missing_chunk_ids.append(chunk_id)
 
-        return SummaryGenerationResult(
-            chunks_attempted=len(order),
-            summaries_written=len(results),
-            authoritative_chunks=len(results),
-            missing_chunk_ids=missing_chunk_ids,
-            files_attempted=1,
-            files_summarized=1 if results else 0,
-        )
+        return tuple(results)
 
     async def summarize_file_chunks(
         self,
@@ -906,7 +922,7 @@ class FileBatchSummarizer(ChunkWriter):
         ``chunk_summaries`` with
         ``is_authoritative=1`` when *persist* is ``True``.
 
-        Returns a list of ``ChunkSummary`` objects.
+        Returns one ``SummaryGenerationResult`` for every outcome.
         """
         if symbol_map is None:
             symbol_map = {}
@@ -926,7 +942,7 @@ class FileBatchSummarizer(ChunkWriter):
                 chunks_attempted=len(chunks),
                 summaries_written=0,
                 authoritative_chunks=len(chunks),
-                missing_chunk_ids=[],
+                missing_chunk_ids=(),
                 files_attempted=1,
                 files_summarized=0,
             )
@@ -934,6 +950,7 @@ class FileBatchSummarizer(ChunkWriter):
         existing_authoritative = len(chunks) - len(to_summarize)
 
         try:
+            summary_call: Any
             if self.summarization_config.get("base_url"):
                 summary_call = self._call_profile_batch_api(
                     file_id, file_path, file_content, active_chunks, symbol_map
@@ -943,13 +960,13 @@ class FileBatchSummarizer(ChunkWriter):
                     file_id, file_path, file_content, active_chunks, symbol_map
                 )
             if call_timeout_seconds is not None:
-                summaries = await self._await_summary_call_with_timeout(
+                provider_summaries = await self._await_summary_call_with_timeout(
                     summary_call,
                     timeout_seconds=call_timeout_seconds,
                 )
             else:
-                summaries = await summary_call
-            missing_chunk_ids: List[str] = []
+                provider_summaries = await summary_call
+            summaries = _normalize_generated_summaries(provider_summaries)
         except TimeoutError:
             return self._blocked_call_result(
                 reason="timeout",
@@ -970,10 +987,7 @@ class FileBatchSummarizer(ChunkWriter):
                 error=exc,
                 retry_profile_batch=True,
             )
-            if isinstance(recovery, SummaryGenerationResult):
-                return recovery
             summaries = recovery
-            missing_chunk_ids = []
         except Exception as exc:
             recovery = await self._recover_with_profile_or_topological(
                 file_id=file_id,
@@ -985,15 +999,22 @@ class FileBatchSummarizer(ChunkWriter):
                 error=exc,
                 retry_profile_batch=not self.summarization_config.get("base_url"),
             )
-            if isinstance(recovery, SummaryGenerationResult):
-                return recovery
             summaries = recovery
-            missing_chunk_ids = []
 
         if persist and summaries:
-            model_name = self._get_model_name()
+            with sqlite3.connect(self.db_path) as conn:
+                persisted_hashes = {
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT chunk_hash FROM chunk_summaries WHERE is_authoritative=1"
+                    ).fetchall()
+                }
+            summaries_to_persist = [
+                summary for summary in summaries if summary.chunk_id not in persisted_hashes
+            ]
             chunk_lookup = {c["chunk_id"]: c for c in active_chunks}
-            for s in summaries:
+            model_name = self._get_model_name() if summaries_to_persist else None
+            for s in summaries_to_persist:
                 c = chunk_lookup.get(s.chunk_id)
                 if c is None:
                     continue
@@ -1005,12 +1026,12 @@ class FileBatchSummarizer(ChunkWriter):
                     chunk_end=c.get("line_end") or 1,
                     symbol=sym,
                     summary_text=s.summary,
-                    model_name=model_name,
+                    model_name=model_name or "unknown",
                     is_authoritative=True,
                 )
             logger.info(
                 "FileBatchSummarizer: persisted %d summaries for %s",
-                len(summaries),
+                len(summaries_to_persist),
                 file_path,
             )
 
@@ -1022,7 +1043,7 @@ class FileBatchSummarizer(ChunkWriter):
             chunks_attempted=len(active_chunks),
             summaries_written=len(summaries),
             authoritative_chunks=existing_authoritative + len(summaries),
-            missing_chunk_ids=missing_chunk_ids,
+            missing_chunk_ids=tuple(missing_chunk_ids),
             files_attempted=1,
             files_summarized=1 if summaries else 0,
             remaining_chunks=len(missing_chunk_ids),
@@ -1149,7 +1170,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                     chunks_attempted=total_attempted,
                     summaries_written=total_summaries_written,
                     authoritative_chunks=total_authoritative_chunks,
-                    missing_chunk_ids=missing_chunk_ids,
+                    missing_chunk_ids=tuple(missing_chunk_ids),
                     files_attempted=total_files_attempted,
                     files_summarized=total_files_summarized,
                     batches_processed=batches_processed,
@@ -1230,7 +1251,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                         chunks_attempted=total_attempted,
                         summaries_written=total_summaries_written,
                         authoritative_chunks=total_authoritative_chunks,
-                        missing_chunk_ids=missing_chunk_ids,
+                        missing_chunk_ids=tuple(missing_chunk_ids),
                         files_attempted=total_files_attempted,
                         files_summarized=total_files_summarized,
                         batches_processed=batches_processed,
@@ -1273,7 +1294,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                             chunks_attempted=total_attempted,
                             summaries_written=total_summaries_written,
                             authoritative_chunks=total_authoritative_chunks,
-                            missing_chunk_ids=missing_chunk_ids,
+                            missing_chunk_ids=tuple(missing_chunk_ids),
                             files_attempted=total_files_attempted,
                             files_summarized=total_files_summarized,
                             batches_processed=batches_processed,
@@ -1311,7 +1332,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             chunks_attempted=total_attempted,
             summaries_written=total_summaries_written,
             authoritative_chunks=total_authoritative_chunks,
-            missing_chunk_ids=missing_chunk_ids,
+            missing_chunk_ids=tuple(missing_chunk_ids),
             files_attempted=total_files_attempted,
             files_summarized=total_files_summarized,
             batches_processed=batches_processed,
