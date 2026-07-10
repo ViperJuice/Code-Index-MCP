@@ -2,7 +2,7 @@
 # PowerShell script to install and configure MCP Index with Docker
 
 param(
-    [string]$Variant = "v1.3.1",
+    [string]$Variant = "local-smoke",
     [string]$Version = "v1.3.1"
 )
 
@@ -80,31 +80,39 @@ function Install-Docker {
 function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
-    Write-Host "1) v1.3.1      - Prepared hardening image (recommended)"
-    Write-Host "2) latest      - Stable-only channel; may not exist before GA"
-    Write-Host "3) local-smoke - Local smoke image built by make release-smoke-container"
+    Write-Host "1) local-smoke - Local image built by make release-smoke-container (default)"
+    Write-Host "2) v1.3.1      - Available only after protected-main publication"
+    Write-Host "3) latest      - Stable-only channel"
     Write-Host ""
     
     $choice = Read-Host "Select variant [1-3] (default: 1)"
     
     switch ($choice) {
         "2" {
+            $script:Variant = "v1.3.1"
+            Write-Host "[INFO] Selected: v1.3.1" -ForegroundColor Green
+        }
+        "3" {
             $script:Variant = "latest"
             Write-Host "[INFO] Selected: latest" -ForegroundColor Green
         }
-        "3" {
+        default {
             $script:Variant = "local-smoke"
             Write-Host "[INFO] Selected: local-smoke" -ForegroundColor Green
-        }
-        default {
-            $script:Variant = "v1.3.1"
-            Write-Host "[INFO] Selected: v1.3.1" -ForegroundColor Green
         }
     }
 }
 
 function Pull-Image {
     $imageTag = "${MCPImage}:${Variant}"
+    if ($Variant -eq "local-smoke") {
+        Write-Host "[WARN] v1.3.1 is prepared but unpublished; using the local smoke image." -ForegroundColor Yellow
+        docker image inspect $imageTag *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Local smoke image not found. Run 'make release-smoke-container' first."
+        }
+        return
+    }
     Write-Host "[INFO] Pulling MCP Index image: $imageTag" -ForegroundColor Green
     docker pull $imageTag
 }
@@ -115,7 +123,7 @@ function Create-Launcher {
 REM MCP Index Docker Launcher for Windows
 
 SET MCP_VARIANT=%MCP_VARIANT%
-IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.3.1
+IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke
 
 SET MCP_IMAGE=ghcr.io/viperjuice/code-index-mcp
 SET WORKSPACE=%CD%

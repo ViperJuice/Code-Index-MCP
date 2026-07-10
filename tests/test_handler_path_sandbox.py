@@ -101,6 +101,147 @@ class TestLooksLikePath:
         assert _looks_like_path("some/sub/dir") is True
 
 
+class TestSelectorSandboxPrecedence:
+    def test_exact_registered_name_wins_over_existing_relative_path(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import _repository_selector_path
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        registered = tmp_path / "allowed" / "registered"
+        registered.mkdir(parents=True)
+        collision = tmp_path / "registered-name"
+        collision.mkdir()
+        monkeypatch.chdir(tmp_path)
+        readiness = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-id",
+            repository_name="registered-name",
+            registered_path=str(registered),
+            requested_path=None,
+        )
+
+        assert _repository_selector_path("registered-name", readiness) is None
+
+        path_readiness = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-id",
+            repository_name="other-name",
+            registered_path=str(registered),
+            requested_path=str(collision),
+        )
+        assert _repository_selector_path("registered-name", path_readiness) == Path(
+            "registered-name"
+        )
+
+    def test_exact_registered_name_bypasses_path_guard_for_all_repository_tools(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.cli import tool_handlers
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        registered = tmp_path / "allowed" / "repo"
+        registered.mkdir(parents=True)
+        collision = tmp_path / "registered-name"
+        collision.mkdir()
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(registered))
+        readiness = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-id",
+            repository_name="registered-name",
+            registered_path=str(registered),
+            requested_path=None,
+            current_commit="abc",
+            last_indexed_commit="abc",
+        )
+        ctx = SimpleNamespace(
+            repo_id="repo-id",
+            workspace_root=registered,
+            sqlite_store=MagicMock(),
+            registry_entry=SimpleNamespace(),
+        )
+        resolver = MagicMock()
+        resolver.classify.return_value = readiness
+        resolver.resolve.return_value = ctx
+        dispatcher = _mock_dispatcher()
+
+        symbol = _run(
+            tool_handlers.handle_symbol_lookup(
+                arguments={"symbol": "Missing", "repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        search_result = SimpleNamespace(
+            results=[],
+            semantic_requested=False,
+            source_type=None,
+            friction_categories=(),
+            history_labels=(),
+            history_repos=(),
+            include_source_metadata=False,
+            readiness=readiness.to_dict(),
+            semantic_readiness=None,
+            index_unavailable=None,
+            code=None,
+            message="No results found in index",
+        )
+        monkeypatch.setattr(
+            tool_handlers,
+            "execute_search_service",
+            lambda **_kwargs: search_result,
+        )
+        search = _run(
+            tool_handlers.handle_search_code(
+                arguments={"query": "Missing", "repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        index_manager = MagicMock()
+        index_manager.rebuild_repository_index.return_value = SimpleNamespace(
+            action="full_index",
+            files_processed=1,
+            commit="abc",
+            readiness={},
+            semantic={},
+        )
+        reindex = _run(
+            tool_handlers.handle_reindex(
+                arguments={"repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+                git_index_manager=index_manager,
+            )
+        )
+        write_summaries = _run(
+            tool_handlers.handle_write_summaries(
+                arguments={"repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+                lazy_summarizer=None,
+            )
+        )
+        summarize_sample = _run(
+            tool_handlers.handle_summarize_sample(
+                arguments={"repository": "registered-name"},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+                lazy_summarizer=None,
+            )
+        )
+
+        for result in (symbol, search, reindex, write_summaries, summarize_sample):
+            assert "path_outside_allowed_roots" not in json.dumps(_parsed(result))
+
+
 # ---------------------------------------------------------------------------
 # search_code guard
 # ---------------------------------------------------------------------------

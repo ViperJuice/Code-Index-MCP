@@ -65,6 +65,28 @@ def _looks_like_path(x: str) -> bool:
         return False
 
 
+def _is_exact_registered_selector(readiness: Optional[RepositoryReadiness]) -> bool:
+    return bool(
+        readiness is not None
+        and readiness.repository_id is not None
+        and readiness.requested_path is None
+    )
+
+
+def _repository_selector_path(
+    repository: Optional[str],
+    readiness: Optional[RepositoryReadiness],
+) -> Optional[Path]:
+    """Return only selectors that need filesystem sandbox validation."""
+    if not repository or not _looks_like_path(repository):
+        return None
+    if _is_exact_registered_selector(readiness):
+        return None
+    if readiness is not None and readiness.state == RepositoryReadinessState.AMBIGUOUS_SELECTOR:
+        return None
+    return Path(repository)
+
+
 def _ensure_response(data: Any) -> str:
     """Ensure response is never empty and always valid JSON."""
     if data is None:
@@ -338,20 +360,21 @@ async def handle_symbol_lookup(
         ]
 
     repository = (arguments or {}).get("repository")
-    if repository and _looks_like_path(repository):
+    readiness = _classify_ctx(repo_resolver, repository)
+    repository_path = _repository_selector_path(repository, readiness)
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return _json_text_response(
                 {
                     "error": "Path outside allowed roots",
                     "code": "path_outside_allowed_roots",
-                    "path": str(Path(repository).resolve()),
+                    "path": str(repository_path.resolve()),
                     "allowed_roots": [str(r) for r in allowed],
                     "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                 }
             )
 
-    readiness = _classify_ctx(repo_resolver, repository)
     if readiness is not None and not readiness.ready:
         return _index_unavailable_response(readiness, "symbol_lookup", symbol=symbol)
 
@@ -443,10 +466,12 @@ async def handle_search_code(
         ]
 
     repository = (arguments or {}).get("repository")
+    selector_readiness = _classify_ctx(repo_resolver, repository)
 
-    if repository and _looks_like_path(repository):
+    repository_path = _repository_selector_path(repository, selector_readiness)
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -454,7 +479,7 @@ async def handle_search_code(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -943,11 +968,13 @@ async def handle_reindex(
 ) -> Sequence[types.TextContent] | types.CreateTaskResult:
     path = (arguments or {}).get("path")
     repository = (arguments or {}).get("repository")
+    repository_readiness = _classify_ctx(repo_resolver, repository) if repository else None
 
     # Sandbox check for repository when it looks like a path
-    if repository and _looks_like_path(repository):
+    repository_path = _repository_selector_path(repository, repository_readiness)
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -955,7 +982,7 @@ async def handle_reindex(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -966,7 +993,7 @@ async def handle_reindex(
     # Conflict detection: both path and repository provided but resolve to different repos
     if path and repository:
         readiness_from_path = _classify_ctx(repo_resolver, str(path))
-        readiness_from_repo = _classify_ctx(repo_resolver, repository)
+        readiness_from_repo = repository_readiness
         if (
             readiness_from_path is not None
             and readiness_from_repo is not None
@@ -985,7 +1012,8 @@ async def handle_reindex(
             )
 
     scope_arg = repository or (str(path) if path else None)
-    readiness = _classify_ctx(repo_resolver, scope_arg)
+    readiness = repository_readiness if repository else _classify_ctx(repo_resolver, scope_arg)
+    alias_bypasses_sandbox = path is None and _is_exact_registered_selector(readiness)
     if readiness is not None and not readiness.ready:
         if readiness.state not in _RECOVERABLE_REINDEX_STATES:
             return _secondary_readiness_refusal_response(readiness, "reindex")
@@ -1005,7 +1033,7 @@ async def handle_reindex(
             return _json_text_response(
                 {"error": "Path not found", "path": str(recovery_target or scope_arg)}
             )
-        if not _path_within_allowed(recovery_target, allowed):
+        if not alias_bypasses_sandbox and not _path_within_allowed(recovery_target, allowed):
             return _json_text_response(
                 {
                     "error": "Path outside allowed roots",
@@ -1064,7 +1092,7 @@ async def handle_reindex(
     if not target_path.exists():
         return _json_text_response({"error": "Path not found", "path": str(target_path)})
 
-    if not _path_within_allowed(target_path, allowed):
+    if not alias_bypasses_sandbox and not _path_within_allowed(target_path, allowed):
         return _json_text_response(
             {
                 "error": "Path outside allowed roots",
@@ -1243,10 +1271,12 @@ async def handle_write_summaries(
     from mcp_server.indexing.summarization import ComprehensiveChunkWriter
 
     repository = (arguments or {}).get("repository")
+    readiness = _classify_ctx(repo_resolver, repository)
+    repository_path = _repository_selector_path(repository, readiness)
 
-    if repository and _looks_like_path(repository):
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -1254,7 +1284,7 @@ async def handle_write_summaries(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -1262,7 +1292,6 @@ async def handle_write_summaries(
                 )
             ]
 
-    readiness = _classify_ctx(repo_resolver, repository)
     if readiness is not None and not readiness.ready:
         return _secondary_readiness_refusal_response(readiness, "write_summaries")
 
@@ -1360,10 +1389,15 @@ async def handle_summarize_sample(
     from mcp_server.indexing.summarization import FileBatchSummarizer
 
     repository = (arguments or {}).get("repository")
+    paths_arg = (arguments or {}).get("paths")
+    repository_readiness = (
+        _classify_ctx(repo_resolver, repository) if repository or not paths_arg else None
+    )
+    repository_path = _repository_selector_path(repository, repository_readiness)
 
-    if repository and _looks_like_path(repository):
+    if repository_path is not None:
         allowed = _allowed_roots()
-        if not _path_within_allowed(Path(repository), allowed):
+        if not _path_within_allowed(repository_path, allowed):
             return [
                 types.TextContent(
                     type="text",
@@ -1371,7 +1405,7 @@ async def handle_summarize_sample(
                         {
                             "error": "Path outside allowed roots",
                             "code": "path_outside_allowed_roots",
-                            "path": str(Path(repository).resolve()),
+                            "path": str(repository_path.resolve()),
                             "allowed_roots": [str(r) for r in allowed],
                             "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
@@ -1379,13 +1413,8 @@ async def handle_summarize_sample(
                 )
             ]
 
-    paths_arg = (arguments or {}).get("paths")
     n_arg = int((arguments or {}).get("n", 3))
     persist_flag = bool((arguments or {}).get("persist", False))
-
-    repository_readiness = (
-        _classify_ctx(repo_resolver, repository) if repository or not paths_arg else None
-    )
 
     if paths_arg:
         allowed = _allowed_roots()

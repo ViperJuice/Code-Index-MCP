@@ -112,6 +112,9 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -138,6 +141,16 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix={{branch}}-,format=short
+
+      - name: Guard protected main before build and push release images
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          VERSION_NO_V="${GITHUB_REF_NAME#v}"
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
 
       - name: Build and push release images
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
@@ -177,9 +190,15 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
+      contents: read
       packages: write
       id-token: write
     steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
@@ -189,6 +208,16 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guard protected main before signing container images
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          VERSION_NO_V="${GITHUB_REF_NAME#v}"
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
 
       - name: Sign container images
         env:

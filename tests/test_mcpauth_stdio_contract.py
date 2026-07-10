@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from unittest.mock import AsyncMock
 
 import mcp.types as types
 import pytest
@@ -24,6 +25,7 @@ def restore_stdio_globals():
     saved = {
         "_gate": stdio_runner._gate,
         "_lazy_summarizer": stdio_runner._lazy_summarizer,
+        "_init_lock": stdio_runner._init_lock,
         "sqlite_store": stdio_runner.sqlite_store,
         "dispatcher": stdio_runner.dispatcher,
         "initialization_error": stdio_runner.initialization_error,
@@ -31,6 +33,7 @@ def restore_stdio_globals():
     yield
     stdio_runner._gate = saved["_gate"]
     stdio_runner._lazy_summarizer = saved["_lazy_summarizer"]
+    stdio_runner._init_lock = saved["_init_lock"]
     stdio_runner.sqlite_store = saved["sqlite_store"]
     stdio_runner.dispatcher = saved["dispatcher"]
     stdio_runner.initialization_error = saved["initialization_error"]
@@ -84,3 +87,26 @@ async def test_non_handshake_tool_keeps_regular_argument_logging(
     ]
     assert tool_logs
     assert any("demo" in message for message in tool_logs)
+
+
+@pytest.mark.asyncio
+async def test_handshake_gate_precedes_all_lazy_initialization(
+    monkeypatch, restore_stdio_globals
+) -> None:
+    monkeypatch.setenv("MCP_CLIENT_SECRET", "pre-init-secret")
+    initialize_services = AsyncMock()
+    monkeypatch.setattr(stdio_runner, "initialize_services", initialize_services)
+    stdio_runner._gate = None
+    stdio_runner._lazy_summarizer = None
+    stdio_runner._init_lock = None
+    stdio_runner.sqlite_store = None
+    stdio_runner.dispatcher = None
+    stdio_runner.initialization_error = None
+
+    blocked = await stdio_runner.call_tool("search_code", {"query": "demo"})
+    assert _payload(blocked)["code"] == "handshake_required"
+    initialize_services.assert_not_awaited()
+
+    authenticated = await stdio_runner.call_tool("handshake", {"secret": "pre-init-secret"})
+    assert _payload(authenticated) == {"authenticated": True}
+    initialize_services.assert_not_awaited()

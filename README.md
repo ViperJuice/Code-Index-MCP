@@ -158,9 +158,10 @@ quality or default sandbox behavior.
 
 ## 🚀 Quick Start
 
-Supported stable install paths are native Python/STDIO with
-`uv sync --locked`, a locally built `index-it-mcp` wheel, and the documented
-`ghcr.io/viperjuice/code-index-mcp` container image.
+Supported install paths before publication are native Python/STDIO with
+`uv sync --locked`, a locally built `index-it-mcp` wheel, and the locally built
+`ghcr.io/viperjuice/code-index-mcp:local-smoke` image. The prepared `v1.3.1`
+container commands become valid only after protected-main publication.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
 [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md),
@@ -180,15 +181,18 @@ claim; row-level support tiers still live in the support matrix.
 
 This automatically detects your environment and creates the appropriate `.mcp.json` configuration.
 
-### 🐳 Docker Setup by Environment
+### 🐳 Docker Setup Before Publication
+
+Build the local smoke image from this checkout. The `v1.3.1` GHCR candidate is
+prepared but unpublished, so the installer also defaults to `local-smoke`.
 
 #### Option 1: Basic Search (No API Keys) - 2 Minutes
 ```bash
-# Install MCP Index with Docker
-curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
+# Build and verify the local image
+make release-smoke-container
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.1
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:local-smoke
 ```
 
 #### Option 2: AI-Powered Search
@@ -197,7 +201,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.1
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.3.1
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:local-smoke
 ```
 
 ### 💻 Environment-Specific Setup
@@ -208,7 +212,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.3.1
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:local-smoke
 ```
 
 #### 🍎 macOS
@@ -285,7 +289,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.3.1"
+        "ghcr.io/viperjuice/code-index-mcp:local-smoke"
       ]
     }
   }

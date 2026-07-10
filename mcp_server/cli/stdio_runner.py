@@ -1278,6 +1278,34 @@ async def call_tool(
 ) -> types.CallToolResult | types.CreateTaskResult:
     global _lazy_summarizer, _init_lock, _gate
 
+    # Authenticate before request-scoped setup or any lazy service side effects.
+    if _gate is None:
+        _gate = HandshakeGate()
+        if not _gate.enabled:
+            logger.warning("running unauthenticated \u2014 MCP_CLIENT_SECRET not set")
+    gate_error = _gate.check(name, arguments or {})
+    if gate_error is not None:
+        return _to_call_tool_result(
+            [types.TextContent(type="text", text=tool_handlers._ensure_response(gate_error))]
+        )
+
+    if name == "handshake":
+        logger.info("=== MCP Tool Call: handshake args=%s ===", {"secret": "[REDACTED]"})
+        start_time = time.time()
+        secret = (arguments or {}).get("secret", "")
+        payload: dict[str, Any]
+        if _gate.verify(secret):
+            payload = {"authenticated": True}
+            tool_status = "success"
+        else:
+            payload = {"error": "Invalid secret.", "code": "handshake_required"}
+            tool_status = "error"
+        record_tool_call(name, tool_status)
+        logger.info("=== MCP Tool Response: handshake (%.2fs) ===", time.time() - start_time)
+        return _to_call_tool_result(
+            [types.TextContent(type="text", text=tool_handlers._ensure_response(payload))]
+        )
+
     _current_session = None
     _client_name = None
     _request_experimental = None
@@ -1337,22 +1365,7 @@ async def call_tool(
     elif _lazy_summarizer is not None and _current_session is not None:
         _lazy_summarizer.update_session(_current_session)
 
-    # Gate check before logging to avoid leaking the handshake secret.
-    if _gate is None:
-        _gate = HandshakeGate()
-        if not _gate.enabled:
-            logger.warning("running unauthenticated \u2014 MCP_CLIENT_SECRET not set")
-    _gate_err = _gate.check(name, arguments or {})
-    if _gate_err is not None:
-        return _to_call_tool_result(
-            [types.TextContent(type="text", text=tool_handlers._ensure_response(_gate_err))]
-        )
-
-    log_arguments = arguments
-    if name == "handshake" and arguments is not None:
-        log_arguments = {"secret": "[REDACTED]"}
-
-    logger.info("=== MCP Tool Call: %s args=%s ===", name, log_arguments)
+    logger.info("=== MCP Tool Call: %s args=%s ===", name, arguments)
     start_time = time.time()
 
     _effective_resolver = (
@@ -1371,27 +1384,7 @@ async def call_tool(
         tool_def = next((tool for tool in _build_tool_list() if tool.name == name), None)
         if _request_experimental is not None and tool_def is not None:
             _request_experimental.validate_for_tool(tool_def)
-        if name == "handshake":
-            _secret = (arguments or {}).get("secret", "")
-            if _gate.verify(_secret):
-                response = [
-                    types.TextContent(
-                        type="text", text=tool_handlers._ensure_response({"authenticated": True})
-                    )
-                ]
-            else:
-                response = [
-                    types.TextContent(
-                        type="text",
-                        text=tool_handlers._ensure_response(
-                            {
-                                "error": "Invalid secret.",
-                                "code": "handshake_required",
-                            }
-                        ),
-                    )
-                ]
-        elif name == "symbol_lookup":
+        if name == "symbol_lookup":
             response = await tool_handlers.handle_symbol_lookup(
                 **common_kwargs,
                 sqlite_store=sqlite_store,

@@ -6,6 +6,8 @@ import json
 import os
 import sqlite3
 import subprocess
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -116,6 +118,91 @@ class SemanticReadiness:
             "remediation": self.remediation,
             "evidence": self.evidence,
         }
+
+
+def _index_file_signature(path: Path) -> tuple[int, int, int, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _index_integrity_signature(
+    index_path: Path,
+) -> tuple[
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+]:
+    database = _index_file_signature(index_path)
+    wal = _index_file_signature(Path(f"{index_path}-wal"))
+    shm = _index_file_signature(Path(f"{index_path}-shm"))
+    return (database, wal, shm)
+
+
+_IndexSignature = tuple[
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+    tuple[int, int, int, int] | None,
+]
+_HEALTHY_INDEX_CACHE_SIZE = 256
+_healthy_index_cache: OrderedDict[tuple[str, _IndexSignature], None] = OrderedDict()
+_healthy_index_cache_lock = threading.Lock()
+
+
+def _inspect_index_uncached(index_path: Path) -> Optional[RepositoryReadinessState]:
+    required_tables = {"schema_version", "repositories", "files", "symbols", "code_chunks"}
+    try:
+        with sqlite3.connect(str(index_path)) as conn:
+            integrity = conn.execute("PRAGMA quick_check").fetchone()
+            if not integrity or integrity[0] != "ok":
+                return RepositoryReadinessState.CORRUPT_SQLITE
+            rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+            ).fetchall()
+            tables = {str(row[0]) for row in rows}
+            if not required_tables.issubset(tables):
+                return RepositoryReadinessState.MISSING_SCHEMA
+            count = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
+            ).fetchone()
+            if not count or int(count[0]) == 0:
+                return RepositoryReadinessState.INDEX_EMPTY
+    except sqlite3.DatabaseError:
+        return RepositoryReadinessState.CORRUPT_SQLITE
+    return None
+
+
+def _inspect_index_snapshot(
+    index_path: str,
+    signature: _IndexSignature,
+) -> Optional[RepositoryReadinessState]:
+    key = (index_path, signature)
+    with _healthy_index_cache_lock:
+        if key in _healthy_index_cache:
+            _healthy_index_cache.move_to_end(key)
+            return None
+
+    result = _inspect_index_uncached(Path(index_path))
+    if result is not None:
+        return result
+
+    with _healthy_index_cache_lock:
+        stale_keys = [
+            cached_key for cached_key in _healthy_index_cache if cached_key[0] == index_path
+        ]
+        for stale_key in stale_keys:
+            _healthy_index_cache.pop(stale_key, None)
+        _healthy_index_cache[key] = None
+        while len(_healthy_index_cache) > _HEALTHY_INDEX_CACHE_SIZE:
+            _healthy_index_cache.popitem(last=False)
+    return None
+
+
+def _clear_index_inspection_cache() -> None:
+    with _healthy_index_cache_lock:
+        _healthy_index_cache.clear()
 
 
 class ReadinessClassifier:
@@ -455,26 +542,12 @@ class ReadinessClassifier:
 
     @staticmethod
     def _inspect_index(index_path: Path) -> Optional[RepositoryReadinessState]:
-        required_tables = {"schema_version", "repositories", "files", "symbols", "code_chunks"}
-        try:
-            with sqlite3.connect(str(index_path)) as conn:
-                integrity = conn.execute("PRAGMA quick_check").fetchone()
-                if not integrity or integrity[0] != "ok":
-                    return RepositoryReadinessState.CORRUPT_SQLITE
-                rows = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
-                ).fetchall()
-                tables = {str(row[0]) for row in rows}
-                if not required_tables.issubset(tables):
-                    return RepositoryReadinessState.MISSING_SCHEMA
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
-                ).fetchone()
-                if not count or int(count[0]) == 0:
-                    return RepositoryReadinessState.INDEX_EMPTY
-        except sqlite3.DatabaseError:
-            return RepositoryReadinessState.CORRUPT_SQLITE
-        return None
+        resolved = index_path.resolve(strict=False)
+        return _inspect_index_snapshot(str(resolved), _index_integrity_signature(resolved))
+
+    @staticmethod
+    def clear_index_inspection_cache() -> None:
+        _clear_index_inspection_cache()
 
 
 def _worktree_remediation() -> str:

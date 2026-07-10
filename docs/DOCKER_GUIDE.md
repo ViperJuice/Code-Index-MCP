@@ -10,6 +10,12 @@ The Docker path is one explicit support surface in
 language/runtime or topology contract. The container name is a separate surface
 from the canonical Python distribution name `index-it-mcp`.
 
+> **Publication gate:** `v1.3.1` is prepared but unpublished. GHCR commands in
+> this guide become valid only after the protected-main publish workflow passes.
+> Before then, run `make release-smoke-container` and substitute `local-smoke`;
+> the installer helpers default to that local image and fail clearly if it has
+> not been built.
+
 Public alpha supports many unrelated repositories from one server when each repo
 has one registered worktree per git common directory and the container
 `MCP_ALLOWED_ROOTS` covers those mounts. Only the tracked/default branch is

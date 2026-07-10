@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
+WORKFLOWS = REPO / ".github" / "workflows"
 WORKFLOW_PATH = REPO / ".github" / "workflows" / "release-automation.yml"
 PUBLISH_JOBS = ("preflight-publish", "build-release", "publish-release")
 
@@ -64,6 +65,56 @@ def test_every_release_mutation_has_an_adjacent_protected_main_guard() -> None:
         assert 'test "$(git rev-parse HEAD)" = "${{ github.sha }}"' in script
         assert 'grep -Fxq "version = \\"$VERSION_NO_V\\"" pyproject.toml' in script
         assert 'grep -Fxq "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in script
+
+
+def _is_external_release_mutation(step: dict[str, object]) -> bool:
+    uses = str(step.get("uses", ""))
+    run = str(step.get("run", ""))
+    push = (
+        str(step.get("with", {}).get("push", "")).lower()
+        if isinstance(step.get("with"), dict)
+        else ""
+    )
+    return (
+        ("docker/build-push-action@" in uses and push == "true")
+        or "softprops/action-gh-release@" in uses
+        or "pypa/gh-action-pypi-publish@" in uses
+        or "cosign sign" in run
+        or step.get("name") == "Create and push tag"
+    )
+
+
+def test_every_workflow_release_mutation_has_an_adjacent_protected_main_guard() -> None:
+    mutations: list[str] = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        for job_name, job in workflow.get("jobs", {}).items():
+            steps = job.get("steps", [])
+            for index, step in enumerate(steps):
+                if not _is_external_release_mutation(step):
+                    continue
+                mutations.append(f"{path.name}:{job_name}:{step.get('name')}")
+                assert index > 0
+                guard = steps[index - 1]
+                assert str(guard.get("name", "")).startswith("Guard protected main before")
+                script = str(guard.get("run", ""))
+                assert "git merge-base --is-ancestor" in script
+                assert 'test "$(git rev-parse HEAD)" = "${{ github.sha }}"' in script
+                assert 'grep -Fxq "version = \\"$VERSION_NO_V\\"" pyproject.toml' in script
+                assert (
+                    'grep -Fxq "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in script
+                )
+
+                checkouts = [
+                    candidate
+                    for candidate in steps[:index]
+                    if str(candidate.get("uses", "")).startswith("actions/checkout@")
+                ]
+                assert checkouts
+                assert checkouts[-1].get("with", {}).get("fetch-depth") == "0"
+                assert checkouts[-1].get("with", {}).get("ref") == "${{ github.sha }}"
+
+    assert mutations
 
 
 def test_prepare_job_is_pr_only_and_honors_auto_merge() -> None:

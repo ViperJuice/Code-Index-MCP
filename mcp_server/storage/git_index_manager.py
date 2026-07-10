@@ -674,6 +674,7 @@ class GitAwareIndexManager:
                 if sidecar.exists():
                     sidecar.unlink()
             os.replace(stage_path, active_path)
+            ReadinessClassifier.clear_index_inspection_cache()
             self._rebuild_checkpoint("after_replacement")
             if not self._index_path_has_durable_rows(active_path):
                 raise RuntimeError("Published index failed durable-row validation")

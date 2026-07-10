@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 MCP_VERSION="${MCP_VERSION:-v1.3.1}"
-MCP_VARIANT="${MCP_VARIANT:-v1.3.1}"
+MCP_VARIANT="${MCP_VARIANT:-local-smoke}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io}"
 MCP_IMAGE="${DOCKER_REGISTRY}/viperjuice/code-index-mcp"
 
@@ -115,9 +115,9 @@ install_docker() {
 choose_variant() {
     echo
     echo "Choose MCP Index variant:"
-    echo "1) v1.3.1      - Prepared hardening image (recommended)"
-    echo "2) latest      - Stable-only channel; may not exist before GA"
-    echo "3) local-smoke - Local smoke image built by make release-smoke-container"
+    echo "1) local-smoke - Local image built by make release-smoke-container (default)"
+    echo "2) v1.3.1      - Available only after protected-main publication"
+    echo "3) latest      - Stable-only channel"
     echo
     
     read -p "Select variant [1-3] (default: 1): " -n 1 -r
@@ -125,21 +125,29 @@ choose_variant() {
     
     case $REPLY in
         2)
+            MCP_VARIANT="v1.3.1"
+            print_info "Selected: v1.3.1"
+            ;;
+        3)
             MCP_VARIANT="latest"
             print_info "Selected: latest"
             ;;
-        3)
+        *)
             MCP_VARIANT="local-smoke"
             print_info "Selected: local-smoke"
-            ;;
-        *)
-            MCP_VARIANT="v1.3.1"
-            print_info "Selected: v1.3.1"
             ;;
     esac
 }
 
 pull_image() {
+    if [ "$MCP_VARIANT" = "local-smoke" ]; then
+        print_warn "v1.3.1 is prepared but unpublished; using the local smoke image."
+        if ! docker image inspect "${MCP_IMAGE}:local-smoke" >/dev/null 2>&1; then
+            print_error "Local smoke image not found. Run 'make release-smoke-container' first."
+            exit 1
+        fi
+        return
+    fi
     print_info "Pulling MCP Index image: ${MCP_IMAGE}:${MCP_VARIANT}"
     docker pull "${MCP_IMAGE}:${MCP_VARIANT}"
 }
@@ -155,7 +163,7 @@ create_launcher() {
 # MCP Index Docker Launcher
 
 # Default settings
-MCP_VARIANT="${MCP_VARIANT:-v1.3.1}"
+MCP_VARIANT="${MCP_VARIANT:-local-smoke}"
 MCP_IMAGE="${MCP_IMAGE:-ghcr.io/viperjuice/code-index-mcp}"
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 

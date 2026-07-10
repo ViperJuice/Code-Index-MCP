@@ -173,8 +173,8 @@ def _register_security_middleware(
         allow_headers=["*"],
     )
     target_app.add_middleware(SecurityHeadersMiddleware, security_headers=security_headers)
-    target_app.add_middleware(AuthenticationMiddleware, auth_manager=active_auth_manager)
     target_app.add_middleware(AuthorizationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(AuthenticationMiddleware, auth_manager=active_auth_manager)
     target_app.add_middleware(RateLimitMiddleware, auth_manager=active_auth_manager)
     target_app.add_middleware(RequestValidationMiddleware)
 

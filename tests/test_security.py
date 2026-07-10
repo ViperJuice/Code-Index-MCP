@@ -424,6 +424,19 @@ class TestAuthManager:
         request.operation = Permission.DELETE
         assert not await auth_manager.authorize_request(request)
 
+    @pytest.mark.asyncio
+    async def test_security_events_rule_requires_admin(self, auth_manager, test_user, admin_user):
+        """Deny security-event reads in middleware before route dependencies."""
+        request = AccessRequest(
+            user_id=test_user.id,
+            path="/api/v1/security/events",
+            operation=Permission.READ,
+        )
+        assert not await auth_manager.authorize_request(request)
+
+        request.user_id = admin_user.id
+        assert await auth_manager.authorize_request(request)
+
 
 class TestSecurityMiddleware:
     """Test security middleware functionality."""

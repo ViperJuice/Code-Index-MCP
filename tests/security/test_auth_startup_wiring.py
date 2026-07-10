@@ -20,6 +20,10 @@ def test_gateway_import_registers_security_middleware_before_startup() -> None:
     ):
         assert expected in middleware_names
 
+    assert middleware_names.index("AuthenticationMiddleware") < middleware_names.index(
+        "AuthorizationMiddleware"
+    )
+
 
 def test_prestartup_registration_does_not_swallow_late_middleware_error() -> None:
     calls: list[str] = []

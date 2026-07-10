@@ -129,9 +129,16 @@ def test_installers_and_download_helper_match_stable_identity_contract():
     powershell = _read_text("scripts/install-mcp-docker.ps1")
     download_helper = _read_text("scripts/download-release.py")
 
-    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.3.1}"' in shell
-    assert 'param(\n    [string]$Variant = "v1.3.1"' in powershell
-    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.3.1' in powershell
+    assert 'MCP_VARIANT="${MCP_VARIANT:-local-smoke}"' in shell
+    assert 'param(\n    [string]$Variant = "local-smoke"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke' in powershell
+    assert "v1.3.1 is prepared but unpublished" in shell
+    assert "v1.3.1 is prepared but unpublished" in powershell
+
+    readme = _read_text("README.md")
+    quick_start = readme.split("## 🚀 Quick Start", 1)[1].split("## Using Against Many Repos", 1)[0]
+    assert "after protected-main publication" in quick_start
+    assert "ghcr.io/viperjuice/code-index-mcp:v1.3.1" not in quick_start
 
     for expected in (
         "index_it_mcp-",

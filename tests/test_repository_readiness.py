@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+from mcp_server.health import repository_readiness
 from mcp_server.health.repository_readiness import (
     ReadinessClassifier,
     RepositoryReadinessState,
@@ -382,3 +384,50 @@ def test_sqlite_query_exception_fails_closed_as_corrupt(tmp_path, monkeypatch):
     readiness = ReadinessClassifier.classify_registered(repo_info)
 
     assert readiness.state == RepositoryReadinessState.CORRUPT_SQLITE
+
+
+def test_unchanged_index_reuses_cached_integrity_inspection(tmp_path, monkeypatch):
+    repo_info = make_repo_info(tmp_path)
+    calls = 0
+    original = repository_readiness._inspect_index_uncached
+
+    def counted(index_path: Path):
+        nonlocal calls
+        calls += 1
+        return original(index_path)
+
+    ReadinessClassifier.clear_index_inspection_cache()
+    monkeypatch.setattr(repository_readiness, "_inspect_index_uncached", counted)
+
+    assert ReadinessClassifier._inspect_index(repo_info.index_path) is None
+    assert ReadinessClassifier._inspect_index(repo_info.index_path) is None
+    assert calls == 1
+
+    stat = repo_info.index_path.stat()
+    os.utime(repo_info.index_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+    assert ReadinessClassifier._inspect_index(repo_info.index_path) is None
+    assert calls == 2
+    ReadinessClassifier.clear_index_inspection_cache()
+
+
+def test_failed_integrity_inspection_is_not_cached(tmp_path, monkeypatch):
+    repo_info = make_repo_info(tmp_path)
+    results = iter((RepositoryReadinessState.CORRUPT_SQLITE, None))
+    calls = 0
+
+    def transient(_index_path: Path):
+        nonlocal calls
+        calls += 1
+        return next(results)
+
+    ReadinessClassifier.clear_index_inspection_cache()
+    monkeypatch.setattr(repository_readiness, "_inspect_index_uncached", transient)
+
+    assert (
+        ReadinessClassifier._inspect_index(repo_info.index_path)
+        == RepositoryReadinessState.CORRUPT_SQLITE
+    )
+    assert ReadinessClassifier._inspect_index(repo_info.index_path) is None
+    assert ReadinessClassifier._inspect_index(repo_info.index_path) is None
+    assert calls == 2
+    ReadinessClassifier.clear_index_inspection_cache()

@@ -45,14 +45,14 @@ access. Intentional local-server tests remain explicitly marked.
   environment, exposed both CLI entrypoints, and completed STDIO search.
 - Workflow-policy tests passed 9 tests, proving immutable action refs and
   protected-main release mutation guards.
-- `uv run --python 3.12 python scripts/check_mypy_baseline.py` passed with 1,547
+- `uv run --python 3.12 python scripts/check_mypy_baseline.py` passed with 1,540
   current errors at or below the 1,562-error baseline; the 43-file
   release-critical mypy surface passed with zero errors.
 - `uv run --python 3.12 bandit -r mcp_server -f json -o
   /tmp/code-index-mcp-hardverify/bandit.json` reported zero high-severity
   findings (60 medium and 284 low findings remain for normal triage).
-- `uv run --python 3.12 pytest tests --benchmark-skip --no-cov` passed with
-  2,632 passed, 140 skipped, and 38 deselected.
+- `uv run --python 3.12 pytest tests --benchmark-skip --no-cov` passed after
+  final review repairs with 2,639 passed, 140 skipped, and 38 deselected.
 - `make alpha-release-gates` passed after all hardening edits, covering locked
   dependency sync, format/lint, the type ratchet, unit and integration smokes,
   documentation truth, the production matrix, and wheel/STDIO release smoke.
@@ -62,6 +62,31 @@ access. Intentional local-server tests remain explicitly marked.
 Version 1.3.1 is prepared and unpublished. Local and remote tag checks, GitHub
 release checks, and the PyPI project-version probe found no 1.3.1 collision.
 No tag, release, container, provenance artifact, or package was published.
+
+## Final Panel Review
+
+GPT-5.5, Gemini 3.1 Pro High, and Fable independently reviewed the cumulative
+eight-phase patch. Gemini found no blocker; GPT-5.5 and Fable identified six
+substantive integration findings. All six were accepted and repaired: the
+container workflow now proves protected-main ancestry before push and signing,
+the STDIO handshake precedes lazy initialization, exact registered aliases are
+classified before path sandboxing, authentication executes before
+authorization, healthy readiness checks are safely cached, and unpublished
+container instructions default to a local smoke image. The reconciled review
+is recorded in `specs/phase-plans-v10_final_code_review.md`.
+
+The first post-repair canonical gate then exposed a seventh integration defect:
+activating authorization caused the legacy gateway routes to be default-denied
+because the access table covered only `/api/v1/*`. The gateway now has explicit
+least-privilege rules for its real route surface, while route-aware middleware
+preserves authenticated `404` and `405` responses. The gateway and auth-boundary
+regression matrix passes 61 tests, and the repeated canonical gate passes.
+
+In focused confirmation, Gemini returned `AGREE`; GPT-5.5 identified one final
+P2 audit-semantics gap for `/api/v1/security/events`. The gap was repaired with
+an admin-only middleware rule and regression. Fable returned `AGREE` on that
+corrected frozen patch, and GPT-5.5's focused follow-up also returned `AGREE`.
+No panel finding remains open.
 
 ## Residual Risk
 

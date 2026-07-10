@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
+from starlette.routing import Match
 
 from .auth_manager import (
     AuthManager,
@@ -220,6 +221,11 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         """Process request with authorization."""
         # Skip authorization if not authenticated
         if not hasattr(request.state, "user_id"):
+            return await call_next(request)
+
+        # Let the router preserve its 404/405 contract. A real route without an
+        # access rule still reaches the default-deny branch below.
+        if not any(route.matches(request.scope)[0] == Match.FULL for route in request.app.routes):
             return await call_next(request)
 
         auth_manager = getattr(request.app.state, "auth_manager", None) or self.auth_manager
