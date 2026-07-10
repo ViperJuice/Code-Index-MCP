@@ -478,7 +478,22 @@ def get_repo_ctx(request: Request) -> RepoContext:
         raise HTTPException(503, detail=_repository_unavailable_detail(candidate_selector))
 
     if repo_resolver is not None:
-        resolved = repo_resolver.resolve(Path.cwd())
+        cwd_selector = str(Path.cwd())
+        try:
+            readiness = repo_resolver.classify(cwd_selector)
+        except Exception as exc:
+            raise HTTPException(503, detail=_repository_unavailable_detail(cwd_selector)) from exc
+        if isinstance(readiness, RepositoryReadiness) and not readiness.ready:
+            raise HTTPException(
+                503,
+                detail={
+                    "error": "Index unavailable",
+                    "code": readiness.code,
+                    "safe_fallback": "native_search",
+                    "readiness": readiness.to_dict(),
+                },
+            )
+        resolved = repo_resolver.resolve(cwd_selector)
         if resolved is not None:
             return resolved
 
@@ -1951,9 +1966,11 @@ async def get_status(
                         dispatcher, "get_runtime_feature_status"
                     ):
                         try:
-                            _ctx = repo_resolver.resolve(info.path)
-                            if _ctx is not None:
-                                _features = dispatcher.get_runtime_feature_status(_ctx)
+                            _readiness = repo_resolver.classify(info.path)
+                            if isinstance(_readiness, RepositoryReadiness) and _readiness.ready:
+                                _ctx = repo_resolver.resolve(info.path)
+                                if _ctx is not None:
+                                    _features = dispatcher.get_runtime_feature_status(_ctx)
                         except Exception:
                             _features = None
                     _repositories.append(_build_health_row(info, features=_features))

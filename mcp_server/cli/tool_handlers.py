@@ -162,11 +162,7 @@ def _resolve_ctx(
 ) -> Optional[RepoContext]:
     """Resolve a RepoContext from path_arg or MCP_WORKSPACE_ROOT fallback."""
     readiness = _classify_ctx(repo_resolver, path_arg)
-    if readiness is not None and readiness.state in {
-        RepositoryReadinessState.UNREGISTERED_REPOSITORY,
-        RepositoryReadinessState.UNSUPPORTED_WORKTREE,
-        RepositoryReadinessState.AMBIGUOUS_SELECTOR,
-    }:
+    if readiness is not None and not readiness.ready:
         return None
 
     if path_arg:
@@ -757,13 +753,15 @@ def _build_repositories(repo_resolver: Any, dispatcher: Any = None) -> list:
         semantic_readiness = None
         if dispatcher is not None and hasattr(dispatcher, "get_runtime_feature_status"):
             try:
-                ctx = repo_resolver.resolve(info.path)
-                if ctx is not None:
-                    features = dispatcher.get_runtime_feature_status(ctx)
-                    semantic_readiness = ReadinessClassifier.classify_semantic_registered(
-                        ctx.registry_entry,
-                        ctx.sqlite_store,
-                    )
+                readiness = _classify_ctx(repo_resolver, str(info.path))
+                if readiness is not None and readiness.ready:
+                    ctx = repo_resolver.resolve(info.path)
+                    if ctx is not None:
+                        features = dispatcher.get_runtime_feature_status(ctx)
+                        semantic_readiness = ReadinessClassifier.classify_semantic_registered(
+                            ctx.registry_entry,
+                            ctx.sqlite_store,
+                        )
             except Exception:
                 features = None
         rows.append(

@@ -145,6 +145,7 @@ def test_prepare_execution_is_read_only_and_pr_mutation_is_isolated() -> None:
     assert not any(
         str(step.get("uses", "")).startswith("actions/checkout@") for step in create_pr["steps"]
     )
+    assert create_pr["steps"][0]["env"]["GH_REPO"] == "${{ github.repository }}"
     assert auto_merge_job["permissions"] == {
         "contents": "write",
         "pull-requests": "write",
@@ -154,6 +155,7 @@ def test_prepare_execution_is_read_only_and_pr_mutation_is_isolated() -> None:
         str(step.get("uses", "")).startswith("actions/checkout@")
         for step in auto_merge_job["steps"]
     )
+    assert auto_merge_job["steps"][0]["env"]["GH_REPO"] == "${{ github.repository }}"
 
 
 def test_publish_permissions_are_job_scoped() -> None:
