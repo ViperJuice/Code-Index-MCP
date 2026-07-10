@@ -312,6 +312,43 @@
     },
     {
       "acceptance_criteria_count": null,
+      "created_at": "2026-07-10T08:13:26Z",
+      "file": "plans/phase-plan-v10-QUALITY.md",
+      "handoff_ref": null,
+      "if_gates_produced": [
+        "IF-0-QUALITY-1",
+        "IF-0-QUALITY-2",
+        "IF-0-AUTHBOUND-1",
+        "IF-0-REPOSEL-1",
+        "IF-0-READYREC-1",
+        "IF-0-SUMCONTRACT-1",
+        "IF-0-PLUGLIFE-1"
+      ],
+      "lanes": [
+        "SL-0",
+        "SL-1",
+        "SL-2",
+        "SL-3",
+        "SL-4"
+      ],
+      "lifecycle": [],
+      "owner_skill": "codex-plan-phase",
+      "phase_alias": "QUALITY",
+      "reflection_ref": null,
+      "roadmap_ref": {
+        "file": "specs/phase-plans-v10.md",
+        "slug": "phase-plans-v10",
+        "status": "imported",
+        "type": "phase"
+      },
+      "slug": "v10-QUALITY",
+      "status": "imported",
+      "task_summary": null,
+      "type": "phase",
+      "updated_at": "2026-07-10T08:13:26Z"
+    },
+    {
+      "acceptance_criteria_count": null,
       "created_at": "2026-07-10T06:41:40Z",
       "file": "plans/phase-plan-v10-READYREC.md",
       "handoff_ref": null,
