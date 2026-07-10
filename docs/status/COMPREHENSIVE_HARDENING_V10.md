@@ -52,7 +52,10 @@ access. Intentional local-server tests remain explicitly marked.
   /tmp/code-index-mcp-hardverify/bandit.json` reported zero high-severity
   findings (60 medium and 284 low findings remain for normal triage).
 - `uv run --python 3.12 pytest tests --benchmark-skip --no-cov` passed after
-  final review repairs with 2,639 passed, 140 skipped, and 38 deselected.
+  final review repairs at code commit
+  `2c1b8a3acee5d6946627d3d7e8e25ac54818134b` with 2,660 passed, 140 skipped,
+  and 38 deselected in 321.94 seconds. The local evidence log is
+  `/tmp/code-index-mcp-hardverify/final5-full-pytest-rerun.log`.
 - `make alpha-release-gates` passed after all hardening edits, covering locked
   dependency sync, format/lint, the type ratchet, unit and integration smokes,
   documentation truth, the production matrix, and wheel/STDIO release smoke.
@@ -65,8 +68,8 @@ No tag, release, container, provenance artifact, or package was published.
 
 ## Final Panel Review
 
-GPT-5.5, Gemini 3.1 Pro High, and Fable independently reviewed the cumulative
-eight-phase patch. Gemini found no blocker; GPT-5.5 and Fable identified six
+GPT-5.6-sol, Grok 4.5, Gemini 3.1 Pro High, and Fable independently reviewed the
+cumulative eight-phase patch. The panel identified substantive integration
 substantive integration findings. All six were accepted and repaired: the
 container workflow now proves protected-main ancestry before push and signing,
 the STDIO handshake precedes lazy initialization, exact registered aliases are
