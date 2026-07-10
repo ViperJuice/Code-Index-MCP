@@ -53,9 +53,9 @@ access. Intentional local-server tests remain explicitly marked.
   findings (60 medium and 284 low findings remain for normal triage).
 - `uv run --python 3.12 pytest tests --benchmark-skip --no-cov` passed after
   final review repairs at code commit
-  `2c1b8a3acee5d6946627d3d7e8e25ac54818134b` with 2,660 passed, 140 skipped,
-  and 38 deselected in 321.94 seconds. The local evidence log is
-  `/tmp/code-index-mcp-hardverify/final5-full-pytest-rerun.log`.
+  `3572ba2309639aa91274e464dbf01bbdc8201414` with 2,661 passed, 140 skipped,
+  and 38 deselected in 322.78 seconds. The local evidence log is
+  `/tmp/code-index-mcp-hardverify/final7-full-pytest.log`.
 - `make alpha-release-gates` passed after all hardening edits, covering locked
   dependency sync, format/lint, the type ratchet, unit and integration smokes,
   documentation truth, the production matrix, and wheel/STDIO release smoke.
