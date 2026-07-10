@@ -165,6 +165,11 @@ def _register_security_middleware(
         else SecurityConfig(jwt_secret_key="x" * 32).security_headers
     )
 
+    target_app.add_middleware(SecurityHeadersMiddleware, security_headers=security_headers)
+    target_app.add_middleware(AuthorizationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(AuthenticationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(RateLimitMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(RequestValidationMiddleware)
     target_app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -172,11 +177,6 @@ def _register_security_middleware(
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
-    target_app.add_middleware(SecurityHeadersMiddleware, security_headers=security_headers)
-    target_app.add_middleware(AuthorizationMiddleware, auth_manager=active_auth_manager)
-    target_app.add_middleware(AuthenticationMiddleware, auth_manager=active_auth_manager)
-    target_app.add_middleware(RateLimitMiddleware, auth_manager=active_auth_manager)
-    target_app.add_middleware(RequestValidationMiddleware)
 
 
 app = FastAPI(

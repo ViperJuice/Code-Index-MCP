@@ -41,8 +41,13 @@ class SandboxSupervisor:
         self._capabilities = capabilities
         self._proc: Optional[subprocess.Popen] = None
         self._call_lock = threading.RLock()
+        self._closed = False
 
     def _ensure_spawned(self) -> None:
+        if self._closed:
+            raise SandboxCallError(
+                {"type": "SupervisorClosed", "message": "sandbox supervisor is closed"}
+            )
         if self._proc is not None and self._proc.poll() is None:
             return
         # Spawn with empty env by default — caps_apply scrubs anyway, but
@@ -163,6 +168,7 @@ class SandboxSupervisor:
 
     def close(self) -> None:
         with self._call_lock:
+            self._closed = True
             if self._proc is None:
                 return
             proc = self._proc

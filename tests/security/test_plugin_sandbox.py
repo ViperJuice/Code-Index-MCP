@@ -135,6 +135,21 @@ def test_supervisor_introspection_does_not_spawn(tmp_path: Path):
     assert sup.worker_pid is None
     assert sup.is_worker_running is False
     assert sup.worker_rss_bytes() == 0
+
+
+def test_supervisor_call_after_close_does_not_respawn(tmp_path: Path):
+    caps = CapabilitySet(fs_read=(), fs_write=(), env_allow=frozenset())
+    sup = SandboxSupervisor(_echo_worker_cmd(tmp_path), caps)
+    sup.call("ping", {}, timeout=5.0)
+    original_pid = sup.worker_pid
+    assert original_pid is not None
+
+    sup.close()
+
+    with pytest.raises(SandboxCallError, match="SupervisorClosed"):
+        sup.call("ping", {}, timeout=5.0)
+    assert sup.worker_pid is None
+    assert sup.is_worker_running is False
     assert sup._proc is None
 
 
