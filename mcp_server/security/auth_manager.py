@@ -427,6 +427,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
                 token,
                 self.config.jwt_secret_key,
                 algorithms=[self.config.jwt_algorithm],
+                options={"require": ["exp", "iat", "type", "user_id", "username", "role"]},
             )
 
             if payload.get("type") != "access":
@@ -440,11 +441,27 @@ class AuthManager(IAuthenticator, IAuthorizer):
             if not user or not user.is_active:
                 return None
 
+            permissions_payload = payload.get("permissions")
+            if permissions_payload is None or not isinstance(permissions_payload, list):
+                return None
+
+            try:
+                UserRole(payload["role"])
+                [Permission(permission) for permission in permissions_payload]
+            except ValueError:
+                await self._log_security_event(
+                    "token_invalid",
+                    user_id=user.id,
+                    username=user.username,
+                    details={"token_type": "access", "reason": "invalid_claim_value"},
+                )
+                return None
+
             return TokenData(
-                user_id=payload["user_id"],
-                username=payload["username"],
-                role=UserRole(payload["role"]),
-                permissions=[Permission(p) for p in payload["permissions"]],
+                user_id=user.id,
+                username=user.username,
+                role=user.role,
+                permissions=user.permissions,
                 issued_at=datetime.fromtimestamp(payload["iat"]),
                 expires_at=datetime.fromtimestamp(payload["exp"]),
             )

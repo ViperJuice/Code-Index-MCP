@@ -16,10 +16,12 @@ from pathlib import Path
 from unittest.mock import ANY, Mock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 from mcp_server.client_types import ClientSearchMatch, ClientSearchResult
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.plugin_base import SearchResult, SymbolDef
+from mcp_server.security import AuthManager, SecurityConfig, UserRole
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 # ---------------------------------------------------------------------------
@@ -35,6 +37,63 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 def dispatcher_with_plugins(sqlite_store: SQLiteStore) -> SimpleDispatcher:
     """Local override: create a SimpleDispatcher compatible with the SL-1 API."""
     return SimpleDispatcher()
+
+
+@pytest.fixture
+def test_client(monkeypatch):
+    """Local override: authenticated client without running gateway startup hooks."""
+    import asyncio
+
+    import mcp_server.gateway as gateway
+
+    original_startup = list(gateway.app.router.on_startup)
+    original_shutdown = list(gateway.app.router.on_shutdown)
+    gateway.app.router.on_startup = []
+    gateway.app.router.on_shutdown = []
+
+    auth_manager = getattr(gateway.app.state, "auth_manager", None)
+    if auth_manager is None:
+        auth_manager = AuthManager(
+            SecurityConfig(
+                jwt_secret_key=os.environ["JWT_SECRET_KEY"],
+                jwt_algorithm="HS256",
+                access_token_expire_minutes=30,
+            )
+        )
+        gateway.app.state.auth_manager = auth_manager
+    auth_manager.rate_limiter.max_requests = 10000
+
+    admin_user = asyncio.run(auth_manager.get_user_by_username("pytest_gateway_admin"))
+    if admin_user is None:
+        admin_user = asyncio.run(
+            auth_manager.create_user(
+                username="pytest_gateway_admin",
+                password="PytestGatewayAdmin123!",
+                email="pytest_gateway_admin@test.local",
+                role=UserRole.ADMIN,
+            )
+        )
+    token = asyncio.run(auth_manager.create_access_token(admin_user))
+
+    client = TestClient(gateway.app, headers={"Authorization": f"Bearer {token}"})
+    try:
+        yield client
+    finally:
+        client.close()
+        gateway.app.router.on_startup = original_startup
+        gateway.app.router.on_shutdown = original_shutdown
+
+
+@pytest.fixture
+def startup_test_client():
+    """Client that keeps the gateway startup/shutdown lifecycle intact."""
+    import mcp_server.gateway as gateway
+
+    client = TestClient(gateway.app)
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 @pytest.fixture
@@ -94,7 +153,7 @@ class TestGatewayStartupShutdown:
         mock_store,
         mock_run_preflight,
         mock_format_preflight,
-        test_client,
+        startup_test_client,
     ):
         """Test successful server startup."""
         mock_run_preflight.return_value = type(
@@ -102,7 +161,7 @@ class TestGatewayStartupShutdown:
         )()
         mock_format_preflight.return_value = ["warning"]
         # Trigger startup event
-        with test_client:
+        with startup_test_client:
             # Verify components were initialized
             mock_run_preflight.assert_called_once()
             mock_store.assert_called_once()
@@ -110,25 +169,28 @@ class TestGatewayStartupShutdown:
             mock_watcher.assert_called_once()
 
     @patch("mcp_server.gateway.SQLiteStore")
-    def test_startup_failure(self, mock_store, test_client):
+    def test_startup_failure(self, mock_store, startup_test_client):
         """Test server startup with initialization failure."""
         mock_store.side_effect = Exception("Database error")
 
         with pytest.raises(Exception, match="Database error"):
-            with test_client:
+            with startup_test_client:
                 pass
 
     @patch("mcp_server.gateway.EnhancedDispatcher")
     @patch("mcp_server.gateway.MultiRepositoryWatcher")
     def test_shutdown_stops_watcher(
-        self, mock_watcher_class, mock_dispatcher_class, test_client_with_dispatcher
+        self, mock_watcher_class, mock_dispatcher_class, startup_test_client, monkeypatch
     ):
         """Test that shutdown stops the multi-repo watcher."""
+        import mcp_server.gateway as gateway
+
         mock_watcher = Mock()
         mock_watcher_class.return_value = mock_watcher
+        monkeypatch.setattr(gateway, "dispatcher", SimpleDispatcher())
 
         # Trigger startup+shutdown via context manager
-        with test_client_with_dispatcher:
+        with startup_test_client:
             pass
 
         # stop_watching_all should have been called during shutdown

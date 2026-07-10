@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from .artifacts.semantic_profiles import SemanticProfileRegistry
 from .cache import (
@@ -45,8 +46,12 @@ from .security import (
     AuthCredentials,
     AuthManager,
     Permission,
+    AuthenticationMiddleware,
     SecurityConfig,
-    SecurityMiddlewareStack,
+    AuthorizationMiddleware,
+    RateLimitMiddleware,
+    RequestValidationMiddleware,
+    SecurityHeadersMiddleware,
     User,
     UserRole,
     get_current_active_user,
@@ -96,6 +101,82 @@ def _parse_cors_origins_from_env() -> list[str]:
     return origins
 
 
+def _build_security_config_from_env() -> SecurityConfig:
+    """Build SecurityConfig from environment and fail closed on invalid input."""
+    jwt_secret_key = os.getenv("JWT_SECRET_KEY")
+    if not jwt_secret_key:
+        raise RuntimeError(
+            "JWT_SECRET_KEY env var must be set. Generate one with: openssl rand -base64 32"
+        )
+
+    try:
+        return SecurityConfig(
+            jwt_secret_key=jwt_secret_key,
+            jwt_algorithm="HS256",
+            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
+            refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
+            password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
+            max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
+            lockout_duration_minutes=int(os.getenv("LOCKOUT_DURATION_MINUTES", "15")),
+            rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "100")),
+            rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "1")),
+            cors_origins=_parse_cors_origins_from_env(),
+            cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            cors_headers=["*"],
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Invalid JWT security configuration: {exc}") from exc
+
+
+def _require_default_admin_password() -> str:
+    """Return the configured default admin password or raise fail-closed."""
+    admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
+    if not admin_password:
+        raise RuntimeError(
+            "DEFAULT_ADMIN_PASSWORD env var must be set. Choose a strong password for the admin account."
+        )
+    if admin_password.strip().lower() in WEAK_CREDENTIAL_BLOCKLIST:
+        raise RuntimeError(
+            "DEFAULT_ADMIN_PASSWORD is on the well-known-weak list. "
+            "Pick a strong password (see config/validation.py blocklist)."
+        )
+    return admin_password
+
+
+def _build_boot_auth_manager() -> tuple[SecurityConfig | None, AuthManager | None]:
+    """Best-effort import-time auth bootstrap for pre-startup route protection."""
+    try:
+        config = _build_security_config_from_env()
+    except RuntimeError:
+        return None, None
+    return config, AuthManager(config)
+
+
+def _register_security_middleware(
+    target_app: FastAPI,
+    config: SecurityConfig | None,
+    active_auth_manager: AuthManager | None,
+) -> None:
+    """Register the HTTP security stack before startup."""
+    cors_origins = config.cors_origins if config is not None else _parse_cors_origins_from_env()
+    security_headers = (
+        config.security_headers if config is not None else SecurityConfig(jwt_secret_key="x" * 32).security_headers
+    )
+
+    target_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
+    target_app.add_middleware(SecurityHeadersMiddleware, security_headers=security_headers)
+    target_app.add_middleware(AuthenticationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(AuthorizationMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(RateLimitMiddleware, auth_manager=active_auth_manager)
+    target_app.add_middleware(RequestValidationMiddleware)
+
+
 app = FastAPI(
     title="MCP Server",
     description="Code Index MCP Server with Security, Metrics, and Health Checks",
@@ -119,6 +200,7 @@ profile_hydration_status: Dict[str, Any] | None = None
 semantic_setup_status: Dict[str, Any] | None = None
 _repo_registry = None
 _store_registry: StoreRegistry | None = None
+security_config, auth_manager = _build_boot_auth_manager()
 
 
 def _get_path_guard() -> Optional[PathTraversalGuard]:
@@ -338,9 +420,11 @@ business_metrics = get_business_metrics()
 setup_metrics_middleware(app, enable_detailed_metrics=True)
 
 # Register SecretRedactionResponseMiddleware at import time so it applies
-# regardless of how the app is booted. The rest of the security stack needs
-# runtime-configured auth_manager and stays in startup_event.
+# regardless of how the app is booted.
 app.add_middleware(SecretRedactionResponseMiddleware)
+_register_security_middleware(app, security_config, auth_manager)
+app.state.auth_manager = auth_manager
+app.state.security_config = security_config
 
 
 @app.on_event("startup")
@@ -360,25 +444,7 @@ async def startup_event():
 
         # Initialize security configuration
         logger.info("Initializing security configuration...")
-        jwt_secret_key = os.getenv("JWT_SECRET_KEY")
-        if not jwt_secret_key:
-            raise RuntimeError(
-                "JWT_SECRET_KEY env var must be set. " "Generate one with: openssl rand -base64 32"
-            )
-        security_config = SecurityConfig(
-            jwt_secret_key=jwt_secret_key,
-            jwt_algorithm="HS256",
-            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
-            refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
-            password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
-            max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
-            lockout_duration_minutes=int(os.getenv("LOCKOUT_DURATION_MINUTES", "15")),
-            rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "100")),
-            rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "1")),
-            cors_origins=_parse_cors_origins_from_env(),
-            cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            cors_headers=["*"],
-        )
+        security_config = _build_security_config_from_env()
 
         # Validate security config before constructing auth manager
         _validation_errors = validate_production_config(
@@ -392,6 +458,8 @@ async def startup_event():
         # Initialize authentication manager
         logger.info("Initializing authentication manager...")
         auth_manager = AuthManager(security_config)
+        app.state.auth_manager = auth_manager
+        app.state.security_config = security_config
 
         # Validate GitHub token scopes (warns and continues if token absent; raises only if MCP_REQUIRE_TOKEN_SCOPES=1)
         TokenValidator.validate_scopes(
@@ -407,17 +475,7 @@ async def startup_event():
         # Create default admin user if it doesn't exist
         admin_user = await auth_manager.get_user_by_username("admin")
         if not admin_user:
-            admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
-            if not admin_password:
-                raise RuntimeError(
-                    "DEFAULT_ADMIN_PASSWORD env var must be set. "
-                    "Choose a strong password for the admin account."
-                )
-            if admin_password.strip().lower() in WEAK_CREDENTIAL_BLOCKLIST:
-                raise RuntimeError(
-                    "DEFAULT_ADMIN_PASSWORD is on the well-known-weak list. "
-                    "Pick a strong password (see config/validation.py blocklist)."
-                )
+            admin_password = _require_default_admin_password()
             logger.info("Creating default admin user...")
             await auth_manager.create_user(
                 username="admin",
@@ -426,18 +484,6 @@ async def startup_event():
                 role=UserRole.ADMIN,
             )
             logger.info("Default admin user created")
-
-        # Set up security middleware
-        logger.info("Setting up security middleware...")
-        security_middleware = SecurityMiddlewareStack(app, security_config, auth_manager)
-        try:
-            security_middleware.setup_middleware()
-        except RuntimeError as exc:
-            if "Cannot add middleware after an application has started" in str(exc):
-                logger.warning("Skipping late middleware registration on this runtime: %s", exc)
-            else:
-                raise
-        logger.info("Security middleware configured successfully")
 
         # Initialize cache system
         logger.info("Initializing cache system...")

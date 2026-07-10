@@ -34,6 +34,7 @@ try:
 except Exception as exc:  # pragma: no cover - optional for non-API tests
     app = None  # type: ignore
     gateway_import_error = exc
+from mcp_server.security import AuthManager, SecurityConfig, User, UserRole
 from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -332,8 +333,32 @@ def test_client() -> TestClient:
     """Create a test client for the FastAPI app."""
     if app is None:
         pytest.skip(f"FastAPI app unavailable: {gateway_import_error}")
-    # Include a bearer token so the fallback auth path in get_current_user grants access
-    return TestClient(app, headers={"Authorization": "Bearer test-token"})
+    with TestClient(app) as client:
+        auth_mgr = getattr(client.app.state, "auth_manager", None)
+        if auth_mgr is None:
+            auth_mgr = AuthManager(
+                SecurityConfig(
+                    jwt_secret_key=os.environ["JWT_SECRET_KEY"],
+                    jwt_algorithm="HS256",
+                    access_token_expire_minutes=30,
+                )
+            )
+            client.app.state.auth_manager = auth_mgr
+
+        admin_user = asyncio.run(auth_mgr.get_user_by_username("pytest_admin"))
+        if admin_user is None:
+            admin_user = asyncio.run(
+                auth_mgr.create_user(
+                    username="pytest_admin",
+                    password="PytestAdminPass123!",
+                    email="pytest_admin@test.local",
+                    role=UserRole.ADMIN,
+                )
+            )
+
+        token = asyncio.run(auth_mgr.create_access_token(admin_user))
+        client.headers.update({"Authorization": f"Bearer {token}"})
+        yield client
 
 
 @pytest.fixture
