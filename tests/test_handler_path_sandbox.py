@@ -601,6 +601,93 @@ class TestReindexUnchanged:
         dumped = json.dumps(data).lower()
         assert "outside" in dumped or "allowed" in dumped
 
+    def test_reindex_rejects_allowed_sibling_outside_selected_repo(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import handle_reindex
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        repo = tmp_path / "repo"
+        sibling = tmp_path / "sibling.py"
+        repo.mkdir()
+        sibling.write_text("pass\n", encoding="utf-8")
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+
+        ctx = SimpleNamespace(repo_id="repo-1", workspace_root=repo, sqlite_store=MagicMock())
+        ready = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            registered_path=str(repo),
+        )
+        unregistered = RepositoryReadiness(
+            state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            requested_path=str(sibling),
+        )
+        resolver = MagicMock()
+        resolver.classify.side_effect = lambda selector: (
+            ready if selector == "repo" else unregistered
+        )
+        resolver.resolve.return_value = ctx
+        dispatcher = _mock_dispatcher()
+
+        result = _run(
+            handle_reindex(
+                arguments={"repository": "repo", "path": str(sibling)},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        data = _parsed(result)
+        assert data["code"] == "path_outside_selected_repository"
+        assert data["mutation_performed"] is False
+        dispatcher.index_file.assert_not_called()
+        ctx.sqlite_store.store_file.assert_not_called()
+
+    def test_reindex_rejects_symlink_escape_from_selected_repo(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import handle_reindex
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        repo = tmp_path / "repo"
+        outside = tmp_path / "outside.py"
+        repo.mkdir()
+        outside.write_text("pass\n", encoding="utf-8")
+        link = repo / "linked.py"
+        link.symlink_to(outside)
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+
+        ctx = SimpleNamespace(repo_id="repo-1", workspace_root=repo, sqlite_store=MagicMock())
+        ready = RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            registered_path=str(repo),
+        )
+        resolver = MagicMock()
+        resolver.classify.return_value = ready
+        resolver.resolve.return_value = ctx
+        dispatcher = _mock_dispatcher()
+
+        result = _run(
+            handle_reindex(
+                arguments={"repository": "repo", "path": str(link)},
+                dispatcher=dispatcher,
+                repo_resolver=resolver,
+            )
+        )
+
+        data = _parsed(result)
+        assert data["code"] == "path_outside_selected_repository"
+        assert data["path"] == str(outside)
+        assert data["mutation_performed"] is False
+        dispatcher.index_file.assert_not_called()
+        ctx.sqlite_store.store_file.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # write_summaries — no path args, must not be guarded

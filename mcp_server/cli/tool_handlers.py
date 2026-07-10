@@ -311,6 +311,7 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     if active_store is None:
         return 0
 
+    workspace_root = workspace_root.expanduser().resolve(strict=True)
     repo_row = active_store.ensure_repository_row(workspace_root)
     if target_path.is_file():
         paths = [target_path]
@@ -324,16 +325,17 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     recorded = 0
     for file_path in paths:
         try:
-            relative_path = file_path.relative_to(workspace_root).as_posix()
-        except ValueError:
-            relative_path = file_path.name
+            resolved_file = file_path.expanduser().resolve(strict=True)
+            relative_path = resolved_file.relative_to(workspace_root).as_posix()
+        except (OSError, ValueError):
+            continue
         try:
             active_store.store_file(
                 repo_row,
-                path=file_path,
+                path=resolved_file,
                 relative_path=relative_path,
                 language=file_path.suffix.lstrip(".") or None,
-                size=file_path.stat().st_size,
+                size=resolved_file.stat().st_size,
             )
             recorded += 1
         except Exception as exc:
@@ -1084,6 +1086,8 @@ async def handle_reindex(
     # Determine target_path: prefer ctx.workspace_root when ctx resolved, else path
     if path:
         target_path = Path(path).expanduser()
+        if ctx is not None and not target_path.is_absolute():
+            target_path = ctx.workspace_root / target_path
     elif ctx is not None:
         target_path = ctx.workspace_root
     else:
@@ -1091,6 +1095,8 @@ async def handle_reindex(
 
     if not target_path.exists():
         return _json_text_response({"error": "Path not found", "path": str(target_path)})
+
+    target_path = target_path.resolve(strict=True)
 
     if not alias_bypasses_sandbox and not _path_within_allowed(target_path, allowed):
         return _json_text_response(
@@ -1102,6 +1108,21 @@ async def handle_reindex(
                 "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
             }
         )
+
+    if ctx is not None:
+        workspace_root = ctx.workspace_root.expanduser().resolve(strict=True)
+        try:
+            target_path.relative_to(workspace_root)
+        except ValueError:
+            return _json_text_response(
+                {
+                    "error": "Reindex path is outside the selected repository",
+                    "code": "path_outside_selected_repository",
+                    "repository_id": ctx.repo_id,
+                    "path": str(target_path),
+                    "mutation_performed": False,
+                }
+            )
 
     whole_repository = (
         ctx is not None

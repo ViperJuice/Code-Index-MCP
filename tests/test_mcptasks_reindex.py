@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 from mcp.types import TaskMetadata
 
-from mcp_server.cli.task_reindex import run_reindex_task
+from mcp_server.cli.task_reindex import _record_reindexed_files, run_reindex_task
 from mcp_server.storage.mcp_task_registry import MCPTaskRegistry
 
 
@@ -150,3 +150,53 @@ async def test_run_reindex_task_marks_terminal_payload_cancelled(tmp_path: Path)
     record = await registry.get_record(task_state.taskId)
     assert record.task.status == "cancelled"
     assert record.terminal_result is not None
+
+
+@pytest.mark.asyncio
+async def test_run_reindex_task_rejects_path_outside_selected_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    outside = tmp_path / "outside.py"
+    repo.mkdir()
+    outside.write_text("pass\n", encoding="utf-8")
+
+    registry = MCPTaskRegistry()
+    task_state = await registry.create_task(TaskMetadata())
+    task = _FakeTask(task_state.taskId)
+    dispatcher = MagicMock()
+    active_store = MagicMock()
+    ctx = SimpleNamespace(repo_id="repo-1", workspace_root=repo)
+
+    result = await run_reindex_task(
+        task=task,
+        registry=registry,
+        dispatcher=dispatcher,
+        ctx=ctx,
+        active_store=active_store,
+        target_path=outside,
+        requested_path=str(outside),
+    )
+
+    assert result.isError is True
+    assert result.structuredContent["code"] == "path_outside_selected_repository"
+    assert result.structuredContent["mutation_performed"] is False
+    dispatcher.index_file.assert_not_called()
+    dispatcher.index_directory.assert_not_called()
+    active_store.store_file.assert_not_called()
+    record = await registry.get_record(task_state.taskId)
+    assert record.task.status == "failed"
+
+
+def test_record_reindexed_files_skips_foreign_symlink(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    outside = tmp_path / "outside.py"
+    repo.mkdir()
+    outside.write_text("pass\n", encoding="utf-8")
+    link = repo / "linked.py"
+    link.symlink_to(outside)
+    active_store = MagicMock()
+    active_store.ensure_repository_row.return_value = "repo-row"
+
+    recorded = _record_reindexed_files(active_store, repo, link)
+
+    assert recorded == 0
+    active_store.store_file.assert_not_called()

@@ -30,6 +30,7 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     if active_store is None:
         return 0
 
+    workspace_root = workspace_root.expanduser().resolve(strict=True)
     repo_row = active_store.ensure_repository_row(workspace_root)
     if target_path.is_file():
         paths = [target_path]
@@ -43,16 +44,17 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     recorded = 0
     for file_path in paths:
         try:
-            relative_path = file_path.relative_to(workspace_root).as_posix()
-        except ValueError:
-            relative_path = file_path.name
+            resolved_file = file_path.expanduser().resolve(strict=True)
+            relative_path = resolved_file.relative_to(workspace_root).as_posix()
+        except (OSError, ValueError):
+            continue
         try:
             active_store.store_file(
                 repo_row,
-                path=file_path,
+                path=resolved_file,
                 relative_path=relative_path,
                 language=file_path.suffix.lstrip(".") or None,
-                size=file_path.stat().st_size,
+                size=resolved_file.stat().st_size,
             )
             recorded += 1
         except Exception:
@@ -61,15 +63,23 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
 
 
 def _candidate_checkpoint_paths(target_path: Path, workspace_root: Path) -> list[str]:
+    workspace_root = workspace_root.expanduser().resolve(strict=True)
     if target_path.is_file():
-        return [target_path.relative_to(workspace_root).as_posix()]
+        try:
+            return [
+                target_path.expanduser().resolve(strict=True).relative_to(workspace_root).as_posix()
+            ]
+        except (OSError, ValueError):
+            return []
     candidates: list[str] = []
     for path in target_path.rglob("*"):
         if not path.is_file() or ".git" in path.parts or ".mcp-index" in path.parts:
             continue
         try:
-            candidates.append(path.relative_to(workspace_root).as_posix())
-        except ValueError:
+            candidates.append(
+                path.expanduser().resolve(strict=True).relative_to(workspace_root).as_posix()
+            )
+        except (OSError, ValueError):
             continue
     return candidates
 
@@ -110,6 +120,27 @@ async def run_reindex_task(
 
     if ctx is None:
         raise RuntimeError("Task-backed reindex requires a repository context")
+
+    workspace_root = ctx.workspace_root.expanduser().resolve(strict=True)
+    target_path = target_path.expanduser().resolve(strict=True)
+    try:
+        target_path.relative_to(workspace_root)
+    except ValueError:
+        payload = {
+            "error": "Reindex path is outside the selected repository",
+            "code": "path_outside_selected_repository",
+            "repository_id": ctx.repo_id,
+            "path": str(target_path),
+            "mutation_performed": False,
+        }
+        result = _call_tool_result(payload, is_error=True)
+        await registry.store_result(task.task_id, result)
+        await registry.update_task(
+            task.task_id,
+            status="failed",
+            status_message="Reindex path is outside the selected repository.",
+        )
+        return result
 
     pending_paths = _candidate_checkpoint_paths(target_path, ctx.workspace_root)
     last_completed_path = ""
