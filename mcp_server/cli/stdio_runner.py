@@ -1117,34 +1117,6 @@ async def initialize_services() -> None:
             except Exception as _ctx_err:
                 logger.debug(f"Could not build local RepoContext (non-fatal): {_ctx_err}")
 
-        # Pre-create plugins with sqlite_store so BM25 indexing persists via ctx.repo_id lookup
-        # This ensures _match_plugin finds a store-aware plugin before lazy-loading a bare one.
-        if (
-            _local_ctx is not None
-            and isinstance(dispatcher, EnhancedDispatcher)
-            and sqlite_store is not None
-        ):
-            try:
-                from mcp_server.plugins.plugin_factory import PluginFactory as _PF
-
-                _languages_to_preload = ["python", "javascript", "typescript", "go", "rust", "java"]
-                for _lang in _languages_to_preload:
-                    try:
-                        # Only pre-load if not already in _legacy_plugins
-                        _already = any(
-                            getattr(_p, "lang", None) == _lang
-                            or getattr(_p, "lang_id", None) == _lang
-                            for _p in getattr(dispatcher, "_legacy_plugins", [])
-                        )
-                        if not _already:
-                            _store_plugin = _PF.create_plugin(_lang, sqlite_store=sqlite_store)
-                            if _store_plugin is not None:
-                                dispatcher._legacy_plugins.insert(0, _store_plugin)
-                    except Exception:
-                        pass
-            except Exception as _inj_err:
-                logger.debug(f"Plugin preload with store failed (non-fatal): {_inj_err}")
-
         if isinstance(dispatcher, EnhancedDispatcher) and not (
             getattr(dispatcher, "_semantic_registry", None)
             or getattr(dispatcher, "_semantic_indexer_fallback", None)
@@ -1321,11 +1293,11 @@ async def call_tool(
         logger.debug("request_ctx not available: %s", _e)
 
     # Lazy initialize on first call
-    if sqlite_store is None and initialization_error is None:
+    if dispatcher is None and sqlite_store is None and initialization_error is None:
         if _init_lock is None:
             _init_lock = asyncio.Lock()
         async with _init_lock:
-            if sqlite_store is None and initialization_error is None:
+            if dispatcher is None and sqlite_store is None and initialization_error is None:
                 await initialize_services()
 
     if initialization_error:
@@ -1514,7 +1486,7 @@ async def call_tool(
 async def _serve(registry_path=None) -> None:
     """Set up and run the MCP stdio server."""
     global _shutdown_called, _gate, _repo_resolver, _store_registry, _task_registry
-    global _git_index_manager
+    global _git_index_manager, dispatcher
 
     _shutdown_called = False
 
@@ -1546,6 +1518,7 @@ async def _serve(registry_path=None) -> None:
     _repo_resolver = repo_resolver
     _store_registry = store_registry
     _git_index_manager = git_index_manager
+    dispatcher = _disp
 
     # Start Prometheus metrics exporter
     exporter = PrometheusExporter()

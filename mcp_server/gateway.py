@@ -34,6 +34,7 @@ from .config.validation import (
 from .core import RepoContext, RepoResolver
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from .health.repository_readiness import RepositoryReadinessState
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from .indexing.source_metadata import normalize_friction_category
@@ -361,10 +362,23 @@ language_detection_status: Dict[str, Any] | None = None
 _FALLBACK_REPO_ID = "default"
 _repo_search_backends: dict[str, tuple[SQLiteStore, BM25Indexer, FuzzyIndexer, HybridSearch]] = {}
 _repo_search_backends_lock = threading.Lock()
+_RECOVERABLE_REINDEX_STATES = frozenset(
+    {
+        RepositoryReadinessState.MISSING_INDEX,
+        RepositoryReadinessState.INDEX_EMPTY,
+        RepositoryReadinessState.STALE_COMMIT,
+        RepositoryReadinessState.CORRUPT_SQLITE,
+        RepositoryReadinessState.MISSING_SCHEMA,
+        RepositoryReadinessState.MISSING_PROVENANCE,
+    }
+)
 
 
 def _repository_unavailable_detail(selector: str) -> dict[str, Any]:
-    readiness = repo_resolver.classify(selector) if repo_resolver is not None else None
+    try:
+        readiness = repo_resolver.classify(selector) if repo_resolver is not None else None
+    except Exception:
+        readiness = None
     return {
         "error": "Index unavailable",
         "code": getattr(getattr(readiness, "state", None), "value", "repository_unavailable"),
@@ -2027,6 +2041,48 @@ async def reindex(
     if dispatcher is None:
         logger.error("Reindex requested but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
+
+    selector = request.headers.get("X-Repo-Id") or request.query_params.get("repository")
+    readiness = None
+    if repo_resolver is not None:
+        target = selector if selector is not None else str(Path.cwd())
+        try:
+            readiness = repo_resolver.classify(target)
+        except Exception as exc:
+            raise HTTPException(503, detail=_repository_unavailable_detail(str(target))) from exc
+
+    if readiness is not None and not readiness.ready:
+        if path and readiness.state in _RECOVERABLE_REINDEX_STATES:
+            raise HTTPException(
+                409,
+                detail={
+                    "error": "Full repository rebuild required",
+                    "code": "full_rebuild_required",
+                    "readiness": readiness.to_dict(),
+                    "mutation_performed": False,
+                },
+            )
+        if not path and readiness.state in _RECOVERABLE_REINDEX_STATES:
+            if git_index_manager is None or readiness.repository_id is None:
+                raise HTTPException(503, detail="Staged repository reindex is unavailable")
+            sync_result = git_index_manager.rebuild_repository_index(readiness.repository_id)
+            if sync_result.action != "full_index":
+                raise HTTPException(
+                    409,
+                    detail={
+                        "error": "Reindex failed",
+                        "code": sync_result.code or "reindex_failed",
+                        "mutation_performed": False,
+                    },
+                )
+            return {
+                "status": "completed",
+                "mode": "staged_full",
+                "indexed_files": sync_result.files_processed,
+                "commit": sync_result.commit,
+                "readiness": sync_result.readiness,
+            }
+        raise HTTPException(503, detail=_repository_unavailable_detail(str(target)))
 
     ctx = get_repo_ctx(request)
     try:

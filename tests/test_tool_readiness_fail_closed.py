@@ -67,6 +67,14 @@ class FakeTaskExperimental:
         raise AssertionError("run_task should not be reached when preflight fails")
 
 
+class RaisingResolver:
+    def classify(self, path):
+        raise ValueError("embedded NUL")
+
+    def resolve(self, path):
+        raise AssertionError("malformed selector must not resolve or fall back")
+
+
 NON_READY_STATES = [
     RepositoryReadinessState.UNREGISTERED_REPOSITORY,
     RepositoryReadinessState.MISSING_INDEX,
@@ -88,6 +96,26 @@ REINDEX_REFUSED_STATES = [
     RepositoryReadinessState.UNSUPPORTED_WORKTREE,
     RepositoryReadinessState.AMBIGUOUS_SELECTOR,
 ]
+
+
+def test_reindex_malformed_explicit_selector_never_falls_back(tmp_path, monkeypatch):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    dispatcher = MagicMock()
+
+    result = _run(
+        handle_reindex(
+            arguments={"repository": "bad\x00selector"},
+            dispatcher=dispatcher,
+            repo_resolver=RaisingResolver(),
+            sqlite_store=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "unregistered_repository"
+    dispatcher.index_file.assert_not_called()
+    dispatcher.index_directory.assert_not_called()
+
 
 RECOVERABLE_REINDEX_STATES = [
     RepositoryReadinessState.MISSING_INDEX,

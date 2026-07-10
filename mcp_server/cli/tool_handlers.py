@@ -200,7 +200,11 @@ def _classify_ctx(
         readiness = classifier(target)
     except Exception as exc:
         logger.debug("RepoResolver.classify(%s) failed: %s", target, exc)
-        return None
+        return RepositoryReadiness(
+            state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            requested_path=str(target),
+            remediation="Provide a valid registered repository ID, name, or path.",
+        )
     return readiness if isinstance(readiness, RepositoryReadiness) else None
 
 

@@ -110,3 +110,27 @@ async def test_handshake_gate_precedes_all_lazy_initialization(
     authenticated = await stdio_runner.call_tool("handshake", {"secret": "pre-init-secret"})
     assert _payload(authenticated) == {"authenticated": True}
     initialize_services.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stateless_dispatcher_skips_legacy_lazy_initialization(
+    monkeypatch, restore_stdio_globals
+) -> None:
+    initialize_services = AsyncMock()
+    serving_dispatcher = object()
+    monkeypatch.setattr(stdio_runner, "initialize_services", initialize_services)
+    monkeypatch.setattr(
+        stdio_runner.tool_handlers,
+        "handle_get_status",
+        AsyncMock(return_value=[types.TextContent(type="text", text='{"status":"ok"}')]),
+    )
+    stdio_runner._gate = HandshakeGate(secret=None)
+    stdio_runner.dispatcher = serving_dispatcher
+    stdio_runner.sqlite_store = None
+    stdio_runner.initialization_error = None
+
+    result = await stdio_runner.call_tool("get_status", {})
+
+    assert _payload(result) == {"status": "ok"}
+    initialize_services.assert_not_awaited()
+    assert stdio_runner.dispatcher is serving_dispatcher

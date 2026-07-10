@@ -728,6 +728,34 @@ class TestReindexEndpoint:
         assert response.json()["mode"] == "staged_full"
         manager.rebuild_repository_index.assert_called_once_with("repo-a")
 
+    def test_reindex_nonready_scoped_path_refuses_before_store_resolution(
+        self, test_client_with_dispatcher, tmp_path, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        target = tmp_path / "sample.py"
+        target.write_text("pass", encoding="utf-8")
+        resolver = Mock()
+        resolver.classify.return_value = RepositoryReadiness(
+            state=RepositoryReadinessState.MISSING_SCHEMA,
+            repository_id="repo-a",
+            registered_path=str(tmp_path),
+        )
+        resolver.resolve.side_effect = AssertionError("must not open the store")
+        monkeypatch.setattr(gateway, "repo_resolver", resolver)
+        test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
+
+        response = test_client_with_dispatcher.post(f"/reindex?repository=repo-a&path={target}")
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "full_rebuild_required"
+        resolver.resolve.assert_not_called()
+        test_client_with_dispatcher.app.state.dispatcher.index_file.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_reindex_specific_file(
         self, test_client_with_dispatcher, temp_code_directory, monkeypatch
