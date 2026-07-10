@@ -1,3 +1,7 @@
+from unittest.mock import MagicMock
+
+import pytest
+
 from mcp_server import (
     ClientReindexResult,
     ClientSearchOptions,
@@ -7,6 +11,12 @@ from mcp_server import (
     IndexItClient,
     IndexUnavailable,
     open_client,
+)
+from mcp_server.client import execute_search_service
+from mcp_server.core.repo_resolver import RepoResolver
+from mcp_server.health.repository_readiness import (
+    RepositoryReadiness,
+    RepositoryReadinessState,
 )
 
 
@@ -53,3 +63,32 @@ def test_distribution_identity_and_client_import_path_stay_separate():
 
     assert importlib.metadata.metadata("index-it-mcp")["Name"] == "index-it-mcp"
     assert IndexItClient.__module__ == "mcp_server.client"
+
+
+def test_search_ready_transition_does_not_open_store_or_dispatch():
+    resolver = object.__new__(RepoResolver)
+    resolver._registry = None
+    resolver._store_registry = MagicMock()
+    resolver.classify = MagicMock(
+        side_effect=[
+            RepositoryReadiness(
+                state=RepositoryReadinessState.READY,
+                repository_id="repo",
+            ),
+            RepositoryReadiness(
+                state=RepositoryReadinessState.STALE_COMMIT,
+                repository_id="repo",
+            ),
+        ]
+    )
+    dispatcher = MagicMock()
+
+    with pytest.raises(RuntimeError, match="could not be resolved"):
+        execute_search_service(
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+            options=ClientSearchOptions(query="demo", repository="repo"),
+        )
+
+    resolver._store_registry.get.assert_not_called()
+    dispatcher.search.assert_not_called()

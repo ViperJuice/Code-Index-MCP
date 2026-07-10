@@ -129,7 +129,11 @@ def _resolve_ctx(
     else:
         target = str(workspace_root or Path.cwd())
     try:
-        return repo_resolver.resolve(target)
+        return (
+            repo_resolver.resolve_ready(target)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(target)
+        )
     except Exception:
         return None
 
