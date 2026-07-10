@@ -172,7 +172,11 @@ def _resolve_ctx(
         if not target:
             target = str(Path.cwd())
     try:
-        return repo_resolver.resolve(target)
+        return (
+            repo_resolver.resolve_ready(target)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(target)
+        )
     except Exception as exc:
         logger.debug("RepoResolver.resolve(%s) failed: %s", target, exc)
         return None
@@ -755,7 +759,11 @@ def _build_repositories(repo_resolver: Any, dispatcher: Any = None) -> list:
             try:
                 readiness = _classify_ctx(repo_resolver, str(info.path))
                 if readiness is not None and readiness.ready:
-                    ctx = repo_resolver.resolve(info.path)
+                    ctx = (
+                        repo_resolver.resolve_ready(info.path)
+                        if isinstance(repo_resolver, RepoResolver)
+                        else repo_resolver.resolve(info.path)
+                    )
                     if ctx is not None:
                         features = dispatcher.get_runtime_feature_status(ctx)
                         semantic_readiness = ReadinessClassifier.classify_semantic_registered(

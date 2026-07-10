@@ -472,7 +472,11 @@ def get_repo_ctx(request: Request) -> RepoContext:
                     "readiness": readiness.to_dict(),
                 },
             )
-        resolved = repo_resolver.resolve(candidate_selector)
+        resolved = (
+            repo_resolver.resolve_ready(candidate_selector)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(candidate_selector)
+        )
         if resolved is not None:
             return resolved
         raise HTTPException(503, detail=_repository_unavailable_detail(candidate_selector))
@@ -493,7 +497,11 @@ def get_repo_ctx(request: Request) -> RepoContext:
                     "readiness": readiness.to_dict(),
                 },
             )
-        resolved = repo_resolver.resolve(cwd_selector)
+        resolved = (
+            repo_resolver.resolve_ready(cwd_selector)
+            if isinstance(repo_resolver, RepoResolver)
+            else repo_resolver.resolve(cwd_selector)
+        )
         if resolved is not None:
             return resolved
 
@@ -1968,7 +1976,11 @@ async def get_status(
                         try:
                             _readiness = repo_resolver.classify(info.path)
                             if isinstance(_readiness, RepositoryReadiness) and _readiness.ready:
-                                _ctx = repo_resolver.resolve(info.path)
+                                _ctx = (
+                                    repo_resolver.resolve_ready(info.path)
+                                    if isinstance(repo_resolver, RepoResolver)
+                                    else repo_resolver.resolve(info.path)
+                                )
                                 if _ctx is not None:
                                     _features = dispatcher.get_runtime_feature_status(_ctx)
                         except Exception:

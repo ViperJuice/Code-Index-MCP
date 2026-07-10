@@ -143,10 +143,11 @@ def test_multi_repo_workspace_hydration_restores_clean_state_and_query_truth(
             lambda self: "owner/repo",
         )
 
+        manager = MultiRepositoryManager(central_index_path=registry_path)
         publish_results = MultiRepoArtifactCoordinator(manager).publish_workspace(
             [matrix.alpha.repo_id, matrix.beta.repo_id]
         )
-        assert all(result.success for result in publish_results)
+        assert all(result.success for result in publish_results), publish_results
 
     for repo_path in matrix.repos:
         shutil.rmtree(repo_path / ".mcp-index")

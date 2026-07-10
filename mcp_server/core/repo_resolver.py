@@ -53,6 +53,16 @@ class RepoResolver:
         }:
             return None
 
+        return self._context_from_readiness(readiness)
+
+    def resolve_ready(self, selector: str | Path) -> Optional[RepoContext]:
+        """Resolve only when this operation's own classification is ready."""
+        readiness = self.classify(selector)
+        if not readiness.ready:
+            return None
+        return self._context_from_readiness(readiness)
+
+    def _context_from_readiness(self, readiness: RepositoryReadiness) -> Optional[RepoContext]:
         repo_id = readiness.repository_id
         if repo_id is None:
             return None

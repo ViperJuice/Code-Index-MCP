@@ -219,8 +219,20 @@ class ReadinessClassifier:
         index_path = (
             Path(repo_info.index_path).resolve(strict=False) if repo_info.index_path else None
         )
-        current_branch = getattr(repo_info, "current_branch", None) or _git_branch(registered_path)
-        current_commit = getattr(repo_info, "current_commit", None) or _git_commit(registered_path)
+        cached_branch = getattr(repo_info, "current_branch", None)
+        cached_commit = getattr(repo_info, "current_commit", None)
+        live_git_required = bool(
+            getattr(repo_info, "git_common_dir", None)
+            and isinstance(cached_commit, str)
+            and len(cached_commit) == 40
+            and all(char in "0123456789abcdef" for char in cached_commit.lower())
+        )
+        if live_git_required:
+            current_branch = _git_branch(registered_path)
+            current_commit = _git_commit(registered_path)
+        else:
+            current_branch = cached_branch or _git_branch(registered_path)
+            current_commit = cached_commit or _git_commit(registered_path)
         tracked_branch = getattr(repo_info, "tracked_branch", None)
         last_indexed_commit = getattr(repo_info, "last_indexed_commit", None)
         staleness_reason = getattr(repo_info, "staleness_reason", None)
@@ -228,7 +240,10 @@ class ReadinessClassifier:
         state = RepositoryReadinessState.READY
         remediation = None
 
-        if indexing_active or staleness_reason == "index_building":
+        if live_git_required and (current_branch is None or current_commit is None):
+            state = RepositoryReadinessState.UNREGISTERED_REPOSITORY
+            remediation = "Restore the registered Git checkout or register an available repository."
+        elif indexing_active or staleness_reason == "index_building":
             state = RepositoryReadinessState.INDEX_BUILDING
             remediation = "Wait for indexing to finish, then retry the request."
         elif tracked_branch and current_branch and tracked_branch != current_branch:
