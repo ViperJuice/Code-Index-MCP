@@ -30,7 +30,7 @@ SL-2 — MCP handler/schema adoption with cross-repository tests
 - **Scope**: Implement canonical selector resolver for repository ID, registered name, and registered path with exact precedence and no CWD fallback.
 - **Owned files**: `mcp_server/core/repo_resolver.py`, `mcp_server/storage/repository_registry.py`, `tests/test_repo_resolver.py`
 - **Interfaces provided**: `RepoResolver.resolve`
-- **Interfaces consumed**: (none)
+- **Interfaces consumed**: none
 - **Parallel-safe**: yes
 - **Tasks**:
   - test: Add unit tests for `RepoResolver` covering exact ID, name, path canonicalization, symlinks, nested paths, nonexistent relative paths, duplicate names/IDs, and sibling worktrees.
@@ -40,7 +40,7 @@ SL-2 — MCP handler/schema adoption with cross-repository tests
 ### SL-2 — MCP handler/schema adoption with cross-repository tests
 - **Scope**: Adopt the new resolver in all MCP tools (search, symbol, summarize, reindex) and status surfaces, and update schemas.
 - **Owned files**: `mcp_server/cli/tool_handlers.py`, `mcp_server/cli/stdio_runner.py`, `tests/test_tool_readiness_fail_closed.py`, `tests/integration/test_multi_repo_server.py`
-- **Interfaces provided**: (none)
+- **Interfaces provided**: none
 - **Interfaces consumed**: `RepoResolver.resolve`
 - **Parallel-safe**: yes
 - **Tasks**:
