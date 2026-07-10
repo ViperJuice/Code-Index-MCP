@@ -103,6 +103,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    outputs:
+      pr_number: ${{ steps.release_pr.outputs.number }}
     steps:
       - name: Create or update release pull request
         id: release_pr
@@ -130,11 +132,20 @@ jobs:
           fi
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
+
+  enable-release-auto-merge:
+    name: Enable release pull request auto-merge
+    needs: create-release-pr
+    if: inputs.mode == 'prepare' && inputs.auto_merge == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
       - name: Enable auto-merge
-        if: inputs.auto_merge == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ steps.release_pr.outputs.number }}
+          PR_NUMBER: ${{ needs.create-release-pr.outputs.pr_number }}
         run: gh pr merge "$PR_NUMBER" --auto --merge
 
   preflight-publish:

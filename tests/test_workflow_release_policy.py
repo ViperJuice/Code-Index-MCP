@@ -129,7 +129,10 @@ def test_package_version_deletion_is_classified_as_an_external_mutation() -> Non
 def test_prepare_execution_is_read_only_and_pr_mutation_is_isolated() -> None:
     prepare = _jobs()["prepare-release-pr"]
     create_pr = _jobs()["create-release-pr"]
-    text = yaml.safe_dump({"prepare": prepare, "create_pr": create_pr})
+    auto_merge_job = _jobs()["enable-release-auto-merge"]
+    text = yaml.safe_dump(
+        {"prepare": prepare, "create_pr": create_pr, "auto_merge": auto_merge_job}
+    )
 
     for forbidden in ("docker/build-push-action", "action-gh-release", "gh-action-pypi-publish"):
         assert forbidden not in text
@@ -142,10 +145,15 @@ def test_prepare_execution_is_read_only_and_pr_mutation_is_isolated() -> None:
     assert not any(
         str(step.get("uses", "")).startswith("actions/checkout@") for step in create_pr["steps"]
     )
-    auto_merge = next(
-        step for step in create_pr["steps"] if step.get("name") == "Enable auto-merge"
+    assert auto_merge_job["permissions"] == {
+        "contents": "write",
+        "pull-requests": "write",
+    }
+    assert auto_merge_job["if"] == "inputs.mode == 'prepare' && inputs.auto_merge == 'true'"
+    assert not any(
+        str(step.get("uses", "")).startswith("actions/checkout@")
+        for step in auto_merge_job["steps"]
     )
-    assert auto_merge["if"] == "inputs.auto_merge == 'true'"
 
 
 def test_publish_permissions_are_job_scoped() -> None:

@@ -34,7 +34,7 @@ from .config.validation import (
 from .core import RepoContext, RepoResolver
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .health.repository_readiness import RepositoryReadinessState
+from .health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from .indexing.source_metadata import normalize_friction_category
@@ -455,6 +455,23 @@ def get_repo_ctx(request: Request) -> RepoContext:
     if candidate_selector is not None:
         if repo_resolver is None:
             raise HTTPException(503, detail=_repository_unavailable_detail(candidate_selector))
+        try:
+            readiness = repo_resolver.classify(candidate_selector)
+        except Exception as exc:
+            raise HTTPException(
+                503, detail=_repository_unavailable_detail(candidate_selector)
+            ) from exc
+        if isinstance(readiness, RepositoryReadiness) and not readiness.ready:
+            raise HTTPException(
+                503,
+                detail={
+                    "error": "Index unavailable",
+                    "code": readiness.code,
+                    "safe_fallback": "native_search",
+                    "repository": candidate_selector,
+                    "readiness": readiness.to_dict(),
+                },
+            )
         resolved = repo_resolver.resolve(candidate_selector)
         if resolved is not None:
             return resolved

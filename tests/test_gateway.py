@@ -1072,7 +1072,33 @@ class TestRepoCtxResolution:
 
         assert response.status_code == 503
         assert response.json()["detail"]["code"] == "unregistered_repository"
-        fake_resolver.resolve.assert_called_once_with("missing-repo")
+        fake_resolver.resolve.assert_not_called()
+
+    @pytest.mark.parametrize("endpoint", ["/search?q=test", "/symbol?symbol=test", "/status"])
+    def test_nonready_http_reads_refuse_before_store_resolution(
+        self, endpoint, test_client_with_dispatcher, monkeypatch
+    ):
+        import mcp_server.gateway as gateway
+        from mcp_server.health.repository_readiness import (
+            RepositoryReadiness,
+            RepositoryReadinessState,
+        )
+
+        resolver = Mock()
+        resolver.classify.return_value = RepositoryReadiness(
+            state=RepositoryReadinessState.MISSING_SCHEMA,
+            repository_id="repo-a",
+            registered_path="/repo/a",
+        )
+        resolver.resolve.side_effect = AssertionError("must not open the store")
+        monkeypatch.setattr(gateway, "repo_resolver", resolver)
+
+        separator = "&" if "?" in endpoint else "?"
+        response = test_client_with_dispatcher.get(f"{endpoint}{separator}repository=repo-a")
+
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "missing_schema"
+        resolver.resolve.assert_not_called()
 
     def test_alternate_search_backends_are_scoped_per_repository(self, monkeypatch, tmp_path):
         import mcp_server.gateway as gateway
