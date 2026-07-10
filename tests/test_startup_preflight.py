@@ -23,8 +23,8 @@ def test_gateway_startup_runs_preflight(monkeypatch):
     monkeypatch.setattr(gateway, "format_preflight_report", _fake_format)
     monkeypatch.setattr(
         gateway,
-        "SecurityConfig",
-        lambda **kwargs: (_ for _ in ()).throw(SentinelError("stop")),
+        "_build_security_config_from_env",
+        lambda: (_ for _ in ()).throw(SentinelError("stop")),
     )
 
     with pytest.raises(SentinelError, match="stop"):

@@ -1,4 +1,3 @@
-from .lock_registry import IndexingLockRegistry, lock_registry
 from .friction import FRICTION_PATTERN_CONFIGS, FrictionPatternConfig, extract_friction_markers
 from .github_issues import (
     GitHubIssueFetchOptions,
@@ -7,6 +6,7 @@ from .github_issues import (
     issue_history_dedupe_key,
     normalize_github_issue,
 )
+from .lock_registry import IndexingLockRegistry, lock_registry
 from .source_metadata import (
     FRICTION_CATEGORIES,
     FRICTION_SOURCE_TYPE,
@@ -22,8 +22,8 @@ from .source_metadata import (
     build_source_metadata,
     extract_matching_source_metadata,
     merge_source_metadata,
-    normalize_history_issue_record,
     normalize_friction_category,
+    normalize_history_issue_record,
 )
 
 __all__ = [

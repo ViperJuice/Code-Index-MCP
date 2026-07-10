@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from mcp_server.config.settings import get_settings
 from mcp_server.indexing.summarization import (
     ChunkWriter,
     ComprehensiveChunkWriter,
@@ -20,7 +21,6 @@ from mcp_server.indexing.summarization import (
     LazyChunkWriter,
     SummaryGenerationResult,
 )
-from mcp_server.config.settings import get_settings
 from mcp_server.setup.semantic_preflight import EnrichmentModelResolution
 from mcp_server.storage.sqlite_store import SQLiteStore
 
@@ -99,9 +99,7 @@ def test_summary_generation_result_normalizes_immutable_items_and_ids():
 
     assert result.summaries == (GeneratedSummary("chunk-1", "Summary text"),)
     assert result.missing_chunk_ids == ("chunk-2",)
-    assert result.to_dict()["summaries"] == [
-        {"chunk_id": "chunk-1", "summary": "Summary text"}
-    ]
+    assert result.to_dict()["summaries"] == [{"chunk_id": "chunk-1", "summary": "Summary text"}]
     with pytest.raises(TypeError):
         iter(result)
 
@@ -418,10 +416,12 @@ async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_p
     assert stored["audit_metadata"]["llm_model"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     assert stored["audit_metadata"]["configured_model_name"] == "chat"
     assert (
-        stored["audit_metadata"]["effective_model_name"]
-        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+        stored["audit_metadata"]["effective_model_name"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
-    assert stored["audit_metadata"]["model_resolution_strategy"] == "single_served_model_for_chat_alias"
+    assert (
+        stored["audit_metadata"]["model_resolution_strategy"]
+        == "single_served_model_for_chat_alias"
+    )
 
 
 @pytest.mark.asyncio
@@ -481,9 +481,9 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
         del file_id, file_path, file_content, symbol_map
         profile_attempts["count"] += 1
         if profile_attempts["count"] == 1:
-            raise importlib.import_module(
-                "mcp_server.indexing.summarization"
-            ).FileTooLargeError("big")
+            raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError(
+                "big"
+            )
         profile_batches.append([chunk["chunk_id"] for chunk in chunks])
         return [
             SimpleNamespace(chunk_id=chunk["chunk_id"], summary=f"summary for {chunk['chunk_id']}")
@@ -492,7 +492,9 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
 
     async def _should_not_run(*_args, **_kwargs):
         topological_called["value"] = True
-        raise AssertionError("topological fallback should not run when bounded profile recovery succeeds")
+        raise AssertionError(
+            "topological fallback should not run when bounded profile recovery succeeds"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
@@ -506,7 +508,8 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
-        file_content="x" * (
+        file_content="x"
+        * (
             importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
             + 1
         ),
@@ -579,7 +582,9 @@ async def test_file_batch_summarizer_tracks_missing_chunks_after_large_file_prof
         return json.dumps(payload), "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
 
     async def _should_not_run(*_args, **_kwargs):
-        raise AssertionError("topological fallback should not run when large-file profile batches succeed")
+        raise AssertionError(
+            "topological fallback should not run when large-file profile batches succeed"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
@@ -618,8 +623,7 @@ async def test_file_batch_summarizer_tracks_missing_chunks_after_large_file_prof
     assert stored["profile_id"] == "oss_high"
     assert stored["audit_metadata"]["configured_model_name"] == "chat"
     assert (
-        stored["audit_metadata"]["effective_model_name"]
-        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+        stored["audit_metadata"]["effective_model_name"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
 
 
@@ -659,7 +663,8 @@ async def test_file_batch_summarizer_falls_back_to_topological_path_when_large_f
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
-        file_content="x" * (
+        file_content="x"
+        * (
             importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
             + 1
         ),
@@ -738,8 +743,7 @@ async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_r
     assert stored["audit_metadata"]["llm_model"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     assert stored["audit_metadata"]["configured_model_name"] == "chat"
     assert (
-        stored["audit_metadata"]["effective_model_name"]
-        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+        stored["audit_metadata"]["effective_model_name"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
 
 
@@ -829,7 +833,9 @@ async def test_file_batch_summarizer_uses_profile_batch_fallback_before_per_chun
         ]
 
     async def _should_not_run(*_args, **_kwargs):
-        raise AssertionError("per-chunk fallback should not run when profile batch fallback succeeds")
+        raise AssertionError(
+            "per-chunk fallback should not run when profile batch fallback succeeds"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_runtime_mismatch  # type: ignore[method-assign]
@@ -1097,10 +1103,15 @@ async def test_process_scope_retries_large_file_profile_recovery_until_backlog_i
                 prompt_fingerprint="test-fingerprint",
                 audit_metadata={"provider_name": "openai_compatible", "profile_id": "oss_high"},
             )
-        return [SimpleNamespace(chunk_id=chunk_id, summary=f"summary for {chunk_id}") for chunk_id in chunk_ids]
+        return [
+            SimpleNamespace(chunk_id=chunk_id, summary=f"summary for {chunk_id}")
+            for chunk_id in chunk_ids
+        ]
 
     async def _should_not_run(*_args, **_kwargs):
-        raise AssertionError("topological fallback should not run when large-file profile recovery keeps making progress")
+        raise AssertionError(
+            "topological fallback should not run when large-file profile recovery keeps making progress"
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     monkeypatch.setattr(writer, "_call_batch_api", _raise_large)
@@ -1122,9 +1133,7 @@ async def test_process_scope_retries_large_file_profile_recovery_until_backlog_i
 
 
 @pytest.mark.asyncio
-async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(
-    tmp_path, monkeypatch
-):
+async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(tmp_path, monkeypatch):
     db_path = tmp_path / "summaries.db"
     store = SQLiteStore(str(db_path))
     repo_id = store.ensure_repository_row(tmp_path)
@@ -1213,9 +1222,7 @@ async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(
 
 
 @pytest.mark.asyncio
-async def test_process_scope_uses_smaller_doc_batch_cap_for_repo_scope(
-    tmp_path, monkeypatch
-):
+async def test_process_scope_uses_smaller_doc_batch_cap_for_repo_scope(tmp_path, monkeypatch):
     db_path = tmp_path / "summaries.db"
     store = SQLiteStore(str(db_path))
     repo_id = store.ensure_repository_row(tmp_path)

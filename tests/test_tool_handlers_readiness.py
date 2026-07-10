@@ -313,9 +313,7 @@ def test_search_code_semantic_not_ready_returns_semantic_metadata(tmp_path, monk
     dispatcher.search.assert_not_called()
 
 
-def test_search_code_semantic_not_ready_preserves_state_specific_metadata(
-    tmp_path, monkeypatch
-):
+def test_search_code_semantic_not_ready_preserves_state_specific_metadata(tmp_path, monkeypatch):
     import mcp_server.health.repository_readiness as readiness_module
     from mcp_server.cli.tool_handlers import handle_search_code
 
@@ -483,7 +481,11 @@ def test_search_code_semantic_ready_returns_metadata_envelope(tmp_path, monkeypa
 
     result = _run(
         handle_search_code(
-            arguments={"query": "class SemanticIndexer", "repository": str(worktree), "semantic": True},
+            arguments={
+                "query": "class SemanticIndexer",
+                "repository": str(worktree),
+                "semantic": True,
+            },
             dispatcher=dispatcher,
             repo_resolver=resolver,
         )
@@ -563,7 +565,11 @@ def test_search_code_semantic_runtime_failure_returns_explicit_failure(tmp_path,
 
     result = _run(
         handle_search_code(
-            arguments={"query": "class SemanticIndexer", "repository": str(worktree), "semantic": True},
+            arguments={
+                "query": "class SemanticIndexer",
+                "repository": str(worktree),
+                "semantic": True,
+            },
             dispatcher=dispatcher,
             repo_resolver=resolver,
         )
@@ -773,7 +779,9 @@ def test_write_summaries_remains_summary_only(tmp_path, monkeypatch):
 
         async def process_scope(self, limit=500):
             del limit
-            return SimpleNamespace(summaries_written=3, chunks_attempted=4, missing_chunk_ids=["c4"])
+            return SimpleNamespace(
+                summaries_written=3, chunks_attempted=4, missing_chunk_ids=["c4"]
+            )
 
     monkeypatch.setattr("mcp_server.indexing.summarization.ComprehensiveChunkWriter", FakeWriter)
     lazy_summarizer = MagicMock()

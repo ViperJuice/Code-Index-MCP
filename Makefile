@@ -1,5 +1,5 @@
 .PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage coverage-baseline coverage-artifact-guard benchmark security docker release-smoke release-smoke-container
-.PHONY: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix alpha-release-gates
+.PHONY: alpha-dependency-sync alpha-format-lint alpha-mypy-ratchet alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix alpha-release-gates
 .PHONY: agent-doctor agent-fast agent-gate agent-full agent-fix agent-affected
 .PHONY: agent-fast-local agent-gate-local agent-full-local agent-fix-local
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
@@ -199,6 +199,9 @@ alpha-format-lint:
 	$(UV_RUN) --extra dev flake8 mcp_server tests
 	$(UV_RUN) --extra dev pylint mcp_server --fail-under=7.0
 
+alpha-mypy-ratchet:
+	$(UV_RUN) --extra dev python scripts/check_mypy_baseline.py
+
 alpha-unit-release-smoke:
 	$(UV_RUN) --extra dev pytest tests/ \
 		--ignore=tests/integration \
@@ -241,7 +244,7 @@ alpha-production-matrix:
 		tests/smoke/test_release_smoke_contract.py \
 		-v --no-cov
 
-alpha-release-gates: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix
+alpha-release-gates: alpha-dependency-sync alpha-format-lint alpha-mypy-ratchet alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix
 
 agent-doctor:
 	$(UV_RUN) --extra dev python scripts/agent_validation.py doctor

@@ -83,10 +83,12 @@ def test_fingerprint_changes_when_semantic_contract_inputs_change():
 def test_collection_and_endpoint_identity_are_normalized_for_fingerprint_stability():
     profiles = _sample_profiles()
     registry_a = SemanticProfileRegistry.from_raw(profiles, "commercial-high")
-    profiles["commercial-high"]["build_metadata"]["collection_name"] = "code_index__commercial_high__v1"
-    profiles["commercial-high"]["build_metadata"]["enrichment_base_url"] = (
-        "https://api.openai.com:443/v1"
-    )
+    profiles["commercial-high"]["build_metadata"][
+        "collection_name"
+    ] = "code_index__commercial_high__v1"
+    profiles["commercial-high"]["build_metadata"][
+        "enrichment_base_url"
+    ] = "https://api.openai.com:443/v1"
     registry_b = SemanticProfileRegistry.from_raw(profiles, "commercial-high")
 
     assert (

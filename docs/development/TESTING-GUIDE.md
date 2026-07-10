@@ -20,6 +20,36 @@ Hosted GitHub Actions are minimal orchestration or protected evidence. Heavy
 validation should stay local, use Dagger explicitly, or run on an owned
 `AGENT_REMOTE_HOST`; silent hosted fallback is not allowed.
 
+## Local Quality Gate Contract
+
+Start from the canonical locked development environment:
+
+```bash
+uv sync --locked --extra dev --link-mode=copy
+```
+
+Use `make agent-fast` while iterating, `make agent-gate` before a pull request,
+and `make agent-full` for the heavier local or explicitly offloaded story. The
+expanded maintainer gate is `make alpha-release-gates`; it remains local and is
+not invoked by ordinary pull-request workflows.
+
+`make alpha-mypy-ratchet` runs full-project mypy and compares the result with
+`config/mypy_baseline.json`. That committed artifact is keyed by module and
+mypy error code: lower counts pass, while growth, new failing modules, new
+error codes, malformed output, and `ignore_errors` switches fail. Release
+critical modules are separately required to type-check at zero.
+
+Default tests are hermetic. `tests/conftest.py` rejects unmarked TCP
+connections; a test that intentionally uses a bounded local server or external
+network must declare `@pytest.mark.requires_network`. Unix-domain IPC remains
+available for local process tests.
+
+Committed type evidence lives at `config/mypy_baseline.json`. Local coverage
+evidence is generated at `coverage.xml` and `htmlcov/`; these generated files
+remain untracked. Release and test commands report their result on stdout, so
+operators who need durable run logs should redirect them to an untracked local
+evidence directory.
+
 This guide provides comprehensive instructions for testing the Code-Index-MCP project, covering unit tests, integration tests, plugin testing, performance testing, and test coverage.
 
 ## Table of Contents
@@ -84,7 +114,7 @@ tests/
 
 ```bash
 # Install test dependencies
-uv sync --locked --extra dev
+uv sync --locked --extra dev --link-mode=copy
 
 # Or install with development extras
 pip install -e ".[test]"

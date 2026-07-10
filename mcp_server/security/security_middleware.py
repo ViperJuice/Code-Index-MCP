@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Callable, Dict, List, Literal, Optional
+from typing import Awaitable, Callable, Dict, List, Literal, Optional, cast
 from urllib.parse import unquote
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security, status
@@ -86,14 +86,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Check for forwarded headers first
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return str(forwarded_for.split(",")[0].strip())
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
         # Fallback to client IP
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -194,19 +194,19 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         if not auth_header.startswith("Bearer "):
             return None
 
-        return auth_header[7:]  # Remove "Bearer " prefix
+        return str(auth_header[7:])  # Remove "Bearer " prefix
 
     def _get_client_ip(self, request: Request) -> str:
         """Extract client IP address from request."""
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return str(forwarded_for.split(",")[0].strip())
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
 
 class AuthorizationMiddleware(BaseHTTPMiddleware):
@@ -297,13 +297,13 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         """Extract client IP address from request."""
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return str(forwarded_for.split(",")[0].strip())
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -385,9 +385,9 @@ async def get_current_user(
 ) -> TokenData:
     """Get current user from request state."""
     if hasattr(request.state, "token_data"):
-        return request.state.token_data
+        return cast(TokenData, request.state.token_data)
 
-    auth_manager = getattr(request.app.state, "auth_manager", None)
+    auth_manager = cast(Optional[AuthManager], getattr(request.app.state, "auth_manager", None))
     if auth_manager is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -427,10 +427,12 @@ async def get_current_active_user(
     return user
 
 
-def require_permission(permission: Permission):
+def require_permission(permission: Permission) -> Callable[..., Awaitable[User]]:
     """Decorator to require specific permission."""
 
-    async def permission_checker(current_user: User = Security(get_current_active_user)):
+    async def permission_checker(
+        current_user: User = Security(get_current_active_user),
+    ) -> User:
         if permission not in current_user.permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -441,10 +443,10 @@ def require_permission(permission: Permission):
     return permission_checker
 
 
-def require_role(role: UserRole):
+def require_role(role: UserRole) -> Callable[..., Awaitable[User]]:
     """Decorator to require specific role or higher."""
 
-    async def role_checker(current_user: User = Security(get_current_active_user)):
+    async def role_checker(current_user: User = Security(get_current_active_user)) -> User:
         role_hierarchy = [
             UserRole.GUEST,
             UserRole.READONLY,
@@ -475,7 +477,9 @@ _SCOPE_TO_PERMISSION: Dict[str, Permission] = {
 }
 
 
-def require_auth(scope: Literal["metrics", "admin", "tools"]) -> Callable[..., User]:
+def require_auth(
+    scope: Literal["metrics", "admin", "tools"],
+) -> Callable[..., Awaitable[User]]:
     """FastAPI dep that delegates to require_permission after scope→permission mapping."""
     permission = _SCOPE_TO_PERMISSION[scope]
     return require_permission(permission)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, cast
 
 import jedi
 
@@ -59,6 +59,7 @@ class Plugin(IPlugin):
         self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
         self._sqlite_store = sqlite_store
         self._repository_id = None
+        self._workspace_root: Path | None = None
 
         # Create or get repository if SQLite is enabled
         if self._sqlite_store:
@@ -96,11 +97,20 @@ class Plugin(IPlugin):
         """Return True if file extension matches plugin."""
         return Path(path).suffix == ".py"
 
+    def bind(self, ctx) -> None:
+        workspace_root = getattr(ctx, "workspace_root", None)
+        self._workspace_root = Path(workspace_root) if workspace_root else None
+
     def _normalized_relative_path(self, path: Path) -> str:
         if self._sqlite_store is not None:
             try:
-                return self._sqlite_store.path_resolver.normalize_path(path)
+                return str(self._sqlite_store.path_resolver.normalize_path(path))
             except Exception:
+                pass
+        if self._workspace_root is not None:
+            try:
+                return path.resolve().relative_to(self._workspace_root.resolve()).as_posix()
+            except ValueError:
                 pass
         if path.is_absolute():
             try:
@@ -119,6 +129,13 @@ class Plugin(IPlugin):
         self._indexer.add_file(str(path), content)
         tree = self._ts._parser.parse(content.encode("utf-8"))
         root = tree.root_node
+        bounded_chunk_path = self._uses_bounded_chunk_path(path)
+        chunks = []
+        if not bounded_chunk_path and chunk_text is not None:
+            try:
+                chunks = chunk_text(content, "python")
+            except Exception:
+                pass
 
         # Store file in SQLite if available
         file_id = None
@@ -221,14 +238,8 @@ class Plugin(IPlugin):
 
         # Store chunks in SQLite (delete old ones first since chunk_id uses temp path)
         if self._sqlite_store and file_id:
-            _chunks = []
             self._sqlite_store.delete_chunks_for_file(file_id)
-            if not self._uses_bounded_chunk_path(path):
-                try:
-                    _chunks = chunk_text(content, "python")
-                except Exception:
-                    pass
-            for i, chunk in enumerate(_chunks):
+            for i, chunk in enumerate(chunks):
                 try:
                     self._sqlite_store.store_chunk(
                         file_id=file_id,
@@ -250,7 +261,13 @@ class Plugin(IPlugin):
                 except Exception:
                     pass
 
-        return {"file": str(path), "symbols": symbols, "language": self.lang}
+        return {
+            "file": str(path),
+            "symbols": symbols,
+            "language": self.lang,
+            "chunks": [chunk.__dict__ for chunk in chunks],
+            "metadata": {"bounded_chunk_path": bounded_chunk_path},
+        }
 
     # ------------------------------------------------------------------
     def getDefinition(self, symbol: str) -> SymbolDef | None:
@@ -323,7 +340,7 @@ class Plugin(IPlugin):
             limit = opts["limit"]
         if opts and opts.get("semantic"):
             return []
-        return self._indexer.search(query, limit=limit)
+        return cast(Iterable[SearchResult], self._indexer.search(query, limit=limit))
 
     # ------------------------------------------------------------------
     def get_indexed_count(self) -> int:

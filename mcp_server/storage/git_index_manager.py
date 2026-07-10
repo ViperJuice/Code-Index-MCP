@@ -4,8 +4,8 @@ This module provides index management that's synchronized with git commits,
 supporting incremental updates and artifact management.
 """
 
-import logging
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..artifacts.commit_artifacts import CommitArtifactManager
+from ..core.ignore_patterns import EXCLUDED_DIR_PARTS
 from ..core.path_resolver import PathResolver
 from ..core.repo_context import RepoContext
 from ..core.repo_resolver import RepoResolver
@@ -431,9 +432,7 @@ class GitAwareIndexManager:
                     "summary_call_timed_out": (result.semantic or {}).get(
                         "summary_call_timed_out", False
                     ),
-                    "summary_call_file_path": (result.semantic or {}).get(
-                        "summary_call_file_path"
-                    ),
+                    "summary_call_file_path": (result.semantic or {}).get("summary_call_file_path"),
                     "summary_call_chunk_ids": (result.semantic or {}).get(
                         "summary_call_chunk_ids", []
                     ),
@@ -441,12 +440,8 @@ class GitAwareIndexManager:
                         "summary_call_timeout_seconds"
                     ),
                     "blocker_source": self._trace_blocker_source(result),
-                    "storage_failure_family": (result.semantic or {}).get(
-                        "storage_failure_family"
-                    ),
-                    "storage_failure_reason": (result.semantic or {}).get(
-                        "storage_failure_reason"
-                    ),
+                    "storage_failure_family": (result.semantic or {}).get("storage_failure_family"),
+                    "storage_failure_reason": (result.semantic or {}).get("storage_failure_reason"),
                     "storage_failure_message": (result.semantic or {}).get(
                         "storage_failure_message"
                     ),
@@ -835,14 +830,26 @@ class GitAwareIndexManager:
         """
         changes = ChangeSet(added=[], modified=[], deleted=[], renamed=[])
         for change in ChangeDetector(repo_path).get_changes_since_commit(from_commit, to_commit):
+            path_excluded = any(part in EXCLUDED_DIR_PARTS for part in Path(change.path).parts)
             if change.change_type == "added":
-                changes.added.append(change.path)
+                if not path_excluded:
+                    changes.added.append(change.path)
             elif change.change_type == "modified":
-                changes.modified.append(change.path)
+                if not path_excluded:
+                    changes.modified.append(change.path)
             elif change.change_type == "deleted":
-                changes.deleted.append(change.path)
+                if not path_excluded:
+                    changes.deleted.append(change.path)
             elif change.change_type == "renamed" and change.old_path:
-                changes.renamed.append((change.old_path, change.path))
+                old_excluded = any(
+                    part in EXCLUDED_DIR_PARTS for part in Path(change.old_path).parts
+                )
+                if old_excluded and not path_excluded:
+                    changes.added.append(change.path)
+                elif not old_excluded and path_excluded:
+                    changes.deleted.append(change.old_path)
+                elif not old_excluded and not path_excluded:
+                    changes.renamed.append((change.old_path, change.path))
 
         return changes
 
@@ -1180,9 +1187,7 @@ class GitAwareIndexManager:
                 "summary_passes": stats.get("summary_passes", 0),
                 "summary_remaining_chunks": stats.get("summary_remaining_chunks", 0),
                 "summary_scope_drained": stats.get("summary_scope_drained", True),
-                "summary_continuation_required": stats.get(
-                    "summary_continuation_required", False
-                ),
+                "summary_continuation_required": stats.get("summary_continuation_required", False),
                 "summary_call_timed_out": stats.get("summary_call_timed_out", False),
                 "summary_call_file_path": stats.get("summary_call_file_path"),
                 "summary_call_chunk_ids": stats.get("summary_call_chunk_ids", []),
@@ -1197,14 +1202,13 @@ class GitAwareIndexManager:
                 "storage_failure_reason": stats.get("storage_failure_reason"),
                 "storage_failure_message": stats.get("storage_failure_message"),
                 "storage_diagnostics": stats.get("storage_diagnostics"),
-                "runtime_restore_declined_reason": stats.get(
-                    "runtime_restore_declined_reason"
-                ),
+                "runtime_restore_declined_reason": stats.get("runtime_restore_declined_reason"),
             }
-            if (
-                stats.get("low_level_blocker") is not None
-                or stats.get("lexical_stage") not in {None, "not_run", "completed"}
-            ):
+            if stats.get("low_level_blocker") is not None or stats.get("lexical_stage") not in {
+                None,
+                "not_run",
+                "completed",
+            }:
                 result.low_level = {
                     "lexical_stage": stats.get("lexical_stage"),
                     "lexical_files_attempted": stats.get("lexical_files_attempted", 0),
@@ -1494,9 +1498,7 @@ class GitAwareIndexManager:
                     "summary_call_timed_out": snapshot.get("summary_call_timed_out", False),
                     "summary_call_file_path": snapshot.get("summary_call_file_path"),
                     "summary_call_chunk_ids": snapshot.get("summary_call_chunk_ids", []),
-                    "summary_call_timeout_seconds": snapshot.get(
-                        "summary_call_timeout_seconds"
-                    ),
+                    "summary_call_timeout_seconds": snapshot.get("summary_call_timeout_seconds"),
                     "process_id": os.getpid(),
                     "blocker_source": snapshot.get("blocker_source"),
                     "semantic_stage": snapshot.get("semantic_stage"),
@@ -1551,9 +1553,7 @@ class GitAwareIndexManager:
                 "summary_call_timed_out": previous_trace.get("summary_call_timed_out", False),
                 "summary_call_file_path": previous_trace.get("summary_call_file_path"),
                 "summary_call_chunk_ids": previous_trace.get("summary_call_chunk_ids", []),
-                "summary_call_timeout_seconds": previous_trace.get(
-                    "summary_call_timeout_seconds"
-                ),
+                "summary_call_timeout_seconds": previous_trace.get("summary_call_timeout_seconds"),
                 "process_id": previous_trace.get("process_id"),
                 "blocker_source": previous_trace.get("blocker_source") or "process_interrupt",
                 "semantic_stage": previous_trace.get("semantic_stage"),
@@ -1652,9 +1652,7 @@ class GitAwareIndexManager:
                         "summary_call_timed_out": trace.get("summary_call_timed_out", False),
                         "summary_call_file_path": trace.get("summary_call_file_path"),
                         "summary_call_chunk_ids": trace.get("summary_call_chunk_ids", []),
-                        "summary_call_timeout_seconds": trace.get(
-                            "summary_call_timeout_seconds"
-                        ),
+                        "summary_call_timeout_seconds": trace.get("summary_call_timeout_seconds"),
                         "process_id": trace.get("process_id"),
                         "blocker_source": trace.get("blocker_source") or "process_interrupt",
                         "semantic_stage": trace.get("semantic_stage"),

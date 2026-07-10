@@ -27,9 +27,7 @@ from .section_extractor import SectionExtractor
 logger = logging.getLogger(__name__)
 
 _LIGHTWEIGHT_MARKDOWN_BYTES = 250_000
-_BOUNDED_MARKDOWN_NAME_RE = re.compile(
-    r"^(?:changelog|release[-_ ]?notes?)$", re.IGNORECASE
-)
+_BOUNDED_MARKDOWN_NAME_RE = re.compile(r"^(?:changelog|release[-_ ]?notes?)$", re.IGNORECASE)
 _ROADMAP_MARKDOWN_NAME_RE = re.compile(
     r"^(?:roadmap|phase[-_ ]?plan(?:s)?(?:[-_ ].+)?)$", re.IGNORECASE
 )
@@ -197,9 +195,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         return symbols
 
-    def _build_lightweight_index_shard(
-        self, path: Path, content: str, reason: str
-    ) -> IndexShard:
+    def _build_lightweight_index_shard(self, path: Path, content: str, reason: str) -> IndexShard:
         """Return a bounded lexical shard that preserves document discoverability."""
         title = self._extract_lightweight_title(content, path)
         metadata = {

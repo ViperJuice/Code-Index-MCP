@@ -52,7 +52,7 @@ class TestGitIntegration:
     def _make_manager(self, registry):
         store_registry = StoreRegistry.for_registry(registry)
         repo_resolver = RepoResolver(registry, store_registry)
-        dispatcher = EnhancedDispatcher()
+        dispatcher = EnhancedDispatcher(semantic_search_enabled=False)
         return GitAwareIndexManager(
             registry,
             dispatcher,
@@ -205,7 +205,7 @@ class TestGitIntegration:
 
         # Initial index should be full
         result = manager.sync_repository_index(repo_id, force_full=True)
-        assert result.action == "full_index"
+        assert result.action == "full_index", result
 
         # Small change should trigger incremental
         (repo.path / "small_change.py").write_text("# Small change\n")
@@ -214,7 +214,7 @@ class TestGitIntegration:
         registry.update_current_commit(repo_id)
 
         result = manager.sync_repository_index(repo_id)
-        assert result.action == "incremental_update"
+        assert result.action == "incremental_update", result
 
         # Large changes should trigger full reindex
         for i in range(15):
@@ -226,7 +226,7 @@ class TestGitIntegration:
 
         result = manager.sync_repository_index(repo_id)
         # When >50% files changed, should do full index
-        assert result.action == "full_index"
+        assert result.action == "full_index", result
 
     def test_incremental_indexing_performance(self, test_env, registry):
         """Test performance of incremental indexing."""
@@ -246,7 +246,7 @@ class TestGitIntegration:
         perf.start_timing("full_index")
         result = manager.sync_repository_index(repo_id, force_full=True)
         full_time = perf.end_timing("full_index")
-        assert result.action == "full_index"
+        assert result.action == "full_index", result
 
         print(f"Full index: {result.files_processed} files in {full_time:.3f}s")
 
@@ -267,7 +267,7 @@ class TestGitIntegration:
 
             print(f"Incremental {i}: {result.files_processed} files in {inc_time:.3f}s")
 
-            assert result.action in {"incremental_update", "full_index"}
+            assert result.action in {"incremental_update", "full_index"}, result
 
     def test_branch_switching(self, test_env, registry):
         """Test index management when switching branches."""

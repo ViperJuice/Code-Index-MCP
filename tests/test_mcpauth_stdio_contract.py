@@ -9,8 +9,8 @@ from typing import Any
 import mcp.types as types
 import pytest
 
-from mcp_server.cli.handshake import HandshakeGate
 from mcp_server.cli import stdio_runner
+from mcp_server.cli.handshake import HandshakeGate
 
 
 def _payload(result: types.CallToolResult) -> Any:
@@ -47,7 +47,9 @@ async def test_handshake_tool_logs_redacted_secret(caplog, restore_stdio_globals
         result = await stdio_runner.call_tool("handshake", {"secret": "top-secret"})
 
     assert _payload(result) == {"authenticated": True}
-    tool_logs = [record.getMessage() for record in caplog.records if "MCP Tool Call" in record.getMessage()]
+    tool_logs = [
+        record.getMessage() for record in caplog.records if "MCP Tool Call" in record.getMessage()
+    ]
     assert tool_logs
     assert any("[REDACTED]" in message for message in tool_logs)
     assert all("top-secret" not in message for message in tool_logs)
@@ -77,6 +79,8 @@ async def test_non_handshake_tool_keeps_regular_argument_logging(
         result = await stdio_runner.call_tool("search_code", {"query": "demo"})
 
     assert _payload(result) == {"results": []}
-    tool_logs = [record.getMessage() for record in caplog.records if "MCP Tool Call" in record.getMessage()]
+    tool_logs = [
+        record.getMessage() for record in caplog.records if "MCP Tool Call" in record.getMessage()
+    ]
     assert tool_logs
     assert any("demo" in message for message in tool_logs)

@@ -150,7 +150,9 @@ def test_arbitrary_bearer_token_rejected(client: TestClient) -> None:
 
 
 def test_forged_signature_rejected(client: TestClient, token_users: dict[str, User]) -> None:
-    token = _encode(_payload_for(token_users["admin"]), secret="different-secret-value-12345678901234567890")
+    token = _encode(
+        _payload_for(token_users["admin"]), secret="different-secret-value-12345678901234567890"
+    )
     response = client.get("/admin", headers=_auth_header(token))
     assert response.status_code == 401
 
@@ -195,7 +197,9 @@ def test_unknown_user_rejected(client: TestClient, token_users: dict[str, User])
 
 
 def test_inactive_user_rejected(client: TestClient, token_users: dict[str, User]) -> None:
-    token = _create_access_token(auth_manager=client.app.state.auth_manager, user=token_users["inactive"])
+    token = _create_access_token(
+        auth_manager=client.app.state.auth_manager, user=token_users["inactive"]
+    )
     response = client.get("/admin", headers=_auth_header(token))
     assert response.status_code == 401
 
@@ -206,19 +210,25 @@ def test_invalid_role_claim_rejected(client: TestClient, token_users: dict[str, 
     assert response.status_code == 401
 
 
-def test_invalid_permission_claim_rejected(client: TestClient, token_users: dict[str, User]) -> None:
+def test_invalid_permission_claim_rejected(
+    client: TestClient, token_users: dict[str, User]
+) -> None:
     token = _encode(_payload_for(token_users["admin"], permissions=["read", "root"]))
     response = client.get("/admin", headers=_auth_header(token))
     assert response.status_code == 401
 
 
-def test_low_privilege_token_gets_403(client: TestClient, auth_manager: AuthManager, token_users: dict[str, User]) -> None:
+def test_low_privilege_token_gets_403(
+    client: TestClient, auth_manager: AuthManager, token_users: dict[str, User]
+) -> None:
     token = _create_access_token(auth_manager, token_users["readonly"])
     response = client.post("/mutate", headers=_auth_header(token))
     assert response.status_code == 403
 
 
-def test_valid_token_uses_persisted_permissions(client: TestClient, token_users: dict[str, User]) -> None:
+def test_valid_token_uses_persisted_permissions(
+    client: TestClient, token_users: dict[str, User]
+) -> None:
     forged_admin_claims = _encode(
         _payload_for(
             token_users["readonly"],
@@ -230,7 +240,9 @@ def test_valid_token_uses_persisted_permissions(client: TestClient, token_users:
     assert response.status_code == 403
 
 
-def test_readonly_token_can_access_read_endpoint(client: TestClient, auth_manager: AuthManager, token_users: dict[str, User]) -> None:
+def test_readonly_token_can_access_read_endpoint(
+    client: TestClient, auth_manager: AuthManager, token_users: dict[str, User]
+) -> None:
     token = _create_access_token(auth_manager, token_users["readonly"])
     response = client.get("/read", headers=_auth_header(token))
     assert response.status_code == 200

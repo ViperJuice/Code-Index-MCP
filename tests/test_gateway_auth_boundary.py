@@ -13,7 +13,9 @@ def test_search_rejects_invalid_bearer(test_client_with_dispatcher: TestClient) 
     assert response.status_code == 401
 
 
-def test_reindex_rejects_readonly_token(test_client_with_dispatcher: TestClient, monkeypatch) -> None:
+def test_reindex_rejects_readonly_token(
+    test_client_with_dispatcher: TestClient, monkeypatch
+) -> None:
     import asyncio
 
     from mcp_server.security import UserRole

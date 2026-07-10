@@ -547,7 +547,8 @@ def _load_index_metadata(repo_root: Path) -> dict[str, Any]:
     if not metadata_path.exists():
         return {}
     try:
-        return json.loads(metadata_path.read_text(encoding="utf-8"))
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {}
     except Exception:
         return {}
 

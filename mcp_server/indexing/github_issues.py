@@ -80,9 +80,7 @@ def normalize_github_issue(
     title = str(issue["title"]).strip()
     inferred_type = _infer_issue_type(label_names, title)
     learnings = (
-        extract_issue_learnings(str(issue.get("body") or ""))
-        if include_body_learnings
-        else []
+        extract_issue_learnings(str(issue.get("body") or "")) if include_body_learnings else []
     )
     normalized: HistoryIssueRecord = {
         "source_type": "history",

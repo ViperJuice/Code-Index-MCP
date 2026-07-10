@@ -7,8 +7,8 @@ enabling efficient sharing and synchronization of indexes.
 import hashlib
 import json
 import logging
-import os
 import shutil
+import sys
 import tarfile
 from datetime import datetime
 from pathlib import Path
@@ -77,7 +77,8 @@ class CommitArtifactManager:
         if self.metadata_file.exists():
             try:
                 with open(self.metadata_file, "r") as f:
-                    return json.load(f)
+                    payload = json.load(f)
+                    return payload if isinstance(payload, dict) else {}
             except Exception as e:
                 logger.error(f"Failed to load artifacts metadata: {e}")
         return {}
@@ -316,13 +317,13 @@ class CommitArtifactManager:
         """Get compatibility information for artifact."""
         return {
             "mcp_version": "1.0.0",  # TODO: Get from package
-            "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}",
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
             "index_schema_version": "1.0",
         }
 
     def _get_index_stats(self, index_path: Path) -> Dict[str, Any]:
         """Get statistics about the index."""
-        stats = {"files": 0, "size_mb": 0}
+        stats: Dict[str, Any] = {"files": 0, "size_mb": 0.0}
 
         # Count database files
         db_files = list(index_path.glob("*.db"))

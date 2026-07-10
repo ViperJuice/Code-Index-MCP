@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[2]
 IDENTITY_NOTE = REPO / "docs" / "status" / "public-package-identity.md"
 

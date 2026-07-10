@@ -40,17 +40,17 @@ from .indexing.source_metadata import normalize_friction_category
 from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
-from .plugin_base import SearchResult, SymbolDef
+from .plugin_base import SymbolDef
 from .plugin_system import PluginManager
 from .security import (
     AuthCredentials,
-    AuthManager,
-    Permission,
     AuthenticationMiddleware,
-    SecurityConfig,
+    AuthManager,
     AuthorizationMiddleware,
+    Permission,
     RateLimitMiddleware,
     RequestValidationMiddleware,
+    SecurityConfig,
     SecurityHeadersMiddleware,
     User,
     UserRole,
@@ -160,7 +160,9 @@ def _register_security_middleware(
     """Register the HTTP security stack before startup."""
     cors_origins = config.cors_origins if config is not None else _parse_cors_origins_from_env()
     security_headers = (
-        config.security_headers if config is not None else SecurityConfig(jwt_secret_key="x" * 32).security_headers
+        config.security_headers
+        if config is not None
+        else SecurityConfig(jwt_secret_key="x" * 32).security_headers
     )
 
     target_app.add_middleware(

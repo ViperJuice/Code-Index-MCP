@@ -116,17 +116,18 @@ class PluginSetRegistry:
             except Exception as exc:
                 logger.info("Plugin %s unavailable for %s: %s", language, path, exc)
                 plugin = None
-            if plugin is not None and all(existing is not plugin for existing in plugins):
+            if plugin is not None:
                 bind = getattr(plugin, "bind", None)
                 if callable(bind):
                     bind(ctx)
+                if all(existing is not plugin for existing in plugins):
                     confirm_started = getattr(self._get_manager(), "confirm_plugin_started", None)
                     if callable(confirm_started):
                         try:
                             confirm_started(language, ctx)
                         finally:
                             plugins = self._sync_loaded(ctx.repo_id)
-                plugins.append(plugin)
+                    plugins.append(plugin)
 
         result: List[Tuple["IPlugin", float]] = []
         for plugin in plugins:

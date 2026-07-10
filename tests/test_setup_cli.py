@@ -28,7 +28,9 @@ class _FakeReport:
             else SimpleNamespace(
                 code="collection_missing",
                 message="Qdrant collection is missing for the active semantic profile",
-                remediation=["Create or hydrate the expected semantic collection before vector writes"],
+                remediation=[
+                    "Create or hydrate the expected semantic collection before vector writes"
+                ],
             )
         )
         self.warnings = [] if overall_ready else ["not ready"]

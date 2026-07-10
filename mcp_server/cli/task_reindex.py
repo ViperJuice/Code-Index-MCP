@@ -12,7 +12,9 @@ import anyio
 import mcp.types as types
 from mcp.server.experimental.task_context import ServerTaskContext
 
-from mcp_server.indexing.checkpoint import ReindexCheckpoint, clear as clear_checkpoint, save
+from mcp_server.indexing.checkpoint import ReindexCheckpoint
+from mcp_server.indexing.checkpoint import clear as clear_checkpoint
+from mcp_server.indexing.checkpoint import save
 from mcp_server.storage.mcp_task_registry import MCPTaskRegistry
 
 
@@ -140,9 +142,8 @@ async def run_reindex_task(
                 last_completed_path=last_completed_path,
             )
 
-        status_message = (
-            f"Reindex {progress.get('stage', 'working')}"
-            + (f": {progress_path}" if progress_path else "")
+        status_message = f"Reindex {progress.get('stage', 'working')}" + (
+            f": {progress_path}" if progress_path else ""
         )
         asyncio.run_coroutine_threadsafe(
             registry.record_progress(

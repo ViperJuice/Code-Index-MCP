@@ -7,9 +7,11 @@ from mcp_server.artifacts.multi_repo_artifact_coordinator import MultiRepoArtifa
 from mcp_server.cli.artifact_commands import _run_incremental_reconcile, artifact
 from mcp_server.indexing.change_detector import FileChange
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def _repo_info(repo_id: str, path: Path) -> RepositoryInfo:
+    (path / ".git").mkdir(exist_ok=True)
     return RepositoryInfo(
         repository_id=repo_id,
         name=path.name,
@@ -20,11 +22,28 @@ def _repo_info(repo_id: str, path: Path) -> RepositoryInfo:
         total_symbols=0,
         indexed_at=datetime.now(),
         current_commit="current-commit",
+        last_indexed_commit="current-commit",
         tracked_branch="main",
         current_branch="main",
+        git_common_dir=str(path / ".git"),
         artifact_enabled=True,
         active=True,
     )
+
+
+def _write_ready_index(repo_info: RepositoryInfo) -> None:
+    repo_info.index_path.parent.mkdir(parents=True, exist_ok=True)
+    source = repo_info.path / "README.md"
+    source.write_text("ready index fixture\n", encoding="utf-8")
+    store = SQLiteStore(str(repo_info.index_path))
+    repository_id = store.ensure_repository_row(repo_info.path, name=repo_info.name)
+    store.store_file(
+        repository_id,
+        path=source,
+        relative_path="README.md",
+        language="markdown",
+    )
+    store.close()
 
 
 def test_artifact_pull_confirms_local_restore(monkeypatch, tmp_path):
@@ -224,8 +243,7 @@ def test_workspace_fetch_cli_prints_validation_truth(monkeypatch, tmp_path):
     repo_info = _repo_info("repo-1", repo_path)
     manager.registry.register(repo_info)
 
-    (repo_path / ".mcp-index").mkdir(exist_ok=True)
-    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+    _write_ready_index(repo_info)
     (repo_path / ".mcp-index" / "artifact-metadata.json").write_text(
         '{"commit":"recover123","tracked_branch":"main","branch":"main","checksum":"checksum-123","schema_version":"2","semantic_profile_hash":"'
         + ("a" * 64)

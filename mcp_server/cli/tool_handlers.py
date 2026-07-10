@@ -240,7 +240,7 @@ def _semantic_not_ready_response(
     *,
     query: str,
 ) -> list[types.TextContent]:
-    response = {
+    response: dict[str, Any] = {
         "results": [],
         "code": "semantic_not_ready",
         "query": query,
@@ -268,7 +268,7 @@ def _semantic_failure_response(
         profile_id = error.profile_id or profile_id
         collection_name = error.collection_name or collection_name
 
-    response = {
+    response: dict[str, Any] = {
         "results": [],
         "code": "semantic_search_failed",
         "query": query,
@@ -636,6 +636,7 @@ async def handle_search_code(
             or history_repos
             or include_source_metadata
         )
+        search_response: dict[str, Any] | list[dict[str, Any]]
         if semantic or filtered_or_enriched:
             search_response = {
                 "results": results_data,
@@ -1079,7 +1080,7 @@ async def handle_reindex(
         and target_path.resolve(strict=False) == ctx.workspace_root.resolve(strict=False)
         and not target_path.is_file()
     )
-    if git_index_manager is not None and whole_repository:
+    if git_index_manager is not None and whole_repository and ctx is not None:
         sync_result = git_index_manager.rebuild_repository_index(ctx.repo_id)
         if sync_result.action != "full_index":
             return _json_text_response(

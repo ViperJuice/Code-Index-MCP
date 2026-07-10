@@ -633,9 +633,7 @@ All notable changes to this project will be documented in this file.
         assert "Recommendations" in symbol_names
         assert "Next Step" in symbol_names
 
-    def test_agents_bounded_index_preserves_document_and_heading_symbols(
-        self, markdown_plugin
-    ):
+    def test_agents_bounded_index_preserves_document_and_heading_symbols(self, markdown_plugin):
         """AGENTS.md should stay lexically discoverable on the bounded path."""
         content = """
 # MCP Server Agent Configuration
@@ -663,9 +661,7 @@ All notable changes to this project will be documented in this file.
         assert "Development Priorities" in symbol_names
         assert "Immediate" in symbol_names
 
-    def test_readme_bounded_index_preserves_document_and_heading_symbols(
-        self, markdown_plugin
-    ):
+    def test_readme_bounded_index_preserves_document_and_heading_symbols(self, markdown_plugin):
         """README.md should stay lexically discoverable on the bounded path."""
         content = """
 # Code-Index-MCP
@@ -721,9 +717,7 @@ All notable changes to this project will be documented in this file.
         assert "MCP Server Use Cases" in symbol_names
         assert "Code Intelligence Service" in symbol_names
 
-    def test_prometheus_overview_and_ai_docs_readme_use_exact_bounded_paths(
-        self, markdown_plugin
-    ):
+    def test_prometheus_overview_and_ai_docs_readme_use_exact_bounded_paths(self, markdown_plugin):
         """The Prometheus README-tail pair should stay narrow and lexically visible."""
         prometheus_content = """
 # Prometheus Overview
@@ -784,9 +778,7 @@ Metrics collection and monitoring.
         assert ai_docs_readme_result["metadata"]["lightweight_index"] is True
         assert ai_docs_readme_result["metadata"]["lightweight_reason"] == "ai_docs_readme_path"
         assert ai_docs_readme_result["chunks"] == []
-        ai_docs_readme_symbols = [
-            symbol["symbol"] for symbol in ai_docs_readme_result["symbols"]
-        ]
+        ai_docs_readme_symbols = [symbol["symbol"] for symbol in ai_docs_readme_result["symbols"]]
         assert "AI Documentation Index" in ai_docs_readme_symbols
         assert "Core Frameworks" in ai_docs_readme_symbols
         assert "[FastAPI](./fastapi_overview.md)" in ai_docs_readme_symbols
@@ -824,9 +816,7 @@ Metrics collection and monitoring.
 #### POST /auth/login
 """
 
-        p2b_result = markdown_plugin.indexFile(
-            "docs/architecture/P2B-known-limits.md", p2b_content
-        )
+        p2b_result = markdown_plugin.indexFile("docs/architecture/P2B-known-limits.md", p2b_content)
         api_result = markdown_plugin.indexFile("docs/api/API-REFERENCE.md", api_content)
         unrelated_result = markdown_plugin.indexFile(
             "docs/api/OTHER.md",
@@ -834,10 +824,7 @@ Metrics collection and monitoring.
         )
 
         assert p2b_result["metadata"]["lightweight_index"] is True
-        assert (
-            p2b_result["metadata"]["lightweight_reason"]
-            == "architecture_p2b_known_limits_path"
-        )
+        assert p2b_result["metadata"]["lightweight_reason"] == "architecture_p2b_known_limits_path"
         assert p2b_result["chunks"] == []
         p2b_symbols = [symbol["symbol"] for symbol in p2b_result["symbols"]]
         assert "P2B Known Limits - Deferred Per-Repo Global State" in p2b_symbols
@@ -859,9 +846,7 @@ Metrics collection and monitoring.
         assert unrelated_result["metadata"].get("lightweight_index") is not True
         assert unrelated_result["chunks"] != []
 
-    def test_later_ai_docs_overview_pair_uses_generic_bounded_markdown_path(
-        self, markdown_plugin
-    ):
+    def test_later_ai_docs_overview_pair_uses_generic_bounded_markdown_path(self, markdown_plugin):
         """The later ai_docs overview pair should stay on the generic overview path."""
         black_content = """
 # Black & isort AI Context

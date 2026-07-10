@@ -13,7 +13,9 @@ def test_direct_client_search_returns_typed_matches(tmp_path: Path):
     )
 
     with boot_test_server(tmp_path, [repo_path]):
-        with open_client(workspace_root=repo_path, registry_path=tmp_path / "registry.json") as client:
+        with open_client(
+            workspace_root=repo_path, registry_path=tmp_path / "registry.json"
+        ) as client:
             result = client.search_code(ClientSearchOptions(query=token))
 
     assert result.index_unavailable is None
@@ -47,9 +49,13 @@ def test_direct_client_search_includes_source_metadata_only_when_requested(tmp_p
             treesitter_file_id="seed.py",
         )
         with store._get_connection() as conn:
-            conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", ("TODO", file_row[0]))
+            conn.execute(
+                "INSERT INTO fts_code (content, file_id) VALUES (?, ?)", ("TODO", file_row[0])
+            )
 
-        with open_client(workspace_root=repo_path, registry_path=tmp_path / "registry.json") as client:
+        with open_client(
+            workspace_root=repo_path, registry_path=tmp_path / "registry.json"
+        ) as client:
             plain = client.search_code(ClientSearchOptions(query="TODO"))
             enriched = client.search_code(
                 ClientSearchOptions(query="TODO", include_source_metadata=True)

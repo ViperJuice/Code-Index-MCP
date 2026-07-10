@@ -33,7 +33,9 @@ def _text_payload(result) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_official_sdk_client_can_initialize_list_tools_and_call_baseline_tools(tmp_path: Path):
+async def test_official_sdk_client_can_initialize_list_tools_and_call_baseline_tools(
+    tmp_path: Path,
+):
     token = "mcpbase_stdio_probe_token"
     symbol = "mcpbase_stdio_probe_symbol"
     repo_path, repo_id = build_temp_repo(

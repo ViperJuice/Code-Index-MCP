@@ -109,8 +109,10 @@ dev = [
     "safety>=3.0.0",
     "bandit>=1.7.5",
     # Type stubs
+    "types-PyYAML>=6.0.0",
     "types-requests>=2.31.0",
     "types-setuptools>=68.0.0",
+    "types-toml>=0.10.8",
     # Profiling & analysis
     "line-profiler>=4.0.0",
     "memory-profiler>=0.61.0",

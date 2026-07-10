@@ -25,7 +25,9 @@ def _configure_runner(monkeypatch) -> None:
     monkeypatch.setattr(
         stdio_runner,
         "_gate",
-        SimpleNamespace(enabled=False, check=lambda *_args, **_kwargs: None, verify=lambda *_: True),
+        SimpleNamespace(
+            enabled=False, check=lambda *_args, **_kwargs: None, verify=lambda *_: True
+        ),
     )
 
 

@@ -32,6 +32,6 @@ def test_decision_record_lists_future_remote_transport_prerequisites():
         "transport-specific tests",
         "client smokes",
         "`MCPAUTH`",
-        'no remote MCP auth is implemented',
+        "no remote MCP auth is implemented",
     ):
         assert expected in text

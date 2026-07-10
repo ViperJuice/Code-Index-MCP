@@ -1077,7 +1077,11 @@ async def initialize_services() -> None:
 
                 from mcp_server.core.repo_context import RepoContext
                 from mcp_server.storage.multi_repo_manager import RepositoryInfo
-                from mcp_server.storage.repo_identity import compute_repo_id
+                from mcp_server.storage.repo_identity import (
+                    _run_git,
+                    compute_repo_id,
+                    resolve_tracked_branch,
+                )
 
                 _repo_id_result = compute_repo_id(current_dir)
                 _repo_id = (
@@ -1085,6 +1089,10 @@ async def initialize_services() -> None:
                     if hasattr(_repo_id_result, "repo_id")
                     else str(_repo_id_result)
                 )
+                _git_common_dir = getattr(_repo_id_result, "git_common_dir", None)
+                _current_commit = _run_git(["rev-parse", "HEAD"], current_dir)
+                _current_branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], current_dir)
+                _tracked_branch = resolve_tracked_branch(_git_common_dir)
                 _reg_entry = RepositoryInfo(
                     repository_id=_repo_id,
                     name=current_dir.name,
@@ -1094,13 +1102,16 @@ async def initialize_services() -> None:
                     total_files=0,
                     total_symbols=0,
                     indexed_at=_dt.now(),
-                    tracked_branch="",
+                    current_commit=_current_commit,
+                    current_branch=_current_branch,
+                    tracked_branch=_tracked_branch,
+                    git_common_dir=(str(_git_common_dir) if _git_common_dir else None),
                 )
                 _local_ctx = RepoContext(
                     repo_id=_repo_id,
                     sqlite_store=sqlite_store,
                     workspace_root=current_dir,
-                    tracked_branch="",
+                    tracked_branch=_tracked_branch,
                     registry_entry=_reg_entry,
                 )
             except Exception as _ctx_err:
@@ -1214,6 +1225,18 @@ async def initialize_services() -> None:
                                     pass
                     if _captured_store:
                         _captured_store.rebuild_fts_code()
+                    if (
+                        _captured_ctx is not None
+                        and _captured_ctx.registry_entry.current_commit
+                        and int(stats.get("failed_files", stats.get("failed", 0)) or 0) == 0
+                    ):
+                        _captured_ctx.registry_entry.last_indexed_commit = (
+                            _captured_ctx.registry_entry.current_commit
+                        )
+                        _captured_ctx.registry_entry.last_indexed_branch = (
+                            _captured_ctx.registry_entry.current_branch
+                        )
+                        _captured_ctx.registry_entry.last_indexed = _dt.now()
                     logger.info(f"Background initial index complete: {stats}")
                 except Exception as _idx_err:
                     logger.error(f"Background initial index failed: {_idx_err}")

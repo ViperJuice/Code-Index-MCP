@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable
 
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 if TYPE_CHECKING:
     from mcp_server.core.repo_context import RepoContext
@@ -12,6 +12,8 @@ class IndexShard(TypedDict):
     file: str
     symbols: list[dict]
     language: str
+    chunks: NotRequired[list[dict]]
+    metadata: NotRequired[dict]
 
 
 class Reference:

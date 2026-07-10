@@ -30,7 +30,9 @@ def test_prestartup_registration_does_not_swallow_late_middleware_error() -> Non
             if middleware_cls.__name__ == "AuthorizationMiddleware":
                 raise RuntimeError("Cannot add middleware after an application has started")
 
-    with pytest.raises(RuntimeError, match="Cannot add middleware after an application has started"):
+    with pytest.raises(
+        RuntimeError, match="Cannot add middleware after an application has started"
+    ):
         gateway._register_security_middleware(
             FakeApp(),  # type: ignore[arg-type]
             gateway.security_config,

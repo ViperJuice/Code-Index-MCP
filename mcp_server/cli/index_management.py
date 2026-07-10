@@ -626,8 +626,7 @@ def check_semantic():
     click.echo("=" * 40)
     click.echo(f"Overall ready: {'✅' if report.overall_ready else '❌'}")
     click.echo(
-        "Can write semantic vectors: "
-        + ("✅" if report.can_write_semantic_vectors else "❌")
+        "Can write semantic vectors: " + ("✅" if report.can_write_semantic_vectors else "❌")
     )
     click.echo(f"Profiles: {report.profiles.status.value} - {report.profiles.message}")
     click.echo(f"Enrichment: {report.enrichment.status.value} - {report.enrichment.message}")

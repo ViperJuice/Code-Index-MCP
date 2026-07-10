@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from mcp_server.cli import tool_handlers
+from mcp_server.indexing.summarization import GeneratedSummary, SummaryGenerationResult
 from tests.fixtures.multi_repo import boot_test_server, build_temp_repo
 
 
@@ -40,9 +41,19 @@ def test_ready_registered_repository_reindexes_searches_and_persists_rows(tmp_pa
         lazy_summarizer._get_model_name.return_value = "test-model"
         batch_summarizer = MagicMock()
         batch_summarizer.summarize_file_chunks = AsyncMock(
-            return_value=[
-                MagicMock(chunk_id="fresh.py:1-2:function", summary="Fresh repo smoke summary")
-            ]
+            return_value=SummaryGenerationResult(
+                chunks_attempted=1,
+                summaries_written=1,
+                authoritative_chunks=1,
+                files_attempted=1,
+                files_summarized=1,
+                summaries=(
+                    GeneratedSummary(
+                        chunk_id="fresh.py:1-2:function",
+                        summary="Fresh repo smoke summary",
+                    ),
+                ),
+            )
         )
         with patch(
             "mcp_server.indexing.summarization.FileBatchSummarizer",

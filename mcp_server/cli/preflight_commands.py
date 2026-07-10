@@ -11,15 +11,16 @@ from typing import List, Optional
 
 import click
 
+from mcp_server.health.repository_readiness import ReadinessClassifier
+from mcp_server.storage.repository_registry import RepositoryRegistry
+from mcp_server.utils.subprocess_env import get_full_env
+
 from .artifact_commands import (
     _get_artifact_identity,
     _get_git_ref_info,
     _get_local_drift,
     _verify_local_index_restored,
 )
-from mcp_server.health.repository_readiness import ReadinessClassifier
-from mcp_server.storage.repository_registry import RepositoryRegistry
-from mcp_server.utils.subprocess_env import get_full_env
 
 
 @dataclass
@@ -144,7 +145,9 @@ def run_preflight() -> PreflightResult:
         registry = RepositoryRegistry()
         repo_info = registry.get_repository_by_path(Path.cwd())
         if repo_info is not None:
-            readiness = ReadinessClassifier.classify_registered(repo_info, requested_path=Path.cwd())
+            readiness = ReadinessClassifier.classify_registered(
+                repo_info, requested_path=Path.cwd()
+            )
             if not readiness.ready:
                 checks.append(
                     PreflightCheck(

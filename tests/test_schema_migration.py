@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader as ArtifactDownloader
+from mcp_server.config.settings import get_settings
 from mcp_server.storage.schema_migrator import UnknownSchemaVersionError
 
 
@@ -14,7 +15,7 @@ def _base_metadata(schema_version: str = "2") -> dict:
     return {
         "compatibility": {
             "schema_version": schema_version,
-            "embedding_model": "voyage-code-3",
+            "embedding_model": get_settings().semantic_embedding_model,
         }
     }
 

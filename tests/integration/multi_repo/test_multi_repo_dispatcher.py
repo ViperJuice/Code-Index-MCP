@@ -14,6 +14,8 @@ import requests
 
 from tests.integration.multi_repo.conftest import _ADMIN_PASSWORD, MultiRepoContext
 
+pytestmark = pytest.mark.requires_network
+
 
 def _get_auth_token(base_url: str) -> str:
     """Obtain a Bearer token from the gateway login endpoint."""

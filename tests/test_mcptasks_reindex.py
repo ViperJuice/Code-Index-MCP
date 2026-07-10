@@ -8,10 +8,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from mcp.types import TaskMetadata
 
 from mcp_server.cli.task_reindex import run_reindex_task
 from mcp_server.storage.mcp_task_registry import MCPTaskRegistry
-from mcp.types import TaskMetadata
 
 
 class _FakeTask:
@@ -31,7 +31,9 @@ class _FakeDispatcher:
     def __init__(self, *, cancel_on_start: bool = False) -> None:
         self.cancel_on_start = cancel_on_start
 
-    def index_directory(self, ctx, target_path, recursive=True, progress_callback=None, cancel_check=None):
+    def index_directory(
+        self, ctx, target_path, recursive=True, progress_callback=None, cancel_check=None
+    ):
         files = sorted(path for path in target_path.rglob("*.py"))
         if self.cancel_on_start and cancel_check is not None and cancel_check():
             return {

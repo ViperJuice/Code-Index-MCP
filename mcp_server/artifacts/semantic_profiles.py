@@ -65,7 +65,7 @@ class SemanticProfile:
         for key, value in supplemental.items():
             build_metadata.setdefault(key, value)
 
-        canonical = {
+        canonical: Dict[str, Any] = {
             "profile_id": profile_id,
             "provider": str(payload["provider"]),
             "model_name": str(payload["model_name"]),
@@ -238,7 +238,8 @@ def _supplement_enrichment_metadata(
 ) -> Dict[str, Any]:
     build_metadata = payload.get("build_metadata")
     if isinstance(build_metadata, Mapping) and all(
-        build_metadata.get(key) for key in ("enrichment_model", "enrichment_base_url", "prompt_template")
+        build_metadata.get(key)
+        for key in ("enrichment_model", "enrichment_base_url", "prompt_template")
     ):
         return {}
 

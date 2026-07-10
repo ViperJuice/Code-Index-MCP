@@ -5,3 +5,4 @@ AUTHBOUND hardens the FastAPI admin/debug JWT boundary only. Protected HTTP rout
 The public allowlist remains `/docs`, `/redoc`, `/openapi.json`, `/health`, `/ready`, and `/liveness`.
 
 The STDIO `MCP_CLIENT_SECRET` handshake remains a separate contract and is unchanged by AUTHBOUND.
+It is a local STDIO handshake guard. FastAPI continues to use admin/debug bearer token authentication, and no remote MCP authorization is implemented.

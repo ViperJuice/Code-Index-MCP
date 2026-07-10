@@ -48,8 +48,7 @@ class TestPluginInitialization:
         script = repo / "scripts" / "create_multi_repo_visual_report.py"
         script.parent.mkdir(parents=True)
         script.write_text(
-            dedent(
-                """
+            dedent("""
                 def setup_style():
                     return "ok"
 
@@ -58,15 +57,16 @@ class TestPluginInitialization:
 
                 def main():
                     return create_html_report({}, ".")
-                """
-            ),
+                """),
             encoding="utf-8",
         )
 
         store = SQLiteStore(str(tmp_path / "index.db"))
         store.path_resolver = PathResolver(repo)
         plugin = PythonPlugin(sqlite_store=store, preindex=False)
-        plugin._repository_id = store.create_repository(str(repo), repo.name, {"language": "python"})
+        plugin._repository_id = store.create_repository(
+            str(repo), repo.name, {"language": "python"}
+        )
 
         calls = []
 
@@ -74,7 +74,9 @@ class TestPluginInitialization:
             calls.append("called")
             return []
 
-        monkeypatch.setattr("mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text)
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
 
         result = plugin.indexFile(script, script.read_text(encoding="utf-8"))
 
@@ -82,7 +84,9 @@ class TestPluginInitialization:
         symbol_names = {symbol["symbol"] for symbol in result["symbols"]}
         assert {"setup_style", "create_html_report", "main"} <= symbol_names
 
-        stored = store.get_file_by_path("scripts/create_multi_repo_visual_report.py", plugin._repository_id)
+        stored = store.get_file_by_path(
+            "scripts/create_multi_repo_visual_report.py", plugin._repository_id
+        )
         assert stored is not None
         with store._get_connection() as conn:
             symbol_count = conn.execute(
@@ -104,23 +108,23 @@ class TestPluginInitialization:
         script = repo / "mcp_server" / "visualization" / "quick_charts.py"
         script.parent.mkdir(parents=True)
         script.write_text(
-            dedent(
-                """
+            dedent("""
                 class QuickCharts:
                     def latency_comparison(self):
                         return "ok"
 
                 def build_chart():
                     return QuickCharts()
-                """
-            ),
+                """),
             encoding="utf-8",
         )
 
         store = SQLiteStore(str(tmp_path / "index.db"))
         store.path_resolver = PathResolver(repo)
         plugin = PythonPlugin(sqlite_store=store, preindex=False)
-        plugin._repository_id = store.create_repository(str(repo), repo.name, {"language": "python"})
+        plugin._repository_id = store.create_repository(
+            str(repo), repo.name, {"language": "python"}
+        )
 
         calls = []
 
@@ -128,7 +132,9 @@ class TestPluginInitialization:
             calls.append("called")
             return []
 
-        monkeypatch.setattr("mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text)
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
 
         result = plugin.indexFile(script, script.read_text(encoding="utf-8"))
 
@@ -136,7 +142,9 @@ class TestPluginInitialization:
         symbol_names = {symbol["symbol"] for symbol in result["symbols"]}
         assert {"QuickCharts", "latency_comparison", "build_chart"} <= symbol_names
 
-        stored = store.get_file_by_path("mcp_server/visualization/quick_charts.py", plugin._repository_id)
+        stored = store.get_file_by_path(
+            "mcp_server/visualization/quick_charts.py", plugin._repository_id
+        )
         assert stored is not None
         with store._get_connection() as conn:
             symbol_count = conn.execute(
@@ -160,19 +168,19 @@ class TestPluginInitialization:
         other_script = repo / "scripts" / "other_report.py"
         other_script.parent.mkdir(parents=True)
         other_script.write_text(
-            dedent(
-                """
+            dedent("""
                 def build():
                     return 1
-                """
-            ),
+                """),
             encoding="utf-8",
         )
 
         store = SQLiteStore(str(tmp_path / "index.db"))
         store.path_resolver = PathResolver(repo)
         plugin = PythonPlugin(sqlite_store=store, preindex=False)
-        plugin._repository_id = store.create_repository(str(repo), repo.name, {"language": "python"})
+        plugin._repository_id = store.create_repository(
+            str(repo), repo.name, {"language": "python"}
+        )
 
         calls = []
 

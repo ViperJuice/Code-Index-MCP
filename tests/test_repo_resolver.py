@@ -282,8 +282,9 @@ class TestRepoResolver:
         registry = RepositoryRegistry(registry_file)
 
         # Manually register two repos with the same name "duplicate_name"
-        from mcp_server.storage.multi_repo_manager import RepositoryInfo
         from datetime import datetime
+
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
         repo_info1 = RepositoryInfo(
             repository_id="id1",
@@ -361,8 +362,9 @@ class TestRepoResolver:
         registry_file = tmp_path / "registry.json"
         registry = RepositoryRegistry(registry_file)
 
-        from mcp_server.storage.multi_repo_manager import RepositoryInfo
         from datetime import datetime
+
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
         # Register a repository with a name that contains a slash
         repo_info = RepositoryInfo(

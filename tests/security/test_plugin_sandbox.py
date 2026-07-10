@@ -7,6 +7,7 @@ import subprocess
 import sys
 import textwrap
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -111,6 +112,21 @@ def test_supervisor_spawn_and_close(tmp_path: Path):
     assert sup._proc is None
     assert sup.worker_pid is None
     assert sup.is_worker_running is False
+
+
+def test_supervisor_serializes_concurrent_large_calls(tmp_path: Path):
+    caps = CapabilitySet(fs_read=(), fs_write=(), env_allow=frozenset())
+    sup = SandboxSupervisor(_echo_worker_cmd(tmp_path), caps)
+    payloads = [{"index": i, "content": str(i) * 32_768} for i in range(12)]
+    try:
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            responses = list(
+                executor.map(lambda payload: sup.call("echo", payload, timeout=5.0), payloads)
+            )
+    finally:
+        sup.close()
+
+    assert [response["echoed"] for response in responses] == payloads
 
 
 def test_supervisor_introspection_does_not_spawn(tmp_path: Path):

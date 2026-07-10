@@ -15,6 +15,7 @@ class _FakePlugin:
     def __init__(self, language: str) -> None:
         self.language = language
         self.closed = 0
+        self.bound_contexts = []
 
     def supports(self, path: str) -> bool:
         extensions = {"python": ".py", "rust": ".rs"}
@@ -22,6 +23,7 @@ class _FakePlugin:
 
     def bind(self, ctx) -> None:
         self.repo_id = ctx.repo_id
+        self.bound_contexts.append(ctx)
 
     def close(self) -> None:
         self.closed += 1
@@ -143,6 +145,16 @@ class TestPluginsForFile:
             ("repo-a", "python"),
         ]
         assert len(reg.plugins_for("repo-a")) == 2
+
+    def test_rebinds_cached_plugin_to_latest_context(self):
+        reg = PluginSetRegistry(_FakeManager())
+        first_ctx = _make_ctx("repo-a")
+        second_ctx = _make_ctx("repo-a")
+
+        plugin = reg.plugins_for_file(first_ctx, Path("first.py"))[0][0]
+        assert reg.plugins_for_file(second_ctx, Path("second.py"))[0][0] is plugin
+
+        assert plugin.bound_contexts == [first_ctx, second_ctx]
 
     def test_evict_delegates_close_to_lifecycle_manager(self):
         manager = _FakeManager()

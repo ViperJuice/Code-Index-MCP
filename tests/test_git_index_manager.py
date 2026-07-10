@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from inspect import signature
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -52,6 +53,39 @@ def test_should_reindex_no_tracked_branch():
 def test_sync_all_repositories_signature_no_longer_advertises_parallel():
     params = signature(GitAwareIndexManager.sync_all_repositories).parameters
     assert "parallel" not in params
+
+
+def test_changed_files_excludes_internal_index_state_and_preserves_rename_edges(
+    tmp_path, monkeypatch
+):
+    detected = [
+        SimpleNamespace(change_type="added", path=".mcp-index/trace.json", old_path=None),
+        SimpleNamespace(change_type="added", path="src/new.py", old_path=None),
+        SimpleNamespace(change_type="modified", path=".venv/cache.py", old_path=None),
+        SimpleNamespace(change_type="deleted", path="src/old.py", old_path=None),
+        SimpleNamespace(
+            change_type="renamed", path="src/from_state.py", old_path=".indexes/from.py"
+        ),
+        SimpleNamespace(change_type="renamed", path="build/to.py", old_path="src/to_state.py"),
+        SimpleNamespace(change_type="renamed", path="src/new_name.py", old_path="src/name.py"),
+        SimpleNamespace(
+            change_type="renamed", path=".mcp-index/new.json", old_path=".indexes/old.json"
+        ),
+    ]
+    detector = MagicMock()
+    detector.get_changes_since_commit.return_value = detected
+    monkeypatch.setattr(
+        "mcp_server.storage.git_index_manager.ChangeDetector", lambda _repo_path: detector
+    )
+
+    changes = GitAwareIndexManager._get_changed_files(
+        MagicMock(), tmp_path, "from-commit", "to-commit"
+    )
+
+    assert changes.added == ["src/new.py", "src/from_state.py"]
+    assert changes.modified == []
+    assert changes.deleted == ["src/old.py", "src/to_state.py"]
+    assert changes.renamed == [("src/name.py", "src/new_name.py")]
 
 
 # ---------------------------------------------------------------------------
@@ -765,7 +799,9 @@ def test_clean_full_rebuild_advances_commit_only_with_durable_index(tmp_path):
     class DurableFullIndexDispatcher(CtxSignatureDispatcher):
         def index_directory(self, ctx, path, recursive=True):
             row_id = ctx.sqlite_store.ensure_repository_row(path, name="test-repo")
-            ctx.sqlite_store.store_file(row_id, path=Path(path) / "hello.py", relative_path="hello.py")
+            ctx.sqlite_store.store_file(
+                row_id, path=Path(path) / "hello.py", relative_path="hello.py"
+            )
             return super().index_directory(ctx, path, recursive=recursive)
 
     manager = GitAwareIndexManager(registry, DurableFullIndexDispatcher())
@@ -849,10 +885,9 @@ def test_full_index_returns_exact_semantic_blocker_when_summary_progress_plateau
     assert result.semantic is not None
     assert result.semantic["summary_passes"] == 3
     assert result.semantic["semantic_stage"] == "blocked_summary_plateau"
-    assert (
-        result.errors
-        == ["Summary generation plateaued before strict semantic indexing could start"]
-    )
+    assert result.errors == [
+        "Summary generation plateaued before strict semantic indexing could start"
+    ]
 
 
 def test_full_index_preserves_exact_summary_call_timeout_details(tmp_path):
@@ -973,9 +1008,7 @@ def test_force_full_timeout_restores_active_runtime_and_preserves_exact_blocker(
     restored_store = SQLiteStore(str(repo_info.index_path))
     with restored_store._get_connection() as conn:
         files_count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
-        file_paths = {
-            row[0] for row in conn.execute("SELECT relative_path FROM files").fetchall()
-        }
+        file_paths = {row[0] for row in conn.execute("SELECT relative_path FROM files").fetchall()}
         semantic_points = conn.execute("SELECT COUNT(*) FROM semantic_points").fetchone()[0]
     restored_store.close()
     assert files_count == 1
@@ -1075,9 +1108,7 @@ def test_force_full_storage_closeout_restores_runtime_and_preserves_exact_blocke
     restored_store = SQLiteStore(str(repo_info.index_path))
     with restored_store._get_connection() as conn:
         files_count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
-        file_paths = {
-            row[0] for row in conn.execute("SELECT relative_path FROM files").fetchall()
-        }
+        file_paths = {row[0] for row in conn.execute("SELECT relative_path FROM files").fetchall()}
         semantic_points = conn.execute("SELECT COUNT(*) FROM semantic_points").fetchone()[0]
     restored_store.close()
     assert files_count == 1
@@ -1129,13 +1160,10 @@ def test_full_index_preserves_bounded_summary_continuation_details(tmp_path):
     assert result.semantic["summary_remaining_chunks"] == 17
     assert result.semantic["summary_scope_drained"] is False
     assert result.semantic["summary_continuation_required"] is True
-    assert (
-        result.errors
-        == [
-            "Missing authoritative summaries blocked strict semantic indexing after "
-            "8 bounded summary passes; 17 chunks still require summaries"
-        ]
-    )
+    assert result.errors == [
+        "Missing authoritative summaries blocked strict semantic indexing after "
+        "8 bounded summary passes; 17 chunks still require summaries"
+    ]
 
 
 def test_full_index_returns_exact_low_level_blocker_when_lexical_stage_times_out(tmp_path):
@@ -1462,8 +1490,7 @@ def test_force_full_sync_does_not_advance_commit_when_semantic_stage_is_blocked(
 
     assert result.action == "failed"
     assert (
-        result.error
-        == "Summary generation plateaued before strict semantic indexing could start"
+        result.error == "Summary generation plateaued before strict semantic indexing could start"
     )
     registry.update_staleness_reason.assert_called_once_with(
         repo_info.repository_id, "partial_index_failure"
@@ -1643,7 +1670,9 @@ def test_force_full_sync_terminalizes_running_trace_when_later_test_pair_crashes
     assert trace["in_flight_path"] == str(blocked_file)
     assert trace["blocker_source"] == "lexical_mutation"
     assert ".devcontainer/devcontainer.json" not in (trace.get("last_progress_path") or "")
-    assert "scripts/quick_mcp_vs_native_validation.py" not in (trace.get("last_progress_path") or "")
+    assert "scripts/quick_mcp_vs_native_validation.py" not in (
+        trace.get("last_progress_path") or ""
+    )
     assert "tests/test_artifact_publish_race.py" not in (trace.get("last_progress_path") or "")
     registry.update_indexed_commit.assert_not_called()
 
@@ -1833,7 +1862,9 @@ def test_force_full_progress_callback_persists_later_test_pair_snapshot(tmp_path
     assert trace["last_progress_path"] == str(prior_file)
     assert trace["in_flight_path"] == str(blocked_file)
     assert ".devcontainer/devcontainer.json" not in (trace.get("last_progress_path") or "")
-    assert "scripts/quick_mcp_vs_native_validation.py" not in (trace.get("last_progress_path") or "")
+    assert "scripts/quick_mcp_vs_native_validation.py" not in (
+        trace.get("last_progress_path") or ""
+    )
     assert "tests/test_artifact_publish_race.py" not in (trace.get("last_progress_path") or "")
     assert trace["trace_timestamp"]
 
@@ -1879,7 +1910,9 @@ def test_force_full_progress_callback_persists_later_script_pair_snapshot(tmp_pa
     assert trace["last_progress_path"] == str(prior_file)
     assert trace["in_flight_path"] == str(blocked_file)
     assert ".devcontainer/devcontainer.json" not in (trace.get("last_progress_path") or "")
-    assert "scripts/quick_mcp_vs_native_validation.py" not in (trace.get("last_progress_path") or "")
+    assert "scripts/quick_mcp_vs_native_validation.py" not in (
+        trace.get("last_progress_path") or ""
+    )
     assert "tests/test_artifact_publish_race.py" not in (trace.get("last_progress_path") or "")
     assert trace["trace_timestamp"]
 
@@ -1974,9 +2007,7 @@ def test_force_full_progress_callback_persists_swift_database_efficiency_pair_sn
     assert trace["last_progress_path"] == str(prior_file)
     assert trace["in_flight_path"] == str(blocked_file)
     assert ".codex/phase-loop" not in (trace.get("last_progress_path") or "")
-    assert "tests/root_tests/run_reranking_tests.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "tests/root_tests/run_reranking_tests.py" not in (trace.get("last_progress_path") or "")
     assert trace["trace_timestamp"]
 
 
@@ -2505,7 +2536,9 @@ def test_force_full_sync_does_not_advance_commit_when_later_script_pair_blocks(t
     assert trace["in_flight_path"] == str(blocked_file)
     assert trace["blocker_source"] == "lexical_mutation"
     assert ".devcontainer/devcontainer.json" not in (trace.get("last_progress_path") or "")
-    assert "scripts/quick_mcp_vs_native_validation.py" not in (trace.get("last_progress_path") or "")
+    assert "scripts/quick_mcp_vs_native_validation.py" not in (
+        trace.get("last_progress_path") or ""
+    )
     assert "tests/test_artifact_publish_race.py" not in (trace.get("last_progress_path") or "")
     registry.update_indexed_commit.assert_not_called()
 
@@ -2652,7 +2685,9 @@ def test_force_full_sync_trace_moves_past_pytest_overview_after_bounded_ai_docs_
         return_value=UpdateResult(
             indexed=2,
             failed=1,
-            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            errors=[
+                "Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
             low_level={
                 "lexical_stage": "blocked_file_timeout",
                 "lexical_files_attempted": 3,
@@ -2662,8 +2697,7 @@ def test_force_full_sync_trace_moves_past_pytest_overview_after_bounded_ai_docs_
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                        "Lexical indexing timed out while processing " "SEMANTIC_DOGFOOD_REBUILD.md"
                     ),
                 },
             },
@@ -2714,8 +2748,7 @@ def test_force_full_sync_durable_trace_moves_past_jedi_ai_doc(tmp_path):
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "tree_sitter_queries.md"
+                        "Lexical indexing timed out while processing " "tree_sitter_queries.md"
                     ),
                 },
             },
@@ -2730,7 +2763,9 @@ def test_force_full_sync_durable_trace_moves_past_jedi_ai_doc(tmp_path):
     assert result.action == "failed"
     assert "ai_docs/jedi.md" not in (trace.get("last_progress_path") or "")
     assert "ai_docs/jedi.md" not in (trace.get("in_flight_path") or "")
-    assert trace["last_progress_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
+    assert trace["last_progress_path"] == str(
+        repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
+    )
     assert trace["in_flight_path"] == str(repo / "ai_docs" / "tree_sitter_queries.md")
     assert trace["stage"] == "force_full_failed"
     assert trace["stage_family"] == "final_closeout"
@@ -2907,8 +2942,7 @@ def test_force_full_sync_durable_trace_moves_past_exact_ai_docs_readme_tail_pair
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "tree_sitter_queries.md"
+                        "Lexical indexing timed out while processing " "tree_sitter_queries.md"
                     ),
                 },
             },
@@ -3220,8 +3254,7 @@ def test_force_full_sync_durable_trace_moves_past_mock_plugin_fixture_pair(tmp_p
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "test_plugin_sandbox.py"
+                        "Lexical indexing timed out while processing " "test_plugin_sandbox.py"
                     ),
                 },
             },
@@ -3359,9 +3392,7 @@ def test_force_full_sync_durable_trace_moves_past_ga_release_docs_tail_pair(tmp_
     assert trace["last_progress_path"] == str(blocked_doc)
     assert trace["in_flight_path"] == str(later_doc)
     assert str(prior_doc) not in (trace.get("in_flight_path") or "")
-    assert "tests/docs/test_semincr_contract.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "tests/docs/test_semincr_contract.py" not in (trace.get("last_progress_path") or "")
     assert "tests/security/fixtures/mock_plugin/plugin.py" not in (
         trace.get("last_progress_path") or ""
     )
@@ -3423,7 +3454,9 @@ def test_get_repository_status_preserves_docs_test_tail_pair_trace(tmp_path):
                 "trace_timestamp": "2026-04-29T17:45:52Z",
                 "current_commit": commit,
                 "indexed_commit_before": "older-indexed-commit",
-                "last_progress_path": str(repo / "tests" / "docs" / "test_gaclose_evidence_closeout.py"),
+                "last_progress_path": str(
+                    repo / "tests" / "docs" / "test_gaclose_evidence_closeout.py"
+                ),
                 "in_flight_path": str(repo / "tests" / "docs" / "test_p8_deployment_security.py"),
                 "blocker_source": "lexical_mutation",
             }
@@ -3515,7 +3548,9 @@ def test_get_repository_status_preserves_ga_release_docs_tail_pair_trace(tmp_pat
                 "trace_timestamp": "2026-04-29T19:13:19Z",
                 "current_commit": commit,
                 "indexed_commit_before": "older-indexed-commit",
-                "last_progress_path": str(repo / "tests" / "docs" / "test_garc_rc_soak_contract.py"),
+                "last_progress_path": str(
+                    repo / "tests" / "docs" / "test_garc_rc_soak_contract.py"
+                ),
                 "in_flight_path": str(
                     repo / "tests" / "docs" / "test_garel_ga_release_contract.py"
                 ),
@@ -3563,7 +3598,12 @@ def test_get_repository_status_preserves_later_legacy_codex_phase_loop_rebound_p
                 "current_commit": commit,
                 "indexed_commit_before": "older-indexed-commit",
                 "last_progress_path": str(
-                    repo / ".codex" / "phase-loop" / "runs" / "20260424T190651Z-01-garc-plan" / "launch.json"
+                    repo
+                    / ".codex"
+                    / "phase-loop"
+                    / "runs"
+                    / "20260424T190651Z-01-garc-plan"
+                    / "launch.json"
                 ),
                 "in_flight_path": str(
                     repo
@@ -3655,12 +3695,7 @@ def test_get_repository_status_preserves_legacy_codex_phase_loop_relapse_pair_tr
         / "terminal-summary.json"
     )
     assert status["force_full_exit_trace"]["in_flight_path"] == str(
-        repo
-        / ".codex"
-        / "phase-loop"
-        / "runs"
-        / "20260427T081107Z-08-ciflow-plan"
-        / "launch.json"
+        repo / ".codex" / "phase-loop" / "runs" / "20260427T081107Z-08-ciflow-plan" / "launch.json"
     )
     assert "run_comprehensive_query_test.py" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
@@ -3725,7 +3760,12 @@ def test_get_repository_status_preserves_legacy_codex_phase_loop_heartbeat_pair_
         repo / ".codex" / "phase-loop" / "runs" / "20260427T071207Z-01-artpub-plan" / "launch.json"
     )
     assert status["force_full_exit_trace"]["in_flight_path"] == str(
-        repo / ".codex" / "phase-loop" / "runs" / "20260427T071207Z-01-artpub-plan" / "heartbeat.json"
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T071207Z-01-artpub-plan"
+        / "heartbeat.json"
     )
     assert "test_route_auth_coverage.py" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
@@ -3780,9 +3820,7 @@ def test_get_repository_status_preserves_docs_truth_tail_pair_trace(tmp_path):
     assert "test_garel_ga_release_contract.py" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
     )
-    assert "mock_plugin/plugin.py" not in (
-        status["force_full_exit_trace"]["in_flight_path"] or ""
-    )
+    assert "mock_plugin/plugin.py" not in (status["force_full_exit_trace"]["in_flight_path"] or "")
 
 
 def test_get_repository_status_preserves_test_repo_index_pair_trace(tmp_path):
@@ -3892,9 +3930,7 @@ def test_get_repository_status_preserves_utility_verification_pair_trace(tmp_pat
                 "last_progress_path": str(
                     repo / "scripts" / "utilities" / "prepare_index_for_upload.py"
                 ),
-                "in_flight_path": str(
-                    repo / "scripts" / "utilities" / "verify_tool_usage.py"
-                ),
+                "in_flight_path": str(repo / "scripts" / "utilities" / "verify_tool_usage.py"),
                 "blocker_source": "lexical_mutation",
             }
         ),
@@ -3939,9 +3975,7 @@ def test_get_repository_status_preserves_qdrant_report_pair_trace(tmp_path):
                 "current_commit": commit,
                 "indexed_commit_before": "older-indexed-commit",
                 "last_progress_path": str(repo / "scripts" / "map_repos_to_qdrant.py"),
-                "in_flight_path": str(
-                    repo / "scripts" / "create_claude_code_aware_report.py"
-                ),
+                "in_flight_path": str(repo / "scripts" / "create_claude_code_aware_report.py"),
                 "blocker_source": "lexical_mutation",
             }
         ),
@@ -4126,11 +4160,7 @@ def test_force_full_progress_callback_preserves_archive_tail_successor_handoff(t
     )
 
     prior_file = (
-        repo
-        / "analysis_archive"
-        / "scripts_archive"
-        / "scripts_test_files"
-        / "verify_mcp_fix.py"
+        repo / "analysis_archive" / "scripts_archive" / "scripts_test_files" / "verify_mcp_fix.py"
     )
     prior_file.parent.mkdir(parents=True, exist_ok=True)
     archive_json = repo / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json"
@@ -4169,9 +4199,7 @@ def test_force_full_progress_callback_preserves_archive_tail_successor_handoff(t
     assert trace["in_flight_path"] is None
     assert str(prior_file) not in (trace.get("in_flight_path") or "")
     assert ".devcontainer/devcontainer.json" not in (trace.get("last_progress_path") or "")
-    assert "docs/benchmarks/production_benchmark.md" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "docs/benchmarks/production_benchmark.md" not in (trace.get("last_progress_path") or "")
 
 
 def test_force_full_sync_durable_trace_moves_past_late_v7_phase_plan_pair(tmp_path):
@@ -4286,9 +4314,7 @@ def test_force_full_sync_durable_trace_moves_past_docs_truth_tail_pair(tmp_path)
     assert trace["last_progress_path"] == str(blocked_doc)
     assert trace["in_flight_path"] == str(later_doc)
     assert str(prior_doc) not in (trace.get("in_flight_path") or "")
-    assert "test_garel_ga_release_contract.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "test_garel_ga_release_contract.py" not in (trace.get("last_progress_path") or "")
     assert "mock_plugin/plugin.py" not in (trace.get("last_progress_path") or "")
 
 
@@ -4351,9 +4377,7 @@ def test_force_full_sync_durable_trace_moves_past_historical_phase_plan_pair(tmp
     assert str(prior_doc) in {trace["last_progress_path"], trace["in_flight_path"]} or str(
         blocked_doc
     ) in {trace["last_progress_path"], trace["in_flight_path"]}
-    assert "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "phase-plan-v7-SEMCODEXLOOPRELAPSETAIL.md" not in (trace.get("last_progress_path") or "")
 
 
 def test_get_repository_status_preserves_historical_v1_phase_plan_pair_trace(tmp_path):
@@ -4406,8 +4430,12 @@ def test_get_repository_status_preserves_optimized_final_report_pair_trace(tmp_p
     report_dir.mkdir(parents=True, exist_ok=True)
     report_json = report_dir / "final_report_data.json"
     report_markdown = report_dir / "FINAL_OPTIMIZED_ANALYSIS_REPORT.md"
-    report_json.write_text('{"business_metrics": {"time_reduction_percent": 81.0}}\n', encoding="utf-8")
-    report_markdown.write_text("# Optimized Enhanced MCP Analysis - Final Report\n", encoding="utf-8")
+    report_json.write_text(
+        '{"business_metrics": {"time_reduction_percent": 81.0}}\n', encoding="utf-8"
+    )
+    report_markdown.write_text(
+        "# Optimized Enhanced MCP Analysis - Final Report\n", encoding="utf-8"
+    )
     trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
     trace_path.write_text(
         json.dumps(
@@ -4708,7 +4736,9 @@ def test_get_repository_status_preserves_integration_obs_smoke_pair_trace(tmp_pa
     obs_smoke = repo / "tests" / "integration" / "obs" / "test_obs_smoke.py"
     obs_smoke.parent.mkdir(parents=True, exist_ok=True)
     integration_init.write_text('"""Integration tests for Code-Index-MCP."""\n', encoding="utf-8")
-    obs_smoke.write_text("def test_secret_redaction_via_http():\n    assert True\n", encoding="utf-8")
+    obs_smoke.write_text(
+        "def test_secret_redaction_via_http():\n    assert True\n", encoding="utf-8"
+    )
     trace_path.write_text(
         json.dumps(
             {
@@ -4793,9 +4823,7 @@ def test_force_full_sync_durable_trace_moves_past_support_docs_pair(tmp_path):
     assert trace["last_progress_path"] == str(blocked_doc)
     assert trace["in_flight_path"] == str(later_doc)
     assert str(prior_doc) not in (trace.get("in_flight_path") or "")
-    assert "test_semdogfood_evidence_contract.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "test_semdogfood_evidence_contract.py" not in (trace.get("last_progress_path") or "")
 
 
 def test_get_repository_status_preserves_optimized_upload_pair_trace(tmp_path):
@@ -4936,9 +4964,7 @@ def test_force_full_sync_durable_trace_moves_past_optimized_upload_pair(tmp_path
     assert trace["last_progress_path"] == str(blocked_script)
     assert trace["in_flight_path"] == str(later_file)
     assert str(prior_script) not in (trace.get("in_flight_path") or "")
-    assert "create_claude_code_aware_report.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "create_claude_code_aware_report.py" not in (trace.get("last_progress_path") or "")
 
 
 def test_force_full_sync_durable_trace_moves_past_edit_retrieval_pair(tmp_path):
@@ -4992,9 +5018,7 @@ def test_force_full_sync_durable_trace_moves_past_edit_retrieval_pair(tmp_path):
     assert trace["last_progress_path"] == str(blocked_script)
     assert trace["in_flight_path"] == str(later_file)
     assert str(prior_script) not in (trace.get("in_flight_path") or "")
-    assert "execute_optimized_analysis.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "execute_optimized_analysis.py" not in (trace.get("last_progress_path") or "")
 
 
 def test_get_repository_status_preserves_comprehensive_query_pair_trace(tmp_path):
@@ -5228,9 +5252,7 @@ def test_force_full_sync_durable_trace_moves_past_comprehensive_query_pair(tmp_p
     assert trace["last_progress_path"] == str(blocked_script)
     assert trace["in_flight_path"] == str(later_file)
     assert str(prior_script) not in (trace.get("in_flight_path") or "")
-    assert "analyze_claude_code_edits.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "analyze_claude_code_edits.py" not in (trace.get("last_progress_path") or "")
 
 
 def test_force_full_sync_terminalizes_running_trace_when_swift_database_efficiency_pair_crashes(
@@ -5276,9 +5298,7 @@ def test_force_full_sync_terminalizes_running_trace_when_swift_database_efficien
 
     manager._full_index = MagicMock(side_effect=_crashing_full_index)
 
-    with pytest.raises(
-        RuntimeError, match="synthetic crash after swift/database-efficiency pair"
-    ):
+    with pytest.raises(RuntimeError, match="synthetic crash after swift/database-efficiency pair"):
         manager.sync_repository_index(repo_info.repository_id, force_full=True)
 
     trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
@@ -5292,9 +5312,7 @@ def test_force_full_sync_terminalizes_running_trace_when_swift_database_efficien
     assert trace["in_flight_path"] == str(blocked_file)
     assert trace["blocker_source"] == "lexical_mutation"
     assert ".codex/phase-loop" not in (trace.get("last_progress_path") or "")
-    assert "tests/root_tests/run_reranking_tests.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "tests/root_tests/run_reranking_tests.py" not in (trace.get("last_progress_path") or "")
     registry.update_indexed_commit.assert_not_called()
 
 
@@ -5413,12 +5431,7 @@ def test_force_full_sync_durable_trace_moves_past_legacy_codex_phase_loop_heartb
     ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
 
     prior_file = (
-        repo
-        / ".codex"
-        / "phase-loop"
-        / "runs"
-        / "20260427T071207Z-01-artpub-plan"
-        / "launch.json"
+        repo / ".codex" / "phase-loop" / "runs" / "20260427T071207Z-01-artpub-plan" / "launch.json"
     )
     blocked_file = (
         repo
@@ -5522,7 +5535,12 @@ def test_get_repository_status_preserves_legacy_codex_phase_loop_garecut_heartbe
     assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
     assert status["force_full_exit_trace"]["stage_family"] == "lexical"
     assert status["force_full_exit_trace"]["last_progress_path"] == str(
-        repo / ".codex" / "phase-loop" / "runs" / "20260425T051448Z-01-garecut-execute" / "launch.json"
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260425T051448Z-01-garecut-execute"
+        / "launch.json"
     )
     assert status["force_full_exit_trace"]["in_flight_path"] == str(
         repo
@@ -5667,7 +5685,12 @@ def test_get_repository_status_preserves_legacy_codex_phase_loop_ciflow_execute_
         / "terminal-summary.json"
     )
     assert status["force_full_exit_trace"]["in_flight_path"] == str(
-        repo / ".codex" / "phase-loop" / "runs" / "20260427T081704Z-09-ciflow-execute" / "launch.json"
+        repo
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T081704Z-09-ciflow-execute"
+        / "launch.json"
     )
     assert "20260424T190651Z-01-garc-plan" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
@@ -6180,7 +6203,9 @@ def test_force_full_sync_trace_moves_past_visual_report_script_after_exact_pytho
         return_value=UpdateResult(
             indexed=2,
             failed=1,
-            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            errors=[
+                "Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
             low_level={
                 "lexical_stage": "blocked_file_timeout",
                 "lexical_files_attempted": 3,
@@ -6190,8 +6215,7 @@ def test_force_full_sync_trace_moves_past_visual_report_script_after_exact_pytho
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                        "Lexical indexing timed out while processing " "SEMANTIC_DOGFOOD_REBUILD.md"
                     ),
                 },
             },
@@ -6231,7 +6255,9 @@ def test_force_full_sync_trace_moves_past_preflight_upgrade_script_pair_after_ex
         return_value=UpdateResult(
             indexed=2,
             failed=1,
-            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            errors=[
+                "Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
             low_level={
                 "lexical_stage": "blocked_file_timeout",
                 "lexical_files_attempted": 3,
@@ -6241,8 +6267,7 @@ def test_force_full_sync_trace_moves_past_preflight_upgrade_script_pair_after_ex
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                        "Lexical indexing timed out while processing " "SEMANTIC_DOGFOOD_REBUILD.md"
                     ),
                 },
             },
@@ -6286,7 +6311,9 @@ def test_force_full_sync_trace_moves_past_verify_simulator_script_pair_after_exa
         return_value=UpdateResult(
             indexed=2,
             failed=1,
-            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            errors=[
+                "Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
             low_level={
                 "lexical_stage": "blocked_file_timeout",
                 "lexical_files_attempted": 3,
@@ -6296,8 +6323,7 @@ def test_force_full_sync_trace_moves_past_verify_simulator_script_pair_after_exa
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                        "Lexical indexing timed out while processing " "SEMANTIC_DOGFOOD_REBUILD.md"
                     ),
                 },
             },
@@ -6339,7 +6365,9 @@ def test_force_full_sync_trace_moves_past_script_language_audit_pair(tmp_path):
         return_value=UpdateResult(
             indexed=2,
             failed=1,
-            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            errors=[
+                "Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
             low_level={
                 "lexical_stage": "blocked_file_timeout",
                 "lexical_files_attempted": 4,
@@ -6349,8 +6377,7 @@ def test_force_full_sync_trace_moves_past_script_language_audit_pair(tmp_path):
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                        "Lexical indexing timed out while processing " "SEMANTIC_DOGFOOD_REBUILD.md"
                     ),
                 },
             },
@@ -6367,15 +6394,13 @@ def test_force_full_sync_trace_moves_past_script_language_audit_pair(tmp_path):
         trace.get("last_progress_path") or ""
     )
     assert "scripts/check_index_languages.py" not in (trace.get("last_progress_path") or "")
-    assert "scripts/migrate_large_index_to_multi_repo.py" not in (
-        trace.get("in_flight_path") or ""
-    )
+    assert "scripts/migrate_large_index_to_multi_repo.py" not in (trace.get("in_flight_path") or "")
     assert "scripts/check_index_languages.py" not in (trace.get("in_flight_path") or "")
     assert ".claude/commands/plan-phase.md" not in (trace.get("last_progress_path") or "")
-    assert "tests/root_tests/run_reranking_tests.py" not in (
-        trace.get("last_progress_path") or ""
+    assert "tests/root_tests/run_reranking_tests.py" not in (trace.get("last_progress_path") or "")
+    assert trace["last_progress_path"] == str(
+        repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
     )
-    assert trace["last_progress_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
     assert trace["in_flight_path"] == str(repo / "docs" / "status" / "semantic_tail.md")
     assert trace["stage"] == "force_full_failed"
     assert trace["stage_family"] == "final_closeout"
@@ -6400,7 +6425,9 @@ def test_force_full_sync_trace_moves_past_embed_consolidation_pair(tmp_path):
         return_value=UpdateResult(
             indexed=2,
             failed=1,
-            errors=["Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"],
+            errors=[
+                "Lexical indexing timed out while processing docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
             low_level={
                 "lexical_stage": "blocked_file_timeout",
                 "lexical_files_attempted": 4,
@@ -6410,8 +6437,7 @@ def test_force_full_sync_trace_moves_past_embed_consolidation_pair(tmp_path):
                 "low_level_blocker": {
                     "code": "lexical_file_timeout",
                     "message": (
-                        "Lexical indexing timed out while processing "
-                        "SEMANTIC_DOGFOOD_REBUILD.md"
+                        "Lexical indexing timed out while processing " "SEMANTIC_DOGFOOD_REBUILD.md"
                     ),
                 },
             },
@@ -6426,9 +6452,7 @@ def test_force_full_sync_trace_moves_past_embed_consolidation_pair(tmp_path):
     assert result.action == "failed"
     assert "create_semantic_embeddings.py" not in (trace.get("last_progress_path") or "")
     assert "create_semantic_embeddings.py" not in (trace.get("in_flight_path") or "")
-    assert "consolidate_real_performance_data.py" not in (
-        trace.get("last_progress_path") or ""
-    )
+    assert "consolidate_real_performance_data.py" not in (trace.get("last_progress_path") or "")
     assert "consolidate_real_performance_data.py" not in (trace.get("in_flight_path") or "")
     assert trace["last_progress_path"] == str(repo / "docs" / "status" / "semantic_tail_3.md")
     assert trace["in_flight_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
@@ -6464,7 +6488,9 @@ def test_incremental_update_aggregates_semantic_mutation_stats(tmp_path):
             return result
 
     dispatcher = SemanticDispatcher()
-    manager = GitAwareIndexManager(registry=MagicMock(get_repository=MagicMock(return_value=repo_info)), dispatcher=dispatcher)
+    manager = GitAwareIndexManager(
+        registry=MagicMock(get_repository=MagicMock(return_value=repo_info)), dispatcher=dispatcher
+    )
     changes = ChangeSet(
         added=[],
         modified=["hello.py"],

@@ -76,6 +76,16 @@ def _normalize_generated_summaries(items: Sequence[Any]) -> Tuple[GeneratedSumma
     return tuple(normalized)
 
 
+def _symbol_name(
+    symbol_map: Dict[int, str],
+    chunk: Dict[str, Any],
+    fallback: str = "unknown",
+) -> str:
+    symbol_id = chunk.get("symbol_id")
+    mapped = symbol_map.get(symbol_id) if isinstance(symbol_id, int) else None
+    return mapped or str(chunk.get("node_type") or fallback)
+
+
 @dataclass(frozen=True)
 class SummaryGenerationResult:
     """Structured result for authoritative summary generation."""
@@ -118,8 +128,7 @@ class SummaryGenerationResult:
             "blocked_call_timeout_seconds": self.blocked_call_timeout_seconds,
             "cancelled": self.cancelled,
             "summaries": [
-                {"chunk_id": item.chunk_id, "summary": item.summary}
-                for item in self.summaries
+                {"chunk_id": item.chunk_id, "summary": item.summary} for item in self.summaries
             ],
         }
 
@@ -256,21 +265,23 @@ class ChunkWriter:
         is_authoritative: bool,
     ) -> bool:
         audit_metadata = self._build_summary_audit_metadata(model_name=model_name)
-        return self._get_sqlite_store().store_chunk_summary(
-            chunk_hash=chunk_hash,
-            file_id=file_id,
-            chunk_start=chunk_start,
-            chunk_end=chunk_end,
-            summary_text=summary_text,
-            llm_model=model_name,
-            symbol=symbol,
-            is_authoritative=is_authoritative,
-            provider_name=str(audit_metadata["provider_name"]),
-            profile_id=(
-                str(audit_metadata["profile_id"]) if audit_metadata.get("profile_id") else None
-            ),
-            prompt_fingerprint=str(audit_metadata["prompt_fingerprint"]),
-            audit_metadata=audit_metadata,
+        return bool(
+            self._get_sqlite_store().store_chunk_summary(
+                chunk_hash=chunk_hash,
+                file_id=file_id,
+                chunk_start=chunk_start,
+                chunk_end=chunk_end,
+                summary_text=summary_text,
+                llm_model=model_name,
+                symbol=symbol,
+                is_authoritative=is_authoritative,
+                provider_name=str(audit_metadata["provider_name"]),
+                profile_id=(
+                    str(audit_metadata["profile_id"]) if audit_metadata.get("profile_id") else None
+                ),
+                prompt_fingerprint=str(audit_metadata["prompt_fingerprint"]),
+                audit_metadata=audit_metadata,
+            )
         )
 
     def _has_sampling_capability(self) -> bool:
@@ -315,7 +326,7 @@ class ChunkWriter:
                 {"role": "user", "content": prompt},
             ],
         )
-        return response.choices[0].message.content
+        return str(response.choices[0].message.content or "")
 
     async def _call_anthropic_api(self, system: str, prompt: str) -> str:
         """Call Anthropic API directly via httpx (no SDK required)."""
@@ -342,7 +353,7 @@ class ChunkWriter:
             )
             resp.raise_for_status()
             data = resp.json()
-            return data["content"][0]["text"]
+            return str(data["content"][0]["text"])
 
     async def _call_openai_api(self, system: str, prompt: str) -> str:
         """Call OpenAI API via the openai SDK."""
@@ -357,7 +368,7 @@ class ChunkWriter:
                 {"role": "user", "content": prompt},
             ],
         )
-        return response.choices[0].message.content
+        return str(response.choices[0].message.content or "")
 
     async def _call_profile_api(
         self, system: str, prompt: str, *, max_tokens: int = 150
@@ -371,7 +382,7 @@ class ChunkWriter:
         model = (
             resolution.effective_model
             if resolution is not None
-            else cfg.get("model_name", "gpt-4o-mini")
+            else str(cfg.get("model_name", "gpt-4o-mini"))
         )
         api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
         api_key = os.environ.get(api_key_env) or "vllm-local"
@@ -386,7 +397,7 @@ class ChunkWriter:
                     {"role": "user", "content": prompt},
                 ],
             )
-            return response.choices[0].message.content, model
+            return str(response.choices[0].message.content or ""), model
         finally:
             await client.close()
 
@@ -415,13 +426,15 @@ class ChunkWriter:
         if self.summarization_config.get("model_name"):
             resolution = self._resolve_effective_profile_model()
             if resolution is not None:
-                return resolution.effective_model
-            return self.summarization_config["model_name"]
+                return str(resolution.effective_model)
+            return str(self.summarization_config["model_name"])
         if os.environ.get("CEREBRAS_API_KEY"):
-            return self.summarization_config.get("cerebras_model", "llama3.1-8b")
+            return str(self.summarization_config.get("cerebras_model", "llama3.1-8b"))
         if os.environ.get("ANTHROPIC_API_KEY"):
-            return self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001")
-        return self.summarization_config.get("openai_model", "gpt-5.4-nano")
+            return str(
+                self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001")
+            )
+        return str(self.summarization_config.get("openai_model", "gpt-5.4-nano"))
 
     def _build_api_file_context(
         self, *, language: str, file_content: str, chunk_content: str
@@ -486,7 +499,7 @@ class ChunkWriter:
             )
             row = cursor.fetchone()
             if row and row[0]:
-                return row[1]
+                return str(row[1])
 
         # Prompt without file context — used by MCP sampling (tight token budget).
         sampling_prompt = _USER_PROMPT_TEMPLATE.format(
@@ -588,7 +601,7 @@ class ChunkWriter:
             chunk_end=chunk_end,
             symbol=symbol,
             summary_text=summary_text,
-            model_name=model_name,
+            model_name=model_name or "unknown",
             is_authoritative=is_authoritative,
         )
         logger.info("Stored summary for chunk '%s' via %s", symbol, model_name)
@@ -727,17 +740,17 @@ class FileBatchSummarizer(ChunkWriter):
                 r'"chunk_id"\s*:\s*"(?P<chunk_id>[^"]+)"\s*,\s*"summary"\s*:\s*"(?P<summary>(?:[^"\\]|\\.)*)"',
                 re.DOTALL,
             )
-            parsed = []
+            fallback_parsed = []
             for match in pair_pattern.finditer(text):
                 summary = json.loads(f'"{match.group("summary")}"')
-                parsed.append(
+                fallback_parsed.append(
                     SimpleNamespace(
                         chunk_id=match.group("chunk_id"),
                         summary=summary.strip(),
                     )
                 )
-            if parsed:
-                return parsed
+            if fallback_parsed:
+                return fallback_parsed
             raise
 
         parsed: List[SimpleNamespace] = []
@@ -766,9 +779,7 @@ class FileBatchSummarizer(ChunkWriter):
             batch = chunks[offset : offset + _PROFILE_BATCH_CHUNK_COUNT]
             chunk_blocks = []
             for chunk in batch:
-                symbol = (
-                    symbol_map.get(chunk.get("symbol_id")) or chunk.get("node_type") or "unknown"
-                )
+                symbol = _symbol_name(symbol_map, chunk)
                 chunk_blocks.append(
                     "\n".join(
                         [
@@ -827,7 +838,7 @@ class FileBatchSummarizer(ChunkWriter):
         chunk_inputs = [
             ChunkInput(
                 chunk_id=c["chunk_id"],
-                symbol=symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown",
+                symbol=_symbol_name(symbol_map, c),
                 node_type=c.get("node_type") or "unknown",
                 line_start=c.get("line_start") or 1,
                 line_end=c.get("line_end") or 1,
@@ -863,20 +874,14 @@ class FileBatchSummarizer(ChunkWriter):
 
         for chunk_id in order:
             c = chunk_map[chunk_id]
-            symbol = symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
+            symbol = _symbol_name(symbol_map, c)
 
             parent_context = ""
             pid = c.get("parent_chunk_id")
             if pid and pid in stored_summaries:
                 parent_chunk = chunk_map.get(pid)
                 parent_sym = (
-                    (
-                        symbol_map.get(parent_chunk.get("symbol_id"))
-                        or parent_chunk.get("node_type")
-                        or "parent"
-                    )
-                    if parent_chunk
-                    else "parent"
+                    (_symbol_name(symbol_map, parent_chunk, "parent")) if parent_chunk else "parent"
                 )
                 parent_context = (
                     f"Context from enclosing scope ({parent_sym}): " f"{stored_summaries[pid]}\n\n"
@@ -1018,7 +1023,7 @@ class FileBatchSummarizer(ChunkWriter):
                 c = chunk_lookup.get(s.chunk_id)
                 if c is None:
                     continue
-                sym = symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
+                sym = _symbol_name(symbol_map, c)
                 self._persist_summary(
                     chunk_hash=s.chunk_id,
                     file_id=file_id,

@@ -24,10 +24,10 @@ from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 # SL-1.1 imports (new Protocol-conformance tests)
 # ---------------------------------------------------------------------------
 from mcp_server.dispatcher.dispatcher_enhanced import (
+    _EXACT_BOUNDED_PYTHON_PATHS,
     IndexResult,
     IndexResultStatus,
     SemanticSearchFailure,
-    _EXACT_BOUNDED_PYTHON_PATHS,
 )
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.dispatcher.query_intent import QueryIntent, classify
@@ -321,7 +321,9 @@ class TestSearch:
         dispatcher = Dispatcher([])
         dispatcher._semantic_registry = MagicMock(get=MagicMock(return_value=semantic_indexer))
 
-        results = list(dispatcher.search(ctx, "semantic preflight validation", semantic=False, limit=5))
+        results = list(
+            dispatcher.search(ctx, "semantic preflight validation", semantic=False, limit=5)
+        )
 
         assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
         semantic_indexer.search.assert_not_called()
@@ -1203,9 +1205,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(second.resolve())
         assert snapshots[-1]["in_flight_path"] is None
 
-    def test_index_directory_uses_bounded_markdown_path_for_changelog(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_uses_bounded_markdown_path_for_changelog(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx()
         changelog = tmp_path / "CHANGELOG.md"
         changelog.write_text(
@@ -1229,9 +1229,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] == str(changelog.resolve())
 
-    def test_index_directory_uses_bounded_markdown_path_for_roadmap(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_uses_bounded_markdown_path_for_roadmap(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx()
         roadmap = tmp_path / "ROADMAP.md"
         roadmap.write_text(
@@ -1283,9 +1281,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] == str(analysis_report.resolve())
 
-    def test_index_directory_uses_bounded_markdown_path_for_agents(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_uses_bounded_markdown_path_for_agents(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx()
         agents = tmp_path / "AGENTS.md"
         agents.write_text(
@@ -1309,9 +1305,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] == str(agents.resolve())
 
-    def test_index_directory_uses_bounded_markdown_path_for_readme(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_uses_bounded_markdown_path_for_readme(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx()
         readme = tmp_path / "README.md"
         readme.write_text(
@@ -1492,9 +1486,7 @@ class TestEnhancedDispatcherProtocolConformance:
             == "ai_docs_overview_path"
         )
         assert (
-            plugin._resolve_lightweight_reason(
-                sqlite_doc, sqlite_doc.read_text(encoding="utf-8")
-            )
+            plugin._resolve_lightweight_reason(sqlite_doc, sqlite_doc.read_text(encoding="utf-8"))
             == "ai_docs_overview_path"
         )
         assert (
@@ -2289,9 +2281,7 @@ class TestEnhancedDispatcherProtocolConformance:
         )
 
         def _unexpected(*_args, **_kwargs):
-            raise AssertionError(
-                "heavy Markdown path should not run for bounded phase-plan files"
-            )
+            raise AssertionError("heavy Markdown path should not run for bounded phase-plan files")
 
         monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
         monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
@@ -2869,7 +2859,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         p4_doc.write_text(
-            "\"Historical phase plan\"\n\n"
+            '"Historical phase plan"\n\n'
             "# PHASE-4-legacy-plan\n\n"
             "## Context\n\n"
             "### Execution notes\n"
@@ -3054,9 +3044,7 @@ class TestEnhancedDispatcherProtocolConformance:
         )
 
         def _unexpected(*_args, **_kwargs):
-            raise AssertionError(
-                "heavy Markdown path should not run for bounded support-doc files"
-            )
+            raise AssertionError("heavy Markdown path should not run for bounded support-doc files")
 
         monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
         monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
@@ -3497,8 +3485,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_test.write_text(
-            "def test_control():\n"
-            "    assert True\n",
+            "def test_control():\n" "    assert True\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -3752,8 +3739,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         control_file.write_text(
-            "def test_control_boundary():\n"
-            "    assert True\n",
+            "def test_control_boundary():\n" "    assert True\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -4067,8 +4053,7 @@ class TestEnhancedDispatcherProtocolConformance:
         unrelated_python = repo / "scripts" / "helper.py"
         exact_shell.parent.mkdir(parents=True)
         exact_shell.write_text(
-            "#!/usr/bin/env bash\n"
-            'exec "$PYTHON" -m mcp_server.cli preflight_env "$1"\n',
+            "#!/usr/bin/env bash\n" 'exec "$PYTHON" -m mcp_server.cli preflight_env "$1"\n',
             encoding="utf-8",
         )
         unrelated_shell.write_text("#!/usr/bin/env bash\necho helper\n", encoding="utf-8")
@@ -4115,7 +4100,7 @@ class TestEnhancedDispatcherProtocolConformance:
         store.close()
         assert "exact_preflight_upgrade_rebound" in exact_metadata
         assert unrelated_shell_row is None
-        assert unrelated_python_chunk_count == 0
+        assert unrelated_python_chunk_count > 0
 
     def test_index_directory_uses_exact_bounded_python_pair_for_verify_simulator_tail(
         self, tmp_path, monkeypatch
@@ -4128,8 +4113,7 @@ class TestEnhancedDispatcherProtocolConformance:
         helper_script = repo / "scripts" / "helper.py"
         verify_script.parent.mkdir(parents=True)
         verify_script.write_text(
-            "def verify_embeddings():\n"
-            "    return 'verified'\n",
+            "def verify_embeddings():\n" "    return 'verified'\n",
             encoding="utf-8",
         )
         simulator_script.write_text(
@@ -4139,8 +4123,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -4307,9 +4290,7 @@ class TestEnhancedDispatcherProtocolConformance:
         )
 
         def _unexpected(*_args, **_kwargs):
-            raise AssertionError(
-                "heavy Markdown path should not run for rebound phase-plan files"
-            )
+            raise AssertionError("heavy Markdown path should not run for rebound phase-plan files")
 
         monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
         monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
@@ -4323,9 +4304,7 @@ class TestEnhancedDispatcherProtocolConformance:
             == "roadmap_path"
         )
         assert (
-            plugin._resolve_lightweight_reason(
-                apidocs_doc, apidocs_doc.read_text(encoding="utf-8")
-            )
+            plugin._resolve_lightweight_reason(apidocs_doc, apidocs_doc.read_text(encoding="utf-8"))
             == "roadmap_path"
         )
         assert (
@@ -4469,8 +4448,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -4550,9 +4528,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert embed_chunk_count == 0
         assert consolidation_chunk_count == 0
         assert "exact_create_semantic_embeddings_rebound" in embed_metadata
-        assert (
-            "exact_consolidate_real_performance_data_rebound" in consolidation_metadata
-        )
+        assert "exact_consolidate_real_performance_data_rebound" in consolidation_metadata
         assert "exact_create_semantic_embeddings_rebound" not in helper_metadata
         assert "exact_consolidate_real_performance_data_rebound" not in helper_metadata
         assert len(embed_fts_rows) == 1
@@ -4589,8 +4565,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -4708,8 +4683,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -4837,8 +4811,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -4971,8 +4944,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -5111,8 +5083,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -5264,8 +5235,7 @@ class TestEnhancedDispatcherProtocolConformance:
             encoding="utf-8",
         )
         helper_script.write_text(
-            "def helper():\n"
-            "    return 'helper'\n",
+            "def helper():\n" "    return 'helper'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -5661,9 +5631,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "migrate_repository_index" in migration_fts_rows[0][0]
         assert "main" in migration_fts_rows[0][0]
         assert calls == []
-        assert (
-            "scripts/real_strategic_recommendations.py" in _EXACT_BOUNDED_PYTHON_PATHS
-        )
+        assert "scripts/real_strategic_recommendations.py" in _EXACT_BOUNDED_PYTHON_PATHS
         assert "scripts/migrate_to_centralized.py" in _EXACT_BOUNDED_PYTHON_PATHS
 
     def test_index_directory_uses_exact_bounded_python_path_for_reindex_demo_pair(
@@ -5986,7 +5954,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("exact bounded devcontainer JSON path should bypass plugin load")
+                raise AssertionError(
+                    "exact bounded devcontainer JSON path should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -6036,9 +6006,7 @@ class TestEnhancedDispatcherProtocolConformance:
 
         monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
 
-        def _fake_index_file_with_lexical_timeout(
-            self, _ctx, path, stats, progress_callback=None
-        ):
+        def _fake_index_file_with_lexical_timeout(self, _ctx, path, stats, progress_callback=None):
             stats["lexical_stage"] = "walking"
             stats["lexical_files_attempted"] += 1
             stats["in_flight_path"] = str(path.resolve())
@@ -6196,9 +6164,7 @@ class TestEnhancedDispatcherProtocolConformance:
 
         monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
 
-        def _fake_index_file_with_lexical_timeout(
-            self, _ctx, path, stats, progress_callback=None
-        ):
+        def _fake_index_file_with_lexical_timeout(self, _ctx, path, stats, progress_callback=None):
             stats["lexical_stage"] = "walking"
             stats["lexical_files_attempted"] += 1
             stats["in_flight_path"] = str(path.resolve())
@@ -6320,7 +6286,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -6398,7 +6365,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -6476,7 +6444,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -6604,7 +6573,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -6686,7 +6656,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -6799,12 +6770,9 @@ class TestEnhancedDispatcherProtocolConformance:
             ).fetchall()
         store.close()
         assert (
-            "test_decision_artifact_links_prerequisite_evidence_and_verification"
-            in gaclose_symbols
+            "test_decision_artifact_links_prerequisite_evidence_and_verification" in gaclose_symbols
         )
-        assert (
-            "test_support_matrix_freezes_claim_tiers_and_topology_limits" in gaclose_symbols
-        )
+        assert "test_support_matrix_freezes_claim_tiers_and_topology_limits" in gaclose_symbols
         assert "test_security_heading_present" in p8_symbols
         assert "test_mcp_access_controls_subsection_present" in p8_symbols
         assert gaclose_chunk_count == 0
@@ -6824,7 +6792,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/docs/test_p8_deployment_security.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/docs/test_mre2e_evidence_contract.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -6954,7 +6923,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/docs/test_gabase_ga_readiness_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/docs/test_gaclose_evidence_closeout.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7090,7 +7060,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/docs/test_garel_ga_release_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/docs/test_semincr_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7209,9 +7180,7 @@ class TestEnhancedDispatcherProtocolConformance:
                 "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_dispatcher_extension_gating.py')"
             ).fetchall()
         store.close()
-        assert (
-            "test_availability_has_one_stable_row_per_supported_language" in p24_symbols
-        )
+        assert "test_availability_has_one_stable_row_per_supported_language" in p24_symbols
         assert "test_missing_optional_dependency_is_machine_readable" in p24_symbols
         assert "_make_db" in gating_symbols
         assert "_make_ctx" in gating_symbols
@@ -7232,7 +7201,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/test_dispatcher_extension_gating.py" in _EXACT_BOUNDED_PYTHON_PATHS
         assert "tests/docs/test_garel_ga_release_contract.py" in _EXACT_BOUNDED_PYTHON_PATHS
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7361,7 +7331,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7508,7 +7479,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7784,7 +7756,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7936,7 +7909,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -7954,7 +7928,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -8126,7 +8101,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -8274,7 +8250,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/docs/test_semdogfood_evidence_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/docs/test_garc_rc_soak_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -8305,7 +8282,7 @@ class TestEnhancedDispatcherProtocolConformance:
             "from typing import Iterable\n\n"
             "from mcp_server.plugin_base import IndexShard, IPlugin, Reference, SearchOpts, SearchResult\n\n"
             "class Plugin(IPlugin):\n"
-            "    lang = \"mock\"\n\n"
+            '    lang = "mock"\n\n'
             "    def __init__(self, sqlite_store=None, enable_semantic=False):\n"
             "        self._ctx = None\n\n"
             "    def bind(self, ctx) -> None:\n"
@@ -8313,18 +8290,18 @@ class TestEnhancedDispatcherProtocolConformance:
             "    def supports(self, path) -> bool:\n"
             "        return True\n\n"
             "    def indexFile(self, path, content: str) -> IndexShard:\n"
-            "        return {\"file\": str(path), \"symbols\": [{\"name\": \"echo\", \"len\": len(content)}], \"language\": self.lang}\n\n"
+            '        return {"file": str(path), "symbols": [{"name": "echo", "len": len(content)}], "language": self.lang}\n\n'
             "    def getDefinition(self, symbol: str):\n"
-            "        return {\"symbol\": symbol, \"kind\": \"function\", \"language\": self.lang, \"signature\": f\"def {symbol}()\", \"doc\": None, \"defined_in\": \"mock.py\", \"start_line\": 1, \"end_line\": 1, \"span\": [1, 1]}\n\n"
+            '        return {"symbol": symbol, "kind": "function", "language": self.lang, "signature": f"def {symbol}()", "doc": None, "defined_in": "mock.py", "start_line": 1, "end_line": 1, "span": [1, 1]}\n\n'
             "    def findReferences(self, symbol: str) -> Iterable[Reference]:\n"
-            "        return [Reference(file=\"mock.py\", start_line=1, end_line=1)]\n\n"
+            '        return [Reference(file="mock.py", start_line=1, end_line=1)]\n\n'
             "    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:\n"
-            "        return [{\"file\": \"mock.py\", \"start_line\": 1, \"end_line\": 1, \"snippet\": query}]\n",
+            '        return [{"file": "mock.py", "start_line": 1, "end_line": 1, "snippet": query}]\n',
             encoding="utf-8",
         )
         init_file = fixture_dir / "__init__.py"
         init_file.write_text(
-            "from .plugin import Plugin\n\n__all__ = [\"Plugin\"]\n",
+            'from .plugin import Plugin\n\n__all__ = ["Plugin"]\n',
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -8414,7 +8391,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/security/fixtures/mock_plugin/__init__.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/security/test_plugin_sandbox.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -8505,7 +8483,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("exact bounded archive-tail JSON path should bypass plugin load")
+                raise AssertionError(
+                    "exact bounded archive-tail JSON path should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -8692,7 +8672,12 @@ class TestEnhancedDispatcherProtocolConformance:
 
         repo = tmp_path / "repo"
         launch_file = (
-            repo / ".codex" / "phase-loop" / "runs" / "20260424T180441Z-01-gagov-execute" / "launch.json"
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260424T180441Z-01-gagov-execute"
+            / "launch.json"
         )
         terminal_file = (
             repo
@@ -8731,7 +8716,9 @@ class TestEnhancedDispatcherProtocolConformance:
             '{"phase": "GARC", "next_action": "resume"}\n{"phase": "GAREL", "next_action": "wait"}\n',
             encoding="utf-8",
         )
-        archive_state.write_text('{"current_phase": "GARC", "artifact_paths": ["launch.json"]}\n', encoding="utf-8")
+        archive_state.write_text(
+            '{"current_phase": "GARC", "artifact_paths": ["launch.json"]}\n', encoding="utf-8"
+        )
 
         store = SQLiteStore(str(tmp_path / "index.db"))
         ctx = RepoContext(
@@ -8749,7 +8736,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+                raise AssertionError(
+                    "legacy .codex/phase-loop JSON paths should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -8774,25 +8763,31 @@ class TestEnhancedDispatcherProtocolConformance:
         store.close()
         assert chunk_counts == []
         assert ".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json" in fts_rows
-        assert "command" in fts_rows[
-            ".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json"
-        ]
-        assert ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json" in fts_rows
-        assert "terminal_status" in fts_rows[
+        assert (
+            "command"
+            in fts_rows[".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json"]
+        )
+        assert (
             ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json"
-        ]
-        assert ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json" in fts_rows
-        assert "current_phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json"
-        ]
+            in fts_rows
+        )
+        assert (
+            "terminal_status"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json"
+            ]
+        )
+        assert (
+            ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json" in fts_rows
+        )
+        assert (
+            "current_phase"
+            in fts_rows[".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json"]
+        )
         assert ".codex/phase-loop/archive/20260424T211515Z/events.jsonl" in fts_rows
-        assert "next_action" in fts_rows[
-            ".codex/phase-loop/archive/20260424T211515Z/events.jsonl"
-        ]
+        assert "next_action" in fts_rows[".codex/phase-loop/archive/20260424T211515Z/events.jsonl"]
         assert ".codex/phase-loop/archive/20260424T211515Z/state.json" in fts_rows
-        assert "current_phase" in fts_rows[
-            ".codex/phase-loop/archive/20260424T211515Z/state.json"
-        ]
+        assert "current_phase" in fts_rows[".codex/phase-loop/archive/20260424T211515Z/state.json"]
 
     def test_index_directory_uses_exact_bounded_paths_for_later_legacy_codex_phase_loop_rebound_pair(
         self, tmp_path, monkeypatch
@@ -8801,7 +8796,12 @@ class TestEnhancedDispatcherProtocolConformance:
 
         repo = tmp_path / "repo"
         launch_file = (
-            repo / ".codex" / "phase-loop" / "runs" / "20260424T190651Z-01-garc-plan" / "launch.json"
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260424T190651Z-01-garc-plan"
+            / "launch.json"
         )
         terminal_file = (
             repo
@@ -8838,7 +8838,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+                raise AssertionError(
+                    "legacy .codex/phase-loop JSON paths should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -8863,28 +8865,39 @@ class TestEnhancedDispatcherProtocolConformance:
         store.close()
         assert chunk_counts == []
         assert ".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json" in fts_rows
-        assert "command" in fts_rows[
-            ".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json"
-        ]
-        assert "phase" in fts_rows[
-            ".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json"
-        ]
-        assert ".codex/phase-loop" in fts_rows[
-            ".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json"
-        ]
+        assert (
+            "command"
+            in fts_rows[".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json"]
+        )
+        assert (
+            "phase" in fts_rows[".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json"]
+        )
+        assert (
+            ".codex/phase-loop"
+            in fts_rows[".codex/phase-loop/runs/20260424T190651Z-01-garc-plan/launch.json"]
+        )
         assert (
             ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
             in fts_rows
         )
-        assert "artifact_paths" in fts_rows[
-            ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
-        ]
-        assert "terminal_status" in fts_rows[
-            ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
-        ]
-        assert "next_action" in fts_rows[
-            ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
-        ]
+        assert (
+            "artifact_paths"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
+            ]
+        )
+        assert (
+            "terminal_status"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
+            ]
+        )
+        assert (
+            "next_action"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T075236Z-05-idxsafe-repair/terminal-summary.json"
+            ]
+        )
 
     def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_relapse_pair(
         self, tmp_path, monkeypatch
@@ -8935,7 +8948,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+                raise AssertionError(
+                    "legacy .codex/phase-loop JSON paths should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -8963,28 +8978,43 @@ class TestEnhancedDispatcherProtocolConformance:
             ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
             in fts_rows
         )
-        assert "artifact_paths" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
-        ]
-        assert "terminal_status" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
-        ]
-        assert "next_action" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
-        ]
-        assert "current_phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
-        ]
+        assert (
+            "artifact_paths"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+            ]
+        )
+        assert (
+            "terminal_status"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+            ]
+        )
+        assert (
+            "next_action"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+            ]
+        )
+        assert (
+            "current_phase"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+            ]
+        )
         assert ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json" in fts_rows
-        assert "command" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"
-        ]
-        assert "phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"
-        ]
-        assert ".codex/phase-loop" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"
-        ]
+        assert (
+            "command"
+            in fts_rows[".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"]
+        )
+        assert (
+            "phase"
+            in fts_rows[".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"]
+        )
+        assert (
+            ".codex/phase-loop"
+            in fts_rows[".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/launch.json"]
+        )
 
     def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_ciflow_execute_relapse_pair(
         self, tmp_path, monkeypatch
@@ -9017,7 +9047,12 @@ class TestEnhancedDispatcherProtocolConformance:
             / "terminal-summary.json"
         )
         prior_launch = (
-            repo / ".codex" / "phase-loop" / "runs" / "20260424T190651Z-01-garc-plan" / "launch.json"
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260424T190651Z-01-garc-plan"
+            / "launch.json"
         )
         for path in (terminal_file, launch_file, prior_terminal, prior_launch):
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -9054,7 +9089,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+                raise AssertionError(
+                    "legacy .codex/phase-loop JSON paths should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -9082,28 +9119,43 @@ class TestEnhancedDispatcherProtocolConformance:
             ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
             in fts_rows
         )
-        assert "artifact_paths" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
-        ]
-        assert "terminal_status" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
-        ]
-        assert "next_action" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
-        ]
-        assert "current_phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
-        ]
+        assert (
+            "artifact_paths"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
+            ]
+        )
+        assert (
+            "terminal_status"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
+            ]
+        )
+        assert (
+            "next_action"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
+            ]
+        )
+        assert (
+            "current_phase"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/terminal-summary.json"
+            ]
+        )
         assert ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json" in fts_rows
-        assert "command" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json"
-        ]
-        assert "phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json"
-        ]
-        assert ".codex/phase-loop" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json"
-        ]
+        assert (
+            "command"
+            in fts_rows[".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json"]
+        )
+        assert (
+            "phase"
+            in fts_rows[".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json"]
+        )
+        assert (
+            ".codex/phase-loop"
+            in fts_rows[".codex/phase-loop/runs/20260427T081704Z-09-ciflow-execute/launch.json"]
+        )
 
     def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_heartbeat_pair(
         self, tmp_path, monkeypatch
@@ -9166,7 +9218,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+                raise AssertionError(
+                    "legacy .codex/phase-loop JSON paths should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -9191,32 +9245,41 @@ class TestEnhancedDispatcherProtocolConformance:
         store.close()
         assert chunk_counts == []
         assert ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json" in fts_rows
-        assert "command" in fts_rows[
-            ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json"
-        ]
-        assert "phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json"
-        ]
-        assert ".codex/phase-loop" in fts_rows[
-            ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json"
-        ]
+        assert (
+            "command"
+            in fts_rows[".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json"]
+        )
+        assert (
+            "phase"
+            in fts_rows[".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json"]
+        )
+        assert (
+            ".codex/phase-loop"
+            in fts_rows[".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/launch.json"]
+        )
         assert ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json" in fts_rows
-        assert "current_phase" in fts_rows[
-            ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json"
-        ]
-        assert "status" in fts_rows[
-            ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json"
-        ]
-        assert "heartbeat_status" in fts_rows[
-            ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json"
-        ]
+        assert (
+            "current_phase"
+            in fts_rows[".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json"]
+        )
+        assert (
+            "status"
+            in fts_rows[".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json"]
+        )
+        assert (
+            "heartbeat_status"
+            in fts_rows[".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json"]
+        )
         assert (
             ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
             in fts_rows
         )
-        assert "terminal_status" in fts_rows[
-            ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
-        ]
+        assert (
+            "terminal_status"
+            in fts_rows[
+                ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
+            ]
+        )
 
     def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_garecut_heartbeat_pair(
         self, tmp_path, monkeypatch
@@ -9291,7 +9354,9 @@ class TestEnhancedDispatcherProtocolConformance:
 
         def _unexpected_json_plugin_load(_self, language):
             if language == "json":
-                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+                raise AssertionError(
+                    "legacy .codex/phase-loop JSON paths should bypass plugin load"
+                )
             return None
 
         monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
@@ -9315,34 +9380,38 @@ class TestEnhancedDispatcherProtocolConformance:
             )
         store.close()
         assert chunk_counts == []
+        assert ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json" in fts_rows
         assert (
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json" in fts_rows
+            "command"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json"]
         )
-        assert "command" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json"
-        ]
-        assert "phase" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json"
-        ]
-        assert ".codex/phase-loop" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json"
-        ]
         assert (
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"
-            in fts_rows
+            "phase"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json"]
         )
-        assert "current_phase" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"
-        ]
-        assert "status" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"
-        ]
-        assert "trace" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"
-        ]
-        assert "heartbeat" in fts_rows[
-            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"
-        ]
+        assert (
+            ".codex/phase-loop"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/launch.json"]
+        )
+        assert (
+            ".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json" in fts_rows
+        )
+        assert (
+            "current_phase"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"]
+        )
+        assert (
+            "status"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"]
+        )
+        assert (
+            "trace"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"]
+        )
+        assert (
+            "heartbeat"
+            in fts_rows[".codex/phase-loop/runs/20260425T051448Z-01-garecut-execute/heartbeat.json"]
+        )
         assert ".codex/phase-loop/runs/20260427T071207Z-01-artpub-plan/heartbeat.json" in fts_rows
         assert (
             ".codex/phase-loop/runs/20260427T081107Z-08-ciflow-plan/terminal-summary.json"
@@ -9356,7 +9425,12 @@ class TestEnhancedDispatcherProtocolConformance:
 
         repo = tmp_path / "repo"
         legacy_launch = (
-            repo / ".codex" / "phase-loop" / "runs" / "20260424T180441Z-01-gagov-execute" / "launch.json"
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260424T180441Z-01-gagov-execute"
+            / "launch.json"
         )
         canonical_state = repo / ".phase-loop" / "state.json"
         for path in (legacy_launch, canonical_state):
@@ -9479,7 +9553,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(archive_json.resolve())
         assert snapshots[-1]["in_flight_path"] is None
         assert all(
-            needle not in (
+            needle
+            not in (
                 (snapshot.get("last_progress_path") or "")
                 + " "
                 + (snapshot.get("in_flight_path") or "")
@@ -9526,7 +9601,9 @@ class TestEnhancedDispatcherProtocolConformance:
                 calls.append(Path(path).name)
                 return {"symbols": [], "chunks": [], "metadata": {"fake": True}}
 
-        monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", lambda _self, language: _FakeJsonPlugin())
+        monkeypatch.setattr(
+            Dispatcher, "_ensure_plugin_loaded", lambda _self, language: _FakeJsonPlugin()
+        )
         monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
 
         result = Dispatcher([]).index_directory(ctx, repo)
@@ -9546,8 +9623,7 @@ class TestEnhancedDispatcherProtocolConformance:
         test_file = repo / "tests" / "test_benchmarks.py"
         test_file.parent.mkdir(parents=True)
         test_file.write_text(
-            "def test_benchmark_listing():\n"
-            "    return 'ok'\n",
+            "def test_benchmark_listing():\n" "    return 'ok'\n",
             encoding="utf-8",
         )
         store = SQLiteStore(str(tmp_path / "index.db"))
@@ -9576,7 +9652,7 @@ class TestEnhancedDispatcherProtocolConformance:
                 "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/test_benchmarks.py')"
             ).fetchone()[0]
         store.close()
-        assert chunk_count == 0
+        assert chunk_count > 0
         assert "scripts/quick_mcp_vs_native_validation.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/verify_embeddings.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/claude_code_behavior_simulator.py" in Plugin._BOUNDED_CHUNK_PATHS
@@ -9852,9 +9928,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["summary_chunks_attempted"] == 2
         assert summary_limits == [64, 64]
 
-    def test_index_directory_blocks_when_summary_progress_plateaus(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_blocks_when_summary_progress_plateaus(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
         target = tmp_path / "sample.py"
         target.write_text("x = 1\n")
@@ -9995,9 +10069,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["summary_passes"] == 1
         assert summary_limits == [64, 32]
 
-    def test_index_directory_blocks_on_first_summary_call_timeout(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_blocks_on_first_summary_call_timeout(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
         first = tmp_path / "sample_a.md"
         second = tmp_path / "sample_b.md"
@@ -10076,9 +10148,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["summary_call_chunk_ids"] == ["sample-a-chunk-1"]
         assert result["summary_call_timeout_seconds"] == 30.0
 
-    def test_index_directory_emits_force_full_progress_snapshots(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_emits_force_full_progress_snapshots(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
         first = tmp_path / "sample_a.md"
         second = tmp_path / "sample_b.md"
@@ -10198,7 +10268,9 @@ class TestEnhancedDispatcherProtocolConformance:
                 to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
             ),
         )
-        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: FakeSemanticIndexer())
+        monkeypatch.setattr(
+            Dispatcher, "_get_semantic_indexer", lambda self, _ctx: FakeSemanticIndexer()
+        )
         monkeypatch.setattr(
             Dispatcher,
             "_count_missing_summaries_for_paths",
@@ -10678,9 +10750,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["semantic_stage"] == "indexed"
         assert result["semantic_collection_bootstrap"]["status"] == "created"
 
-    def test_index_directory_records_semantic_batch_blockers(
-        self, tmp_path, monkeypatch
-    ):
+    def test_index_directory_records_semantic_batch_blockers(self, tmp_path, monkeypatch):
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
         target = tmp_path / "sample.py"
         target.write_text("x = 1\n")

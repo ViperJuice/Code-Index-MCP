@@ -7,11 +7,11 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from mcp.types import TaskMetadata
 
 from mcp_server.cli.task_write_summaries import run_write_summaries_task
 from mcp_server.indexing.summarization import SummaryGenerationResult
 from mcp_server.storage.mcp_task_registry import MCPTaskRegistry
-from mcp.types import TaskMetadata
 
 
 class _FakeTask:
@@ -92,7 +92,9 @@ async def test_run_write_summaries_task_records_cancelled_terminal_result() -> N
         writer = MagicMock()
         writer.process_scope = AsyncMock(
             return_value=replace(
-                SummaryGenerationResult(chunks_attempted=1, summaries_written=0, remaining_chunks=5),
+                SummaryGenerationResult(
+                    chunks_attempted=1, summaries_written=0, remaining_chunks=5
+                ),
                 cancelled=True,
             )
         )

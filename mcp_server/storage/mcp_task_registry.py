@@ -174,7 +174,9 @@ class MCPTaskRegistry(TaskStore):
         record.updated_at = datetime.now(timezone.utc)
         await self.notify_update(task_id)
 
-    async def request_cancellation(self, task_id: str, *, status_message: str | None = None) -> Task:
+    async def request_cancellation(
+        self, task_id: str, *, status_message: str | None = None
+    ) -> Task:
         record = self._get_record(task_id)
         if is_terminal(record.task.status):
             raise ValueError(f"Cannot cancel task in terminal state '{record.task.status}'")

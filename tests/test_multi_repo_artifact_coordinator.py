@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -10,9 +11,12 @@ from mcp_server.artifacts.multi_repo_artifact_coordinator import (
 )
 from mcp_server.cli.artifact_commands import artifact
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def _repo_info(repo_id: str, path: Path) -> RepositoryInfo:
+    (path / ".git").mkdir(exist_ok=True)
+    commit = f"commit-{repo_id}"
     return RepositoryInfo(
         repository_id=repo_id,
         name=path.name,
@@ -22,10 +26,29 @@ def _repo_info(repo_id: str, path: Path) -> RepositoryInfo:
         total_files=0,
         total_symbols=0,
         indexed_at=datetime.now(),
-        current_commit=f"commit-{repo_id}",
+        current_commit=commit,
+        last_indexed_commit=commit,
+        current_branch="main",
+        tracked_branch="main",
+        git_common_dir=str(path / ".git"),
         artifact_enabled=True,
         active=True,
     )
+
+
+def _write_ready_index(repo_info: RepositoryInfo) -> None:
+    repo_info.index_path.parent.mkdir(parents=True, exist_ok=True)
+    source = repo_info.path / "README.md"
+    source.write_text("ready index fixture\n", encoding="utf-8")
+    store = SQLiteStore(str(repo_info.index_path))
+    repository_id = store.ensure_repository_row(repo_info.path, name=repo_info.name)
+    store.store_file(
+        repository_id,
+        path=source,
+        relative_path="README.md",
+        language="markdown",
+    )
+    store.close()
 
 
 def test_workspace_manifest_roundtrip():
@@ -102,7 +125,7 @@ def test_coordinator_fetch_updates_registry(monkeypatch, tmp_path: Path):
     }
 
     def _fake_download_latest(self, output_dir, backup=True, full_only=False, **kwargs):
-        (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+        _write_ready_index(repo_info)
         (repo_path / ".mcp-index" / "artifact-metadata.json").write_text(
             json.dumps(artifact_metadata),
             encoding="utf-8",
@@ -151,8 +174,7 @@ def test_reconcile_workspace_marks_missing_or_ready(tmp_path: Path):
     assert results[0].details["artifact_health"] == "missing"
     assert results[0].details["validation_status"] == "missing"
 
-    (repo_path / ".mcp-index").mkdir(exist_ok=True)
-    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+    _write_ready_index(repo_info)
     (repo_path / ".mcp-index" / "artifact-metadata.json").write_text(
         json.dumps(
             {
@@ -178,8 +200,7 @@ def test_publish_workspace_uses_local_first_wording(monkeypatch, tmp_path: Path)
     repo_info = _repo_info("repo-1", repo_path)
     manager.registry.register(repo_info)
 
-    (repo_path / ".mcp-index").mkdir(exist_ok=True)
-    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+    _write_ready_index(repo_info)
     (repo_path / ".mcp-index" / ".index_metadata.json").write_text(
         '{"semantic_profiles": {"commercial_high": {}, "oss_high": {}}}',
         encoding="utf-8",
@@ -224,10 +245,8 @@ def test_workspace_publish_and_fetch_do_not_chdir(monkeypatch, tmp_path: Path):
     repo_path.mkdir()
     repo_info = _repo_info("repo-1", repo_path)
     manager.registry.register(repo_info)
-    (repo_path / ".mcp-index").mkdir(exist_ok=True)
-    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+    _write_ready_index(repo_info)
 
-    monkeypatch.setattr("os.chdir", lambda path: (_ for _ in ()).throw(AssertionError(path)))
     monkeypatch.setattr(
         "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.compress_indexes",
         lambda self, output_path, secure=True, **kwargs: (Path(output_path), "checksum", 123),
@@ -256,8 +275,13 @@ def test_workspace_publish_and_fetch_do_not_chdir(monkeypatch, tmp_path: Path):
     )
 
     coordinator = MultiRepoArtifactCoordinator(manager)
-    assert coordinator.publish_workspace(["repo-1"])[0].success is True
-    assert coordinator.fetch_workspace(["repo-1"])[0].success is True
+    original_chdir = os.chdir
+    try:
+        monkeypatch.setattr("os.chdir", lambda path: (_ for _ in ()).throw(AssertionError(path)))
+        assert coordinator.publish_workspace(["repo-1"])[0].success is True
+        assert coordinator.fetch_workspace(["repo-1"])[0].success is True
+    finally:
+        monkeypatch.setattr("os.chdir", original_chdir)
 
 
 def test_workspace_status_cli_reports_registered_repositories(monkeypatch, tmp_path: Path):
@@ -272,8 +296,7 @@ def test_workspace_status_cli_reports_registered_repositories(monkeypatch, tmp_p
     repo_info.last_recovered_commit = "def456"
     manager.registry.register(repo_info)
 
-    (repo_path / ".mcp-index").mkdir(exist_ok=True)
-    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+    _write_ready_index(repo_info)
     (repo_path / ".mcp-index" / "artifact-metadata.json").write_text(
         json.dumps(
             {

@@ -130,7 +130,7 @@ class MemoryAwarePluginManager:
         self._plugin_info: Dict[Tuple[Optional[str], str], PluginMemoryInfo] = {}
 
         # Weak references for garbage collection tracking
-        self._weak_refs: Dict[Tuple[Optional[str], str], weakref.ref] = {}
+        self._weak_refs: Dict[Tuple[Optional[str], str], weakref.ReferenceType[Any]] = {}
 
         # Thread safety
         self._lock = threading.RLock()
@@ -211,9 +211,13 @@ class MemoryAwarePluginManager:
                 last_used_monotonic=time.monotonic(),
             )
 
-            self._weak_refs[cache_key] = weakref.ref(
-                plugin, lambda ref, k=cache_key: self._on_plugin_deleted(k)
-            )
+            def on_plugin_deleted(
+                _ref: weakref.ReferenceType[Any],
+                key: Tuple[Optional[str], str] = cache_key,
+            ) -> None:
+                self._on_plugin_deleted(key)
+
+            self._weak_refs[cache_key] = weakref.ref(plugin, on_plugin_deleted)
 
             logger.info(
                 f"Loaded {language} plugin (repo={repo_id}) in "
@@ -342,7 +346,7 @@ class MemoryAwarePluginManager:
 
     def _get_current_memory(self) -> int:
         """Get current process memory usage in bytes."""
-        return self._process.memory_info().rss
+        return int(self._process.memory_info().rss)
 
     def _get_plugin_memory_usage(self) -> int:
         """Get total memory used by plugins (attribution/telemetry only)."""

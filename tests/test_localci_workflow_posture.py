@@ -48,3 +48,18 @@ def test_ci_workflows_use_agent_contract_or_reduced_triggers() -> None:
     assert "push:" not in index_management
     assert "pull_request:" not in mcp_index
     assert "push:" not in mcp_index
+
+
+def test_expanded_local_quality_gate_does_not_add_pull_request_compute() -> None:
+    pull_request_workflows = {
+        name: _read(name) for name in EXPECTED_CLASSIFICATIONS if "pull_request:" in _read(name)
+    }
+
+    for text in pull_request_workflows.values():
+        assert "alpha-release-gates" not in text
+        assert "alpha-mypy-ratchet" not in text
+
+    ci = pull_request_workflows["ci-cd-pipeline.yml"]
+    assert ci.count("matrix:") == 1
+    matrix_job = ci[ci.index("informational-test-cross-platform:") :]
+    assert "if: github.event_name == 'workflow_dispatch'" in matrix_job

@@ -4,6 +4,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 ARTIFACT = REPO / "docs" / "status" / "localci-validation-contract.md"
+TESTING_GUIDE = REPO / "docs" / "development" / "TESTING-GUIDE.md"
 
 
 def test_localci_evidence_artifact_records_contract() -> None:
@@ -33,5 +34,21 @@ def test_localci_evidence_artifact_records_non_goals() -> None:
         "No GitHub secret mutation was performed.",
         "No coverage threshold change was performed.",
         "No hosted coverage upload was performed.",
+    ):
+        assert phrase in text
+
+
+def test_testing_guide_records_quality_gate_recovery_contract() -> None:
+    text = TESTING_GUIDE.read_text(encoding="utf-8")
+    for phrase in (
+        "uv sync --locked --extra dev --link-mode=copy",
+        "make alpha-release-gates",
+        "make alpha-mypy-ratchet",
+        "config/mypy_baseline.json",
+        "@pytest.mark.requires_network",
+        "rejects unmarked TCP",
+        "not invoked by ordinary pull-request workflows",
+        "coverage.xml",
+        "htmlcov/",
     ):
         assert phrase in text

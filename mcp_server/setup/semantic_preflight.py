@@ -553,20 +553,20 @@ def check_enrichment_chat(
                 name="enrichment_chat",
                 message="Enrichment endpoint returned no chat choices",
                 failure_class="chat_response_invalid",
-            details={
-                "base_url": base_url,
-                "model": effective_model,
-                "configured_model": model,
-                "effective_model": effective_model,
-                "api_key_env": api_key_env,
-                "api_key_present": True,
-                "resolution_strategy": resolution.resolution_strategy,
-                "considered_model_ids": resolution.available_models,
-                "models_probe_verified": resolution.models_probe_verified,
-                "models_probe_failure": resolution.probe_failure,
-            },
-            fixes=[
-                "Verify the enrichment proxy implements OpenAI-compatible chat responses",
+                details={
+                    "base_url": base_url,
+                    "model": effective_model,
+                    "configured_model": model,
+                    "effective_model": effective_model,
+                    "api_key_env": api_key_env,
+                    "api_key_present": True,
+                    "resolution_strategy": resolution.resolution_strategy,
+                    "considered_model_ids": resolution.available_models,
+                    "models_probe_verified": resolution.models_probe_verified,
+                    "models_probe_failure": resolution.probe_failure,
+                },
+                fixes=[
+                    "Verify the enrichment proxy implements OpenAI-compatible chat responses",
                 ],
             )
         return CheckResult(
@@ -799,8 +799,9 @@ def check_qdrant_collection(
             if isinstance(vectors, dict)
             else None
         )
-        if actual_dimension != expected_dimension or actual_distance != resolver.normalize_distance_metric(
-            expected_distance
+        if (
+            actual_dimension != expected_dimension
+            or actual_distance != resolver.normalize_distance_metric(expected_distance)
         ):
             return CheckResult(
                 name="qdrant_collection",
@@ -1179,7 +1180,9 @@ def run_semantic_preflight(
             or settings.openai_api_base
             or "http://localhost:8001/v1"
         )
-        embedding_model = str(build_metadata.get("embedding_model_name") or selected_profile.model_name)
+        embedding_model = str(
+            build_metadata.get("embedding_model_name") or selected_profile.model_name
+        )
         embedding_api_key_env = str(
             build_metadata.get("embedding_api_key_env")
             or build_metadata.get("openai_api_key_env")
@@ -1190,7 +1193,9 @@ def run_semantic_preflight(
         enrichment_api_key_env = str(
             build_metadata.get("enrichment_api_key_env") or embedding_api_key_env
         )
-        collection_name = str(build_metadata.get("collection_name") or settings.semantic_collection_name)
+        collection_name = str(
+            build_metadata.get("collection_name") or settings.semantic_collection_name
+        )
         vector_dimension = int(selected_profile.vector_dimension)
         distance_metric = str(selected_profile.distance_metric)
 
