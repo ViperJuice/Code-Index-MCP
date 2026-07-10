@@ -341,6 +341,34 @@
       "task_summary": null,
       "type": "phase",
       "updated_at": "2026-07-10T06:25:08Z"
+    },
+    {
+      "acceptance_criteria_count": null,
+      "created_at": "2026-07-10T07:17:21Z",
+      "file": "plans/phase-plan-v10-SUMCONTRACT.md",
+      "handoff_ref": null,
+      "if_gates_produced": [
+        "IF-0-SUMCONTRACT-1"
+      ],
+      "lanes": [
+        "SL-0",
+        "SL-1"
+      ],
+      "lifecycle": [],
+      "owner_skill": "codex-plan-phase",
+      "phase_alias": "SUMCONTRACT",
+      "reflection_ref": null,
+      "roadmap_ref": {
+        "file": "specs/phase-plans-v10.md",
+        "slug": "phase-plans-v10",
+        "status": "imported",
+        "type": "phase"
+      },
+      "slug": "v10-SUMCONTRACT",
+      "status": "imported",
+      "task_summary": null,
+      "type": "phase",
+      "updated_at": "2026-07-10T07:17:21Z"
     }
   ],
   "schema_version": 1
