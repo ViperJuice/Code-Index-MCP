@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
+from ..interfaces.inference_contracts import (
+    COMPATIBILITY_CRITICAL_FIELDS,
+    EmbeddingResponseV1,
+    EmbeddingRole,
+    ExpectedProfile,
+    ProvenanceAuthority,
+    ProvenanceField,
+    validate_profile,
+)
 from .semantic_namespace import SemanticNamespaceResolver
 
 
@@ -386,3 +396,146 @@ def get_primary_semantic_profile_metadata(
 
     profile_id = next(iter(profiles.keys()))
     return profile_id, profiles[profile_id]
+
+
+# =====================================================================
+# Provenance attestation (IF-0-EMBEDPROV-1)
+# =====================================================================
+
+# The reconciliation remediation, named verbatim in every fail-closed diagnostic
+# so an operator is always told exactly how to recover.
+REINDEX_REMEDIATION = (
+    "Run an operator-authorized reindex to rebuild the index under the attested "
+    "provider profile (or probe-revalidate the live endpoint via "
+    "SemanticIndexer.reconcile_existing_collection)."
+)
+
+# Maps a provenance field name (on ``embedding-response.v1`` / ``ExpectedProfile``)
+# to the attribute that carries its assumed value on a ``SemanticProfile``.
+_PROVENANCE_TO_PROFILE_ATTR: Dict[str, str] = {
+    "served_model_id": "model_name",
+    "model_revision": "model_version",
+    "dimension": "vector_dimension",
+    "normalization": "normalization_policy",
+}
+
+
+@dataclass
+class ProfileAttestation:
+    """Outcome of reconciling a provider response against a semantic profile.
+
+    ``ok`` is fail-closed: any compatibility-critical field that is neither
+    server-``reported`` nor operator-``declared`` (i.e. still ``unknown`` after the
+    declared overlay), or whose server-reported value mismatches the profile,
+    makes ``ok`` False. ``derived`` records, per compatibility-critical field, the
+    value the index should be stamped with (server-reported values replace assumed
+    ones) and the authority/source it came from.
+    """
+
+    ok: bool
+    failures: List[str] = field(default_factory=list)
+    checked_fields: List[str] = field(default_factory=list)
+    derived: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    reported_fields: List[str] = field(default_factory=list)
+    role: Optional[str] = None
+    remediation: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "failures": list(self.failures),
+            "checked_fields": list(self.checked_fields),
+            "derived": {name: dict(entry) for name, entry in self.derived.items()},
+            "reported_fields": list(self.reported_fields),
+            "role": self.role,
+            "remediation": self.remediation,
+        }
+
+    def failure_reason(self, *, subject: str = "embedding profile") -> str:
+        """Human-actionable diagnostic that always NAMES the remediation."""
+        detail = "; ".join(self.failures) or "provenance validation failed"
+        remediation = self.remediation or REINDEX_REMEDIATION
+        return (
+            f"Provenance attestation failed for {subject}: {detail}. "
+            f"Refusing to write vectors under an unverified profile. {remediation}"
+        )
+
+
+def build_expected_profile(profile: Any, *, role: Optional[EmbeddingRole] = None) -> ExpectedProfile:
+    """Build an :class:`ExpectedProfile` from a semantic profile's assumed values."""
+    return ExpectedProfile(
+        served_model_id=getattr(profile, "model_name", None),
+        model_revision=getattr(profile, "model_version", None),
+        dimension=getattr(profile, "vector_dimension", None),
+        normalization=getattr(profile, "normalization_policy", None),
+        role=role,
+        processor_id=None,
+    )
+
+
+def _overlay_declared(
+    response: EmbeddingResponseV1, expected: ExpectedProfile
+) -> EmbeddingResponseV1:
+    """Return a copy of ``response`` with unknown critical fields declared.
+
+    A compatibility-critical field the provider left ``unknown`` is explicitly
+    upgraded to ``declared`` using the operator's profile value — never silently
+    assumed and never fabricated as ``reported``. A field the profile also cannot
+    supply stays ``unknown`` so it fails closed. The original response is not
+    mutated.
+    """
+    effective = copy.copy(response)
+    for name in COMPATIBILITY_CRITICAL_FIELDS:
+        pf = response.provenance_field(name)
+        if pf.authority == ProvenanceAuthority.UNKNOWN:
+            declared_value = expected.expected_value(name)
+            if declared_value is not None:
+                setattr(effective, name, ProvenanceField.declared(declared_value))
+    return effective
+
+
+def attest_embedding_response(
+    profile: Any,
+    response: EmbeddingResponseV1,
+    *,
+    role: Optional[EmbeddingRole] = None,
+    remediation: str = REINDEX_REMEDIATION,
+) -> ProfileAttestation:
+    """Attest a provider ``embedding-response.v1`` against a semantic profile.
+
+    Server-``reported`` values are the highest authority and are carried into the
+    derived profile (replacing the assumed value). Fields the provider cannot
+    report are explicitly ``declared`` from profile config. Any compatibility-
+    critical field that remains ``unknown``, or whose reported value mismatches the
+    profile, fails closed (``ok=False``) with a remediation-naming diagnostic.
+    """
+    expected = build_expected_profile(profile, role=role)
+    effective = _overlay_declared(response, expected)
+    result = validate_profile(expected, effective)
+
+    derived: Dict[str, Dict[str, Any]] = {}
+    reported_fields: List[str] = []
+    for name in COMPATIBILITY_CRITICAL_FIELDS:
+        pf = effective.provenance_field(name)
+        if pf.authority == ProvenanceAuthority.REPORTED:
+            source = "reported"
+            reported_fields.append(name)
+        elif pf.authority == ProvenanceAuthority.DECLARED:
+            source = "declared"
+        else:
+            source = "unknown"
+        derived[name] = {
+            "value": pf.value,
+            "authority": pf.authority.value,
+            "source": source,
+        }
+
+    return ProfileAttestation(
+        ok=result.ok,
+        failures=result.failures,
+        checked_fields=result.checked_fields,
+        derived=derived,
+        reported_fields=reported_fields,
+        role=response.role.value if isinstance(response.role, ProvenanceField) else None,
+        remediation=None if result.ok else remediation,
+    )

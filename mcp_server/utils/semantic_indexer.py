@@ -22,11 +22,16 @@ from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 from ..artifacts.semantic_namespace import SemanticNamespaceResolver
 from ..artifacts.semantic_profiles import (
+    REINDEX_REMEDIATION,
+    ProfileAttestation,
     SemanticProfile,
     SemanticProfileRegistry,
+    attest_embedding_response,
     extract_semantic_profile_metadata,
+    get_primary_semantic_profile_metadata,
 )
 from ..core.path_resolver import PathResolver
+from ..interfaces.inference_contracts import EmbeddingRole
 from ..plugins.language_registry import get_language_by_extension
 from .embedding_providers import create_embedding_provider
 
@@ -282,6 +287,12 @@ class SemanticIndexer:
         )
         self.embedding_provider = self.embedding_client.provider_name
 
+        # Assumed-profile bootstrap for construct-then-inspect back-compat. The
+        # AUTHORITATIVE, provenance-attested profile the vectors are actually
+        # written under is (re)persisted by ``_prepare_for_writes`` on the write
+        # path, strictly before any point write (IF-0-EMBEDPROV-1).
+        self._writes_prepared = False
+        self._attestation: Optional[ProfileAttestation] = None
         self._ensure_collection()
         self._update_metadata()
 
@@ -345,9 +356,75 @@ class SemanticIndexer:
         )
 
     # ------------------------------------------------------------------
+    def _provider_supports_provenance(self) -> bool:
+        """True when the configured provider can emit ``embedding-response.v1``."""
+        client = getattr(self, "embedding_client", None)
+        return callable(getattr(client, "embed_with_provenance", None))
+
+    def _validate_embedding_response(
+        self, response: Any, expected_count: int
+    ) -> List[List[float]]:
+        """Fail-closed request↔response index validation for a batch embed.
+
+        Enforces a one-to-one mapping between request position and response item:
+        every item's ``index`` must equal its request position (rejecting
+        missing/duplicate/reordered/out-of-range), each item must be ``ok`` with a
+        present vector, and each vector must match the collection dimension. On any
+        violation this raises BEFORE any vector is returned, so a malformed or
+        partial response can never be positionally sliced onto the wrong chunk.
+        Returns vectors in request order.
+        """
+        items = list(getattr(response, "items", []) or [])
+        if len(items) != expected_count:
+            raise RuntimeError(
+                "Embedding response arity mismatch: requested "
+                f"{expected_count} texts but provider returned {len(items)} items. "
+                "Refusing to positionally attach a partial/short embedding batch."
+            )
+
+        expected_dim = self.embedding_dimension
+        vectors: List[List[float]] = []
+        for position, item in enumerate(items):
+            idx = getattr(item, "index", None)
+            if idx != position:
+                raise RuntimeError(
+                    "Embedding response index is not a one-to-one mapping: item at "
+                    f"request position {position} carries index {idx!r} "
+                    "(reordered/duplicate/out-of-range responses are rejected to "
+                    "prevent misattaching a vector to the wrong chunk)."
+                )
+            status = getattr(item, "status", None)
+            status_value = getattr(status, "value", status)
+            if status_value != "ok" or item.vector is None:
+                raise RuntimeError(
+                    f"Embedding item {position} is not usable "
+                    f"(status={status_value!r}, error={getattr(item, 'error', None)!r})."
+                )
+            vector = list(item.vector)
+            if expected_dim and len(vector) != expected_dim:
+                raise RuntimeError(
+                    f"Embedding item {position} has dimension {len(vector)} but the "
+                    f"collection expects {expected_dim}."
+                )
+            vectors.append(vector)
+        return vectors
+
     def _embed_texts(self, texts: List[str], input_type: str = "document") -> List[List[float]]:
-        """Generate embeddings using the configured provider."""
-        return self.embedding_client.embed(texts, input_type=input_type)
+        """Generate embeddings using the configured provider.
+
+        When the provider emits ``embedding-response.v1`` (the migrated Voyage /
+        OpenAI-compatible providers), the response is validated for a one-to-one
+        request↔response index mapping and per-vector dimension before its vectors
+        are returned in request order. Legacy bare-vector providers/test doubles
+        that only expose ``embed`` are used unchanged.
+        """
+        texts_list = list(texts)
+        if self._provider_supports_provenance():
+            response = self.embedding_client.embed_with_provenance(
+                texts_list, input_type=input_type
+            )
+            return self._validate_embedding_response(response, len(texts_list))
+        return self.embedding_client.embed(texts_list, input_type=input_type)
 
     def _max_chunk_chars(self) -> int:
         """Return max chunk size for embedding payloads."""
@@ -1148,6 +1225,237 @@ class SemanticIndexer:
         except Exception:
             # Don't fail if metadata can't be written
             pass
+
+    # ------------------------------------------------------------------
+    def _atomic_write_metadata(self, metadata: Dict[str, Any]) -> None:
+        """Persist metadata atomically, RAISING on failure (unlike _update_metadata).
+
+        Writes to a sibling temp file then ``os.replace`` so a crash or an I/O
+        error leaves the previous ``.index_metadata.json`` byte-for-byte intact —
+        the metadata-write step therefore mutates ZERO durable state on failure,
+        which the lifecycle ordering invariant depends on.
+        """
+        target = self.metadata_file
+        tmp = f"{target}.attest.tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as handle:
+                json.dump(metadata, handle, indent=2)
+            os.replace(tmp, target)
+        except Exception:
+            try:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            except Exception:
+                pass
+            raise
+
+    def _attest_active_profile(
+        self, probe_texts: Optional[List[str]] = None, *, input_type: str = "document"
+    ) -> ProfileAttestation:
+        """Probe the live provider and attest its response against the profile.
+
+        Sends a tiny probe embed, then reconciles the returned
+        ``embedding-response.v1`` against the active profile: server-``reported``
+        values replace assumed ones, provider-unreportable fields are explicitly
+        ``declared`` from config, and any compatibility-critical field left
+        ``unknown`` (or a reported value that mismatches the profile) fails closed.
+        The provider call is the FIRST thing that can fail here, so a provider
+        failure raises before any collection or metadata state is touched.
+        """
+        role = EmbeddingRole.QUERY if input_type == "query" else EmbeddingRole.DOCUMENT
+        texts = probe_texts if probe_texts else ["semantic-provenance-probe"]
+        response = self.embedding_client.embed_with_provenance(texts, input_type=input_type)
+        # Bijection/dimension guard on the probe response as well.
+        self._validate_embedding_response(response, len(list(texts)))
+        return attest_embedding_response(self.semantic_profile, response, role=role)
+
+    def _attested_metadata(self, attestation: ProfileAttestation) -> Dict[str, Any]:
+        """Build the durable metadata payload stamped with attestation provenance."""
+        metadata = self._build_metadata()
+        attestation_block = attestation.to_dict()
+        attestation_block["attested_at"] = datetime.now().isoformat()
+        metadata["semantic_attestation"] = attestation_block
+        # Stamp the primary profile record so query-time compatibility checks can
+        # see the vectors were written under an attested, server-derived profile.
+        if self._profile_active and isinstance(metadata.get("semantic_profiles"), dict):
+            profile_record = metadata["semantic_profiles"].get(self.semantic_profile.profile_id)
+            if isinstance(profile_record, dict):
+                profile_record["attested"] = True
+                profile_record["provenance"] = attestation_block["derived"]
+                reported_dim = attestation_block["derived"].get("dimension", {}).get("value")
+                if isinstance(reported_dim, int) and reported_dim > 0:
+                    # Server-reported dimension replaces the assumed value.
+                    profile_record["model_dimension"] = reported_dim
+        return metadata
+
+    def _prepare_for_writes(self) -> None:
+        """Ordered write gate: attest -> persist -> ensure_collection (once).
+
+        Enforces the lifecycle invariant that provider attestation and atomic
+        profile persistence happen BEFORE collection create/validate and any point
+        write. If the provider fails, or the derived profile fails validation, or
+        the metadata write fails, this raises and mutates ZERO collection/metadata
+        state (``_ensure_collection`` is only reached after a successful, durable
+        attested-profile write). Idempotent: runs its work at most once.
+
+        Providers that predate the provenance contract (bare ``embed`` test
+        doubles) cannot be attested; the gate degrades to the INFERSAFE-stabilized
+        ``_ensure_collection`` path unchanged for them.
+        """
+        if getattr(self, "_writes_prepared", False):
+            return
+
+        if not self._provider_supports_provenance():
+            # Legacy provider (bare ``embed`` test double): cannot be attested.
+            # Preserve prior behavior exactly — the collection was already ensured
+            # in __init__, so this is a no-op gate.
+            self._writes_prepared = True
+            return
+
+        # 1. Attest (provider failure raises here — nothing mutated yet).
+        attestation = self._attest_active_profile()
+        if not attestation.ok:
+            # Fail closed, naming the remediation (INFERSAFE blocked-path parity).
+            raise RuntimeError(
+                attestation.failure_reason(
+                    subject=f"collection '{self.collection}'"
+                )
+            )
+
+        # 2. Persist the attested profile atomically (raises on write failure,
+        #    BEFORE the collection is created/validated — so a metadata-write
+        #    failure never leaves a collection created under an unpersisted
+        #    profile).
+        self._atomic_write_metadata(self._attested_metadata(attestation))
+        self._attestation = attestation
+
+        # 3. Only now create/validate the collection and permit point writes.
+        self._ensure_collection()
+        self._writes_prepared = True
+
+    # ------------------------------------------------------------------
+    def _indexed_profile_record(self) -> Optional[Dict[str, Any]]:
+        """Load the persisted primary semantic-profile record, if any."""
+        existing = self._load_existing_metadata()
+        _profile_id, record = get_primary_semantic_profile_metadata(existing)
+        return record
+
+    def _check_query_provenance(self, response: Any) -> None:
+        """Fail closed when a query embedding is incompatible with the index.
+
+        Attests the query-time ``embedding-response.v1`` and compares its derived
+        provenance against what the vectors were actually indexed under (the
+        persisted profile record / fingerprint), rejecting a drifted query model
+        (e.g. a different served model id or vector dimension) rather than
+        returning silently wrong nearest neighbours.
+        """
+        attestation = attest_embedding_response(
+            self.semantic_profile, response, role=EmbeddingRole.QUERY
+        )
+        if not attestation.ok:
+            raise RuntimeError(
+                attestation.failure_reason(
+                    subject=f"query against collection '{self.collection}'"
+                )
+            )
+
+        record = self._indexed_profile_record()
+        # Only cross-check against a persisted record that was itself attested;
+        # an un-attested/legacy record is not authoritative, so step 1's live
+        # attestation is the guard.
+        if not record or not record.get("attested"):
+            return
+
+        indexed_dim = record.get("model_dimension")
+        query_dim = attestation.derived.get("dimension", {}).get("value")
+        if (
+            isinstance(indexed_dim, int)
+            and isinstance(query_dim, int)
+            and indexed_dim != query_dim
+        ):
+            raise RuntimeError(
+                "Query embedding provenance is incompatible with the indexed "
+                f"vectors: index was built at dimension {indexed_dim} but the query "
+                f"model reports dimension {query_dim}. Refusing to search across "
+                f"incompatible vector spaces. {REINDEX_REMEDIATION}"
+            )
+
+        indexed_model = record.get("embedding_model")
+        query_model = attestation.derived.get("served_model_id", {})
+        if (
+            query_model.get("source") == "reported"
+            and isinstance(indexed_model, str)
+            and isinstance(query_model.get("value"), str)
+            and indexed_model != query_model["value"]
+        ):
+            raise RuntimeError(
+                "Query embedding provenance is incompatible with the indexed "
+                f"vectors: index was built with model {indexed_model!r} but the "
+                f"query endpoint reports served model {query_model['value']!r}. "
+                f"{REINDEX_REMEDIATION}"
+            )
+
+    # ------------------------------------------------------------------
+    def reconcile_existing_collection(
+        self, *, probe_texts: Optional[List[str]] = None, allow_reindex: bool = False
+    ) -> Dict[str, Any]:
+        """Reconcile a pre-provenance collection against the live provider.
+
+        Pre-provenance collections (e.g. the v9 4096-d pilot indexed under an
+        assumed profile) carry no attestation. This probe-revalidates them: it
+        embeds a live probe, derives the true profile, and checks it against the
+        existing persisted profile/collection shape.
+
+        * Compatible probe -> the collection is revalidated and its metadata is
+          re-persisted as attested (``status='reconciled'``).
+        * Incompatible probe -> a diagnostic that NAMES the reindex remediation is
+          returned (``status='reindex_required'``); nothing is mutated unless the
+          operator passes ``allow_reindex=True``, in which case the collection is
+          rebuilt to the attested shape.
+
+        Requires a provenance-capable provider; a legacy provider cannot be
+        reconciled and returns ``status='unattestable'``.
+        """
+        if not self._provider_supports_provenance():
+            return {
+                "status": "unattestable",
+                "collection": self.collection,
+                "message": (
+                    "Configured provider does not emit embedding-response.v1; "
+                    "cannot probe-revalidate. " + REINDEX_REMEDIATION
+                ),
+                "remediation": REINDEX_REMEDIATION,
+            }
+
+        attestation = self._attest_active_profile(probe_texts=probe_texts)
+        if not attestation.ok:
+            result: Dict[str, Any] = {
+                "status": "reindex_required",
+                "collection": self.collection,
+                "message": attestation.failure_reason(
+                    subject=f"existing collection '{self.collection}'"
+                ),
+                "remediation": REINDEX_REMEDIATION,
+                "attestation": attestation.to_dict(),
+            }
+            if allow_reindex:
+                # Operator authorized destructive rebuild to the attested shape.
+                self._atomic_write_metadata(self._attested_metadata(attestation))
+                self._ensure_collection(allow_recreate=True)
+                self._writes_prepared = True
+                result["status"] = "reindexed"
+            return result
+
+        # Compatible: revalidate + re-persist as attested.
+        self._atomic_write_metadata(self._attested_metadata(attestation))
+        self._attestation = attestation
+        self._ensure_collection()
+        self._writes_prepared = True
+        return {
+            "status": "reconciled",
+            "collection": self.collection,
+            "attestation": attestation.to_dict(),
+        }
 
     # ------------------------------------------------------------------
     def _generate_compatibility_hash(self) -> str:
@@ -1970,6 +2278,8 @@ class SemanticIndexer:
                 "missing_summary_chunk_ids": missing_summary_chunk_ids,
                 "semantic_error": "Missing authoritative summaries for strict semantic indexing",
             }
+        # Attest + persist the provenance profile BEFORE any point write.
+        self._prepare_for_writes()
         embeds = self._embed_texts(prep["embedding_inputs"], input_type="document")
         return self._store_file_embeddings(path, prep, embeds)
 
@@ -2049,6 +2359,10 @@ class SemanticIndexer:
             len(preparations),
             embed_batch_size,
         )
+
+        # Attest + persist the provenance profile BEFORE any embedding/point write
+        # so a provider or metadata failure mutates zero collection/metadata state.
+        self._prepare_for_writes()
 
         # Phase 3: embed in token-aware batches.
         # Voyage AI enforces a hard 120 000-token-per-request limit in addition to
@@ -2135,10 +2449,21 @@ class SemanticIndexer:
                 "Check connection status with validate_connection()."
             )
 
-        try:
-            embedding = self._embed_texts([text], input_type="query")[0]
-        except Exception as e:
-            raise RuntimeError(f"Failed to generate query embedding: {e}")
+        if self._provider_supports_provenance():
+            try:
+                response = self.embedding_client.embed_with_provenance(
+                    [text], input_type="query"
+                )
+                embedding = self._validate_embedding_response(response, 1)[0]
+            except Exception as e:
+                raise RuntimeError(f"Failed to generate query embedding: {e}")
+            # Fail closed if the query model drifted from the indexed vectors.
+            self._check_query_provenance(response)
+        else:
+            try:
+                embedding = self._embed_texts([text], input_type="query")[0]
+            except Exception as e:
+                raise RuntimeError(f"Failed to generate query embedding: {e}")
 
         query_limit = limit
         if self._looks_like_code_intent(text):
@@ -2216,6 +2541,7 @@ class SemanticIndexer:
 
         # Generate embedding
         try:
+            self._prepare_for_writes()
             embedding = self._embed_texts([embedding_text], input_type="document")[0]
 
             # Compute content hash
@@ -2587,6 +2913,7 @@ class SemanticIndexer:
             if not self._qdrant_available:
                 raise RuntimeError(f"Qdrant is not available - cannot index document {path}")
 
+            self._prepare_for_writes()
             try:
                 self.qdrant.upsert(collection_name=self.collection, points=points)
             except Exception as e:
