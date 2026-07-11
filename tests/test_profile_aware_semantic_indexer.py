@@ -47,6 +47,9 @@ class _FakeQdrantClient:
             )
         )
 
+    def create_collection(self, *, collection_name, vectors_config):
+        self.collections[collection_name] = (vectors_config.size, vectors_config.distance)
+
     def recreate_collection(self, *, collection_name, vectors_config):
         self.collections[collection_name] = (vectors_config.size, vectors_config.distance)
 

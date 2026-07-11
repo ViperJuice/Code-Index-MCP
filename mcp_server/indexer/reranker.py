@@ -12,6 +12,7 @@ import os
 # Define interfaces inline for now
 from abc import ABC, abstractmethod
 from dataclasses import dataclass as dc
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
@@ -92,6 +93,78 @@ class Result:
 
 
 logger = logging.getLogger(__name__)
+
+
+class RerankOutcome(str, Enum):
+    """Structured, truthful outcome vocabulary for a rerank attempt.
+
+    Shared between :mod:`reranker` and the dispatcher so the two agree on a
+    single set of states. A failed rerank, or one that returned the original
+    ordering unchanged, must NEVER be reported as :attr:`SUCCEEDED`.
+    """
+
+    #: No reranker is configured on the dispatcher path.
+    NOT_CONFIGURED = "not_configured"
+    #: The reranker ran but produced no observable reordering (ambiguous —
+    #: this is also the signature of a masked internal failure).
+    ATTEMPTED = "attempted"
+    #: The reranker ran and produced a genuinely reordered result.
+    SUCCEEDED = "succeeded"
+    #: The reranker raised; the caller kept the original ordering.
+    FAILED = "failed"
+    #: A configured fallback provider was used after the primary failed.
+    FALLBACK_APPLIED = "fallback_applied"
+    #: Reranking was deliberately skipped by policy (e.g. text rerankers on
+    #: the pure-vector semantic path); carries the policy identity.
+    SKIPPED_POLICY = "skipped_policy"
+
+
+@dc
+class RerankFallbackSignal:
+    """Optional signal a reranker MAY publish to report fallback usage.
+
+    A reranker sets this on itself (attribute ``last_fallback``) when it fails
+    over from a primary provider to a fallback. The dispatcher reads it after a
+    rerank call to build truthful diagnostics. Carries provider identities only
+    — never document or query text.
+    """
+
+    failed_provider: str
+    fallback_provider: str
+
+
+@dc
+class RerankDiagnostics:
+    """Truthful, redaction-safe record of a single rerank attempt.
+
+    Contains only ids, counts, provider names, timings, and error strings —
+    never raw code, snippet, or document text.
+    """
+
+    outcome: RerankOutcome
+    provider: Optional[str] = None
+    failed_provider: Optional[str] = None
+    fallback_provider: Optional[str] = None
+    candidate_count: int = 0
+    returned_count: int = 0
+    reordered: bool = False
+    duration_ms: Optional[float] = None
+    error: Optional[str] = None
+    policy: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "outcome": self.outcome.value,
+            "provider": self.provider,
+            "failed_provider": self.failed_provider,
+            "fallback_provider": self.fallback_provider,
+            "candidate_count": self.candidate_count,
+            "returned_count": self.returned_count,
+            "reordered": self.reordered,
+            "duration_ms": self.duration_ms,
+            "error": self.error,
+            "policy": self.policy,
+        }
 
 
 class BaseReranker(IReranker, ABC):

@@ -117,15 +117,22 @@ def ensure_qdrant_collection(
     collection_name: str,
     expected_dimension: int,
     distance_metric: str,
-    allow_recreate: bool = True,
+    allow_recreate: bool = False,
 ) -> CollectionEnsureResult:
-    """Verify the target collection and create it when the contract allows."""
+    """Verify the target collection and create it when the contract allows.
+
+    Fail-closed by default: ``allow_recreate`` must be explicitly set to ``True``
+    by an operator-authorized path before an existing collection may be
+    destructively recreated. Ordinary runtime callers leave it ``False``.
+    """
     expected_distance = SemanticIndexer.resolve_qdrant_distance(distance_metric)
     collections = client.get_collections()
     exists = any(c.name == collection_name for c in collections.collections)
 
     if not exists:
-        client.recreate_collection(
+        # Non-destructive create: never call recreate_collection here so a stale
+        # exists-check can never wipe a live collection created concurrently.
+        client.create_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(
                 size=expected_dimension,
@@ -145,20 +152,26 @@ def ensure_qdrant_collection(
     vectors_config = collection_info.config.params.vectors
     actual_dimension = getattr(vectors_config, "size", None)
     actual_distance = getattr(vectors_config, "distance", None)
-    mismatch = actual_dimension not in (None, expected_dimension) or actual_distance not in (
-        None,
-        expected_distance,
-    )
+
+    def _blocked() -> CollectionEnsureResult:
+        return CollectionEnsureResult(
+            status="blocked",
+            collection_name=collection_name,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance.value,
+            actual_dimension=actual_dimension,
+            actual_distance_metric=getattr(actual_distance, "value", None),
+        )
+
+    # Fail closed when the live collection's shape cannot be read: an unknown /
+    # unreadable config must never be silently treated as a compatible reuse.
+    if actual_dimension is None or actual_distance is None:
+        return _blocked()
+
+    mismatch = actual_dimension != expected_dimension or actual_distance != expected_distance
     if mismatch:
         if not allow_recreate:
-            return CollectionEnsureResult(
-                status="blocked",
-                collection_name=collection_name,
-                expected_dimension=expected_dimension,
-                expected_distance_metric=expected_distance.value,
-                actual_dimension=actual_dimension,
-                actual_distance_metric=getattr(actual_distance, "value", None),
-            )
+            return _blocked()
         client.recreate_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(
@@ -254,12 +267,18 @@ class SemanticIndexer:
         self._connection_mode = None  # 'server', 'file', or 'memory'
         self.qdrant = self._init_qdrant_client(qdrant_path)
 
+        # Credentials must never be sourced from the on-disk profile payload.
+        # Resolve the embedding API key from the process environment only; the
+        # profile may carry a secret-REFERENCE (an env var name), never a secret.
+        _build_metadata = self.semantic_profile.build_metadata or {}
+        _api_key_env = _build_metadata.get("openai_api_key_env")
+        _resolved_api_key = os.environ.get(_api_key_env) if _api_key_env else None
         self.embedding_client = create_embedding_provider(
             provider_name=self.semantic_profile.provider,
             model_name=self.embedding_model,
             vector_dimension=self.embedding_dimension,
-            api_key=(self.semantic_profile.build_metadata or {}).get("openai_api_key"),
-            base_url=(self.semantic_profile.build_metadata or {}).get("openai_api_base"),
+            api_key=_resolved_api_key,
+            base_url=_build_metadata.get("openai_api_base"),
         )
         self.embedding_provider = self.embedding_client.provider_name
 
@@ -993,11 +1012,18 @@ class SemanticIndexer:
             self._qdrant_available = False
             return False
 
-    def _ensure_collection(self) -> None:
+    def _ensure_collection(self, *, allow_recreate: bool = False) -> None:
         """Ensure the collection exists in Qdrant.
 
+        Fail-closed by default: ordinary runtime NEVER recreates. Destructive
+        recreation requires an operator-authorized caller to pass
+        ``allow_recreate=True`` explicitly. A ``blocked`` result raises an
+        actionable diagnostic instead of silently reusing an incompatible
+        collection, mirroring ``semantic_preflight``'s fail-closed handling.
+
         Raises:
-            RuntimeError: If collection cannot be created or verified
+            RuntimeError: If collection cannot be created, is blocked, or
+                cannot be verified.
         """
         if not self._qdrant_available:
             raise RuntimeError("Qdrant is not available - cannot ensure collection")
@@ -1008,8 +1034,17 @@ class SemanticIndexer:
                 collection_name=self.collection,
                 expected_dimension=self.embedding_dimension,
                 distance_metric=self.distance_metric,
-                allow_recreate=True,
+                allow_recreate=allow_recreate,
             )
+            if result.status == "blocked":
+                raise RuntimeError(
+                    f"Qdrant collection '{self.collection}' is blocked: its shape/config does "
+                    f"not match the active semantic profile (expected "
+                    f"dimension={result.expected_dimension} metric={result.expected_distance_metric}, "
+                    f"actual dimension={result.actual_dimension} metric={result.actual_distance_metric}). "
+                    "Refusing to reuse or destructively recreate it. Run an operator-authorized "
+                    "reindex to rebuild the collection with the correct shape."
+                )
             if result.status == "created":
                 logger.info("Successfully created collection: %s", self.collection)
             elif result.status == "recreated":

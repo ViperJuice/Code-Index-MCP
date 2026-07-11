@@ -463,6 +463,11 @@ class EnhancedDispatcher:
 
         # Initialize reranker
         self._reranker = None  # type: Optional[Any]
+        # Retain the configured reranker type so the outcome vocabulary can name
+        # the policy identity (e.g. on the semantic-skip path) truthfully.
+        self._reranker_type = reranker_type
+        # Structured diagnostics for the most recent _apply_reranker call.
+        self._last_rerank_diagnostics = None  # type: Optional[Any]
         if reranker_type and reranker_type != "none":
             try:
                 from ..indexer.reranker import (
@@ -1298,6 +1303,15 @@ class EnhancedDispatcher:
             logger.warning(f"Symbol route failed for '{name}': {e}")
             return []
 
+    def _record_rerank_diagnostics(self, diagnostics) -> None:
+        """Store and log a structured rerank outcome.
+
+        Only ids, counts, provider names, timings, and errors are recorded —
+        never raw code, snippet, or document text.
+        """
+        self._last_rerank_diagnostics = diagnostics
+        logger.info("rerank outcome: %s", diagnostics.to_dict())
+
     def _apply_reranker(
         self,
         sqlite_store: Optional[SQLiteStore],
@@ -1306,11 +1320,43 @@ class EnhancedDispatcher:
         limit: int,
         semantic_source: bool = False,
     ) -> List[Dict]:
-        """Enrich candidates with chunk text and apply the reranker if configured."""
+        """Enrich candidates with chunk text and apply the reranker if configured.
+
+        Records a truthful :class:`RerankDiagnostics` for every exit path so a
+        failed or unchanged ordering is never reported as ``succeeded``.
+        """
+        import time as _time
+
+        from ..indexer.reranker import RerankDiagnostics, RerankOutcome
+
+        provider = self._reranker_type if self._reranker is not None else None
+
+        def _order_key(items):
+            # Stable content key (file, line) — compare-only, no text leakage.
+            return [(c.get("file"), c.get("line")) for c in items]
+
         if self._reranker is None:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.NOT_CONFIGURED,
+                    candidate_count=len(candidates),
+                    returned_count=min(len(candidates), limit),
+                )
+            )
             return candidates[:limit]
+
         if semantic_source and self._reranker_skips_semantic:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.SKIPPED_POLICY,
+                    provider=provider,
+                    policy=self._reranker_type,
+                    candidate_count=len(candidates),
+                    returned_count=min(len(candidates), limit),
+                )
+            )
             return candidates[:limit]
+
         # Exclude paths with penalty >= 1.0 (benchmark/coverage noise files).
         filtered = [c for c in candidates if _path_score_penalty(c.get("file", "")) < 1.0]
         if not filtered:
@@ -1320,11 +1366,61 @@ class EnhancedDispatcher:
                 c["_rerank_doc"] = self._get_chunk_content_for_reranking(
                     sqlite_store, c.get("file", "")
                 )
+
+        # Reset any stale fallback signal before the attempt.
+        if hasattr(self._reranker, "last_fallback"):
+            self._reranker.last_fallback = None
+
+        _start = _time.perf_counter()
         try:
-            return self._reranker.rerank(query, filtered, limit)
+            reranked = self._reranker.rerank(query, filtered, limit)
         except Exception as e:
+            duration_ms = (_time.perf_counter() - _start) * 1000.0
             logger.warning(f"_apply_reranker failed, returning original order: {e}")
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.FAILED,
+                    provider=provider,
+                    candidate_count=len(filtered),
+                    returned_count=min(len(candidates), limit),
+                    duration_ms=duration_ms,
+                    error=str(e),
+                )
+            )
             return candidates[:limit]
+
+        duration_ms = (_time.perf_counter() - _start) * 1000.0
+        reordered = _order_key(reranked) != _order_key(filtered[: len(reranked)])
+
+        # A reranker MAY publish a fallback signal (provider names only).
+        fallback = getattr(self._reranker, "last_fallback", None)
+        if fallback is not None:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.FALLBACK_APPLIED,
+                    provider=provider,
+                    failed_provider=getattr(fallback, "failed_provider", None),
+                    fallback_provider=getattr(fallback, "fallback_provider", None),
+                    candidate_count=len(filtered),
+                    returned_count=len(reranked),
+                    reordered=reordered,
+                    duration_ms=duration_ms,
+                )
+            )
+            return reranked
+
+        outcome = RerankOutcome.SUCCEEDED if reordered else RerankOutcome.ATTEMPTED
+        self._record_rerank_diagnostics(
+            RerankDiagnostics(
+                outcome=outcome,
+                provider=provider,
+                candidate_count=len(filtered),
+                returned_count=len(reranked),
+                reordered=reordered,
+                duration_ms=duration_ms,
+            )
+        )
+        return reranked
 
     def _is_registered_context(self, ctx: RepoContext) -> bool:
         entry = getattr(ctx, "registry_entry", None)

@@ -132,7 +132,7 @@ class SemanticProfile:
             "chunker_version": self.chunker_version,
             "compatibility_fingerprint": self.compatibility_fingerprint,
             "reranker_defaults": self.reranker_defaults,
-            "build_metadata": self.build_metadata,
+            "build_metadata": _redact_secret_fields(self.build_metadata),
         }
 
 
@@ -208,6 +208,70 @@ class SemanticProfileRegistry:
                 profile_id: profile.to_dict() for profile_id, profile in self._profiles.items()
             },
         }
+
+
+# Substrings that mark a build_metadata key as holding a raw secret VALUE.
+_SECRET_KEY_MARKERS = (
+    "api_key",
+    "apikey",
+    "secret",
+    "token",
+    "password",
+    "passwd",
+    "bearer",
+    "authorization",
+    "credential",
+    "access_key",
+    "private_key",
+)
+
+# Suffixes that mark a key as holding a secret REFERENCE (e.g. an env var name),
+# never the secret itself. These are preserved verbatim.
+_SECRET_REFERENCE_SUFFIXES = (
+    "_env",
+    "_ref",
+    "_name",
+    "_var",
+    "_reference",
+    "_key_id",
+    "_key_ref",
+)
+
+_REDACTED_PLACEHOLDER = "***redacted***"
+
+
+def _looks_like_secret_reference(key: str) -> bool:
+    """True when the key names a secret reference (env var name) not a value."""
+    return key.lower().endswith(_SECRET_REFERENCE_SUFFIXES)
+
+
+def _redact_secret_fields(metadata: Any) -> Any:
+    """Redact any credential-bearing field from a metadata mapping.
+
+    Any key whose name looks like it holds a raw secret value
+    (``*api_key*``, bearer/authorization/token/secret/password/credential) is
+    replaced with a redaction placeholder. Secret-REFERENCE names (keys ending
+    in ``_env``/``_ref``/``_name`` etc.) and any ``Bearer <token>`` string
+    values are also handled. Nested mappings are redacted recursively so no
+    secret survives serialization via ``to_dict`` or artifact export.
+    """
+    if not isinstance(metadata, Mapping):
+        return metadata
+
+    redacted: Dict[str, Any] = {}
+    for key, value in metadata.items():
+        key_str = str(key)
+        lowered = key_str.lower()
+        is_secret_key = any(marker in lowered for marker in _SECRET_KEY_MARKERS)
+        if is_secret_key and not _looks_like_secret_reference(key_str):
+            redacted[key] = _REDACTED_PLACEHOLDER
+        elif isinstance(value, Mapping):
+            redacted[key] = _redact_secret_fields(value)
+        elif isinstance(value, str) and value.strip().lower().startswith("bearer "):
+            redacted[key] = _REDACTED_PLACEHOLDER
+        else:
+            redacted[key] = value
+    return redacted
 
 
 def _compute_compatibility_fingerprint(canonical_payload: Mapping[str, Any]) -> str:
