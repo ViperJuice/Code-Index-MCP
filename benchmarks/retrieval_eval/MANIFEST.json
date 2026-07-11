@@ -1,0 +1,24 @@
+{
+  "version": "manifest.v1",
+  "dataset_sha256": "62263e2d2ddcedea2e464cc56d913d3ed64117232d093e31b6f8e9a7e378100d",
+  "corpus_sha256": "93c894e1435f55ff0ce56c13a78a7c7be18a55e0e8a83816eb357ac13a22e089",
+  "thresholds_sha256": "3587b91d8d8ac6ef35f224768fcd64b812558fd4d7c275f19e7190c69499cf36",
+  "holdout_query_ids": [
+    "EI-05",
+    "II-04",
+    "II-07",
+    "EO-04",
+    "CD-04",
+    "CD-06",
+    "AC-03",
+    "CF-03",
+    "HN-02",
+    "HN-06"
+  ],
+  "review": {
+    "reviewer": "roadmap-v10 board",
+    "date": "2026-07-11",
+    "dataset_checksum": "62263e2d2ddcedea2e464cc56d913d3ed64117232d093e31b6f8e9a7e378100d",
+    "signed": true
+  }
+}

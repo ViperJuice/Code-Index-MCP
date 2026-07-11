@@ -212,6 +212,71 @@ def _get_lexical_timeout_seconds() -> float:
         return 20.0
 
 
+#: Default per-request timeout (seconds) for the endpoint reranker transport so a
+#: hung transport can never block the search path forever.
+_DEFAULT_RERANK_TIMEOUT_S = 30.0
+
+
+def _get_endpoint_rerank_timeout_seconds() -> float:
+    """Return the endpoint reranker timeout from ``MCP_RERANK_TIMEOUT_S``.
+
+    Falls back to :data:`_DEFAULT_RERANK_TIMEOUT_S` (30s) on an unset or
+    unparseable value; clamps to a >=1s floor.
+    """
+    raw = os.getenv("MCP_RERANK_TIMEOUT_S")
+    if raw is None:
+        return _DEFAULT_RERANK_TIMEOUT_S
+    try:
+        return max(float(raw), 1.0)
+    except (ValueError, TypeError):
+        return _DEFAULT_RERANK_TIMEOUT_S
+
+
+#: Reranker types that route source-code text to a third-party commercial API and
+#: therefore require the active deployment profile to permit commercial egress.
+_COMMERCIAL_RERANKER_TYPES = frozenset({"voyage", "cohere"})
+
+
+# Redact bearer tokens, api keys, and token-like substrings before any exception
+# text enters rerank diagnostics or logs. Kept deliberately small and defensive.
+_SECRET_REDACTION_PATTERN = re.compile(
+    r"(?i)"
+    r"(?:bearer\s+[A-Za-z0-9._\-]+)"
+    r"|(?:(?:api[_-]?key|apikey|token|secret|password|authorization)\s*[=:]\s*[^\s,;'\"]+)"
+    r"|(?:sk-[A-Za-z0-9]{6,})"
+)
+
+
+def _redact_secrets(text: Optional[str]) -> Optional[str]:
+    """Strip bearer/api-key/token-like substrings from *text*.
+
+    Applied to exception messages before they are stored in diagnostics or
+    written to logs so a leaked credential in a provider error can't surface.
+    """
+    if not text:
+        return text
+    return _SECRET_REDACTION_PATTERN.sub("[REDACTED]", str(text))
+
+
+def _active_profile_permits_commercial() -> bool:
+    """Return ``True`` only when the active deployment profile permits commercial
+    (source-code egress) inference.
+
+    Fail-closed: any import/resolution error (including
+    :class:`CommercialEgressNotOptedIn` when a commercial profile is selected
+    without the explicit opt-in) yields ``False`` so a commercial reranker is
+    never constructed by accident.
+    """
+    try:
+        from ..config.settings import resolve_active_deployment_profile
+    except Exception:  # pragma: no cover - settings contract always importable
+        return False
+    try:
+        contract = resolve_active_deployment_profile()
+    except Exception:
+        return False
+    return bool(getattr(contract, "commercial_egress", False))
+
 # Path segment penalties for lexical (BM25/fuzzy) results.
 # FTS5 scores are negative; adding a positive penalty degrades rank.
 _PATH_PENALTY_RULES: List[Tuple[str, float]] = [
@@ -297,6 +362,111 @@ def _run_blocking_with_timeout(func: Any, *, timeout_seconds: float) -> Any:
     return result.get("value")
 
 
+# =====================================================================
+# Reranker semantic-path capability (RERANKEND / IF-0-RERANKEND-1)
+# =====================================================================
+#: Text/lexical rerankers degrade a pure-vector semantic ranking, so they are
+#: skipped by policy on the semantic path. This is the default capability lookup
+#: for reranker *types* the dispatcher builds in-process; individual rerankers
+#: may override it by declaring a ``skips_semantic_path`` attribute (see
+#: :func:`_reranker_skips_semantic_path`). The endpoint (``rerank.v1``) path is
+#: embedding-consistent and does NOT skip.
+TEXT_ONLY_RERANKER_TYPES = frozenset({"flashrank", "cross-encoder"})
+
+
+def _reranker_skips_semantic_path(reranker_type: Optional[str], reranker: Any) -> bool:
+    """Whether ``reranker`` must be skipped on the pure-vector semantic path.
+
+    Explicit capability contract (replaces the historical ad-hoc type-tuple
+    branch): a reranker may DECLARE its policy via a ``skips_semantic_path``
+    attribute; when absent, the decision falls back to the text-only reranker
+    type set. This keeps the semantic-skip decision a stated capability rather
+    than an inline special case, while requiring no change to the read-only
+    reranker classes in ``reranker.py``.
+    """
+    declared = getattr(reranker, "skips_semantic_path", None)
+    if declared is not None:
+        return bool(declared)
+    return reranker_type in TEXT_ONLY_RERANKER_TYPES
+
+
+class _SyncDictEndpointReranker:
+    """Synchronous ``List[Dict]`` facade over an async canonical :class:`IReranker`.
+
+    The dispatcher's sync search path speaks the ``List[Dict]`` candidate shape
+    and the sync ``rerank(query, candidates, top_k) -> List[Dict]`` convention of
+    the in-process trio (Voyage/FlashRank/CrossEncoder). This adapter lets that
+    exact path drive an async endpoint reranker (e.g.
+    :class:`~mcp_server.indexer.reranker.EndpointReranker`) by:
+
+        1. Mapping each candidate dict to a canonical ``SearchResult`` (feeding
+           ``_rerank_doc or snippet or file`` into ``snippet`` for parity with
+           the trio's document-text preference).
+        2. Driving the async reranker through
+           :class:`~mcp_server.indexer.reranker.SyncRerankerAdapter` (which uses
+           the loop-safe ``run_coroutine_sync`` bridge — never ``asyncio.run``
+           inside a running loop).
+        3. Reordering the ORIGINAL dict objects by each ``RerankItem``'s
+           ``original_rank`` so downstream metadata (``_rerank_doc``,
+           ``repository_id``, scores) is preserved.
+
+    Structured outcome signals published by the underlying reranker
+    (``last_outcome`` / ``last_diagnostics`` / ``last_fallback``) are mirrored
+    onto this adapter after each call so the dispatcher's ``_apply_reranker``
+    outcome bookkeeping keeps working unchanged.
+    """
+
+    #: Endpoint reranking is embedding-consistent; it is NOT skipped on the
+    #: semantic path (unlike in-process text rerankers).
+    skips_semantic_path = False
+
+    def __init__(self, async_reranker: Any, *, timeout: Optional[float] = None):
+        from ..indexer.reranker import SyncRerankerAdapter
+
+        self._async = async_reranker
+        self._sync = SyncRerankerAdapter(async_reranker, timeout=timeout)
+        self.last_fallback = None
+        self.last_outcome = None
+        self.last_diagnostics = None
+
+    def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
+        from ..indexer.reranker import SearchResult as RerankSearchResult
+
+        search_results = [
+            RerankSearchResult(
+                file_path=c.get("file", ""),
+                start_line=c.get("line", 0) or 0,
+                end_line=c.get("line", 0) or 0,
+                column=0,
+                snippet=c.get("_rerank_doc") or c.get("snippet") or c.get("file", ""),
+                match_type=c.get("match_type", "endpoint"),
+                score=float(c.get("score", 0.0) or 0.0),
+                context=c.get("context"),
+            )
+            for c in candidates
+        ]
+
+        result = self._sync.rerank(query, search_results, top_k)
+
+        # Mirror any structured signals the async reranker published.
+        self.last_fallback = getattr(self._async, "last_fallback", None)
+        self.last_outcome = getattr(self._async, "last_outcome", None)
+        self.last_diagnostics = getattr(self._async, "last_diagnostics", None)
+
+        if not getattr(result, "is_success", False):
+            # Funnel a contract/provider Result failure into the dispatcher's
+            # FAILED path. The error string is a contract message (no doc text).
+            raise RuntimeError(str(getattr(result, "error", "rerank failed")))
+
+        rerank_result = result.data
+        ordered: List[Dict] = []
+        for item in rerank_result.results:
+            idx = item.original_rank
+            if 0 <= idx < len(candidates):
+                ordered.append(candidates[idx])
+        return ordered[:top_k]
+
+
 class EnhancedDispatcher:
     """Enhanced dispatcher with dynamic plugin loading and advanced routing capabilities."""
 
@@ -348,6 +518,7 @@ class EnhancedDispatcher:
         reranker_type: str = "none",
         plugin_set_registry: Optional[PluginSetRegistry] = None,
         semantic_indexer_registry: Optional[SemanticIndexerRegistry] = None,
+        endpoint_rerank_transport: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
     ):
         """Initialize the enhanced dispatcher.
 
@@ -463,35 +634,26 @@ class EnhancedDispatcher:
 
         # Initialize reranker
         self._reranker = None  # type: Optional[Any]
+        # Retain the configured reranker type so the outcome vocabulary can name
+        # the policy identity (e.g. on the semantic-skip path) truthfully.
+        self._reranker_type = reranker_type
+        # Structured diagnostics for the most recent _apply_reranker call.
+        self._last_rerank_diagnostics = None  # type: Optional[Any]
         if reranker_type and reranker_type != "none":
             try:
-                from ..indexer.reranker import (
-                    CrossEncoderReranker,
-                    FlashRankReranker,
-                    VoyageReranker,
+                self._reranker = self._build_reranker(
+                    reranker_type, endpoint_rerank_transport=endpoint_rerank_transport
                 )
-
-                if reranker_type == "voyage":
-                    voyage_model = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2")
-                    self._reranker = VoyageReranker(model=voyage_model)
-                    logger.info(f"Reranker initialized: VoyageReranker model={voyage_model}")
-                elif reranker_type == "flashrank":
-                    flashrank_model = os.getenv("FLASHRANK_MODEL", "ms-marco-MiniLM-L-12-v2")
-                    self._reranker = FlashRankReranker(model=flashrank_model)
-                    logger.info(f"Reranker initialized: FlashRankReranker model={flashrank_model}")
-                elif reranker_type == "cross-encoder":
-                    ce_model = os.getenv(
-                        "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-                    )
-                    self._reranker = CrossEncoderReranker(model=ce_model)
-                    logger.info(f"Reranker initialized: CrossEncoderReranker model={ce_model}")
-                else:
-                    logger.warning(f"Unknown reranker_type '{reranker_type}', disabling reranker")
             except Exception as e:
                 logger.warning(f"Failed to initialize reranker: {e}")
-        # Text-based rerankers degrade pure vector results; skip them on the semantic path.
-        # VoyageReranker ("voyage") is consistent with Voyage embeddings so it is allowed.
-        self._reranker_skips_semantic = reranker_type in ("flashrank", "cross-encoder")
+        # Skip text/lexical rerankers on the pure-vector semantic path. Expressed
+        # as an explicit capability contract (see _reranker_skips_semantic_path):
+        # a reranker may declare `skips_semantic_path`; otherwise the text-only
+        # type set decides. The endpoint (rerank.v1) path is embedding-consistent
+        # and does not skip; VoyageReranker ("voyage") is Voyage-consistent too.
+        self._reranker_skips_semantic = _reranker_skips_semantic_path(
+            reranker_type, self._reranker
+        )
 
         # Initialize legacy plugin list (backward compatibility for callers injecting plugins)
         if plugins:
@@ -1298,6 +1460,86 @@ class EnhancedDispatcher:
             logger.warning(f"Symbol route failed for '{name}': {e}")
             return []
 
+    @classmethod
+    def wrap_endpoint_reranker(
+        cls, async_reranker: Any, *, timeout: Optional[float] = None
+    ) -> "_SyncDictEndpointReranker":
+        """Wrap an async canonical :class:`IReranker` for the sync dispatcher path.
+
+        Returns a :class:`_SyncDictEndpointReranker` that presents the sync
+        ``rerank(query, List[Dict], top_k) -> List[Dict]`` convention while
+        driving ``async_reranker`` through the loop-safe sync/async bridge. This
+        is the single seam used both by ``_build_reranker`` (production wiring)
+        and by tests.
+        """
+        return _SyncDictEndpointReranker(async_reranker, timeout=timeout)
+
+    def _build_reranker(
+        self,
+        reranker_type: str,
+        *,
+        endpoint_rerank_transport: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+    ) -> Optional[Any]:
+        """Construct the reranker object for ``reranker_type`` or ``None``.
+
+        In-process trio (Voyage/FlashRank/CrossEncoder) present the sync
+        ``List[Dict]`` interface directly. The canonical ``endpoint`` type routes
+        through :class:`_SyncDictEndpointReranker` over an injected ``rerank.v1``
+        transport; with no transport it fails safe to ``None`` rather than
+        constructing a broken reranker.
+        """
+        from ..indexer.reranker import (
+            CrossEncoderReranker,
+            EndpointReranker,
+            FlashRankReranker,
+            VoyageReranker,
+        )
+
+        if reranker_type in _COMMERCIAL_RERANKER_TYPES and not _active_profile_permits_commercial():
+            logger.warning(
+                "Commercial reranker '%s' requested but the active deployment "
+                "profile does not permit commercial egress; disabling reranker",
+                reranker_type,
+            )
+            return None
+
+        if reranker_type == "voyage":
+            voyage_model = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2")
+            logger.info(f"Reranker initialized: VoyageReranker model={voyage_model}")
+            return VoyageReranker(model=voyage_model)
+        if reranker_type == "flashrank":
+            flashrank_model = os.getenv("FLASHRANK_MODEL", "ms-marco-MiniLM-L-12-v2")
+            logger.info(f"Reranker initialized: FlashRankReranker model={flashrank_model}")
+            return FlashRankReranker(model=flashrank_model)
+        if reranker_type == "cross-encoder":
+            ce_model = os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+            logger.info(f"Reranker initialized: CrossEncoderReranker model={ce_model}")
+            return CrossEncoderReranker(model=ce_model)
+        if reranker_type == "endpoint":
+            if endpoint_rerank_transport is None:
+                logger.warning(
+                    "reranker_type 'endpoint' requires an injected rerank.v1 "
+                    "transport; disabling reranker"
+                )
+                return None
+            provider = os.getenv("RERANK_ENDPOINT_PROVIDER", "endpoint")
+            endpoint = EndpointReranker(endpoint_rerank_transport, provider=provider)
+            logger.info(f"Reranker initialized: EndpointReranker provider={provider}")
+            return self.wrap_endpoint_reranker(
+                endpoint, timeout=_get_endpoint_rerank_timeout_seconds()
+            )
+        logger.warning(f"Unknown reranker_type '{reranker_type}', disabling reranker")
+        return None
+
+    def _record_rerank_diagnostics(self, diagnostics) -> None:
+        """Store and log a structured rerank outcome.
+
+        Only ids, counts, provider names, timings, and errors are recorded —
+        never raw code, snippet, or document text.
+        """
+        self._last_rerank_diagnostics = diagnostics
+        logger.info("rerank outcome: %s", diagnostics.to_dict())
+
     def _apply_reranker(
         self,
         sqlite_store: Optional[SQLiteStore],
@@ -1306,11 +1548,43 @@ class EnhancedDispatcher:
         limit: int,
         semantic_source: bool = False,
     ) -> List[Dict]:
-        """Enrich candidates with chunk text and apply the reranker if configured."""
+        """Enrich candidates with chunk text and apply the reranker if configured.
+
+        Records a truthful :class:`RerankDiagnostics` for every exit path so a
+        failed or unchanged ordering is never reported as ``succeeded``.
+        """
+        import time as _time
+
+        from ..indexer.reranker import RerankDiagnostics, RerankOutcome
+
+        provider = self._reranker_type if self._reranker is not None else None
+
+        def _order_key(items):
+            # Stable content key (file, line) — compare-only, no text leakage.
+            return [(c.get("file"), c.get("line")) for c in items]
+
         if self._reranker is None:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.NOT_CONFIGURED,
+                    candidate_count=len(candidates),
+                    returned_count=min(len(candidates), limit),
+                )
+            )
             return candidates[:limit]
+
         if semantic_source and self._reranker_skips_semantic:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.SKIPPED_POLICY,
+                    provider=provider,
+                    policy=self._reranker_type,
+                    candidate_count=len(candidates),
+                    returned_count=min(len(candidates), limit),
+                )
+            )
             return candidates[:limit]
+
         # Exclude paths with penalty >= 1.0 (benchmark/coverage noise files).
         filtered = [c for c in candidates if _path_score_penalty(c.get("file", "")) < 1.0]
         if not filtered:
@@ -1320,11 +1594,83 @@ class EnhancedDispatcher:
                 c["_rerank_doc"] = self._get_chunk_content_for_reranking(
                     sqlite_store, c.get("file", "")
                 )
+
+        # Reset any stale fallback signal before the attempt.
+        if hasattr(self._reranker, "last_fallback"):
+            self._reranker.last_fallback = None
+
+        _start = _time.perf_counter()
         try:
-            return self._reranker.rerank(query, filtered, limit)
+            reranked = self._reranker.rerank(query, filtered, limit)
         except Exception as e:
-            logger.warning(f"_apply_reranker failed, returning original order: {e}")
+            duration_ms = (_time.perf_counter() - _start) * 1000.0
+            logger.warning(
+                "_apply_reranker failed, returning original order: %s",
+                _redact_secrets(str(e)),
+            )
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.FAILED,
+                    provider=provider,
+                    candidate_count=len(filtered),
+                    returned_count=min(len(candidates), limit),
+                    duration_ms=duration_ms,
+                    error=_redact_secrets(str(e)),
+                )
+            )
             return candidates[:limit]
+
+        duration_ms = (_time.perf_counter() - _start) * 1000.0
+        reordered = _order_key(reranked) != _order_key(filtered[: len(reranked)])
+
+        # A reranker MAY publish a fallback signal (provider names only).
+        fallback = getattr(self._reranker, "last_fallback", None)
+        if fallback is not None:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.FALLBACK_APPLIED,
+                    provider=provider,
+                    failed_provider=getattr(fallback, "failed_provider", None),
+                    fallback_provider=getattr(fallback, "fallback_provider", None),
+                    candidate_count=len(filtered),
+                    returned_count=len(reranked),
+                    reordered=reordered,
+                    duration_ms=duration_ms,
+                )
+            )
+            return reranked
+
+        # A sync reranker MAY swallow a provider failure and return the original
+        # order while surfacing the reason via `last_error`. That is a FAILED
+        # outcome, NOT a no-op ATTEMPTED — otherwise a masked failure masquerades
+        # as a benign unchanged ordering.
+        last_error = getattr(self._reranker, "last_error", None)
+        if last_error is not None:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.FAILED,
+                    provider=provider,
+                    candidate_count=len(filtered),
+                    returned_count=len(reranked),
+                    reordered=reordered,
+                    duration_ms=duration_ms,
+                    error=_redact_secrets(str(last_error)),
+                )
+            )
+            return reranked
+
+        outcome = RerankOutcome.SUCCEEDED if reordered else RerankOutcome.ATTEMPTED
+        self._record_rerank_diagnostics(
+            RerankDiagnostics(
+                outcome=outcome,
+                provider=provider,
+                candidate_count=len(filtered),
+                returned_count=len(reranked),
+                reordered=reordered,
+                duration_ms=duration_ms,
+            )
+        )
+        return reranked
 
     def _is_registered_context(self, ctx: RepoContext) -> bool:
         entry = getattr(ctx, "registry_entry", None)
@@ -1538,7 +1884,7 @@ class EnhancedDispatcher:
 
             # Fuzzy (trigram) path for misspelled queries
             if fuzzy and sqlite_store:
-                logger.info(f"Using fuzzy trigram search for query: {query}")
+                logger.info("Using fuzzy trigram search (query_chars=%d)", len(query or ""))
                 try:
                     sym_results = sqlite_store.search_symbols_fuzzy(query, limit)
                     file_results = sqlite_store.search_files_fuzzy(query, limit)
@@ -1586,15 +1932,17 @@ class EnhancedDispatcher:
                     sym_results = self._symbol_route(sqlite_store, sym_name, kind_hint, limit)
                     if sym_results:
                         logger.info(
-                            f"Symbol route hit for '{query}' → '{sym_name}' "
-                            f"({len(sym_results)} result(s))"
+                            "Symbol route hit (query_chars=%d, symbol=%r, results=%d)",
+                            len(query or ""),
+                            sym_name,
+                            len(sym_results),
                         )
                         yield from sym_results
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
                         return
 
-                logger.info(f"Using direct lexical search for query: {query}")
+                logger.info("Using direct lexical search (query_chars=%d)", len(query or ""))
                 try:
                     tables_to_try = ["bm25_content", "fts_code"]
 
@@ -1700,7 +2048,11 @@ class EnhancedDispatcher:
                 )
 
             if semantic and _semantic_indexer:
-                logger.info(f"Using semantic indexer for query: {query}")
+                logger.info(
+                    "Using semantic indexer (query_chars=%d, limit=%d)",
+                    len(query or ""),
+                    limit,
+                )
                 try:
                     semantic_results = _semantic_indexer.search(query=query, limit=limit)
                     candidates = []
@@ -1858,7 +2210,11 @@ class EnhancedDispatcher:
             queries = [query]
             if is_doc_query:
                 queries = self._expand_document_query(query)
-                logger.info(f"Expanded document query '{query}' to {len(queries)} variations")
+                logger.info(
+                    "Expanded document query (query_chars=%d) to %d variations",
+                    len(query or ""),
+                    len(queries),
+                )
                 # Force semantic search for natural language queries
                 semantic = True
 
@@ -2082,7 +2438,11 @@ class EnhancedDispatcher:
         except SemanticSearchFailure:
             raise
         except Exception as e:
-            logger.error(f"Error in search for {query}: {e}", exc_info=True)
+            logger.error(
+                "Error in search (query_chars=%d): %s",
+                len(query or ""),
+                _redact_secrets(str(e)),
+            )
         finally:
             try:
                 from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter

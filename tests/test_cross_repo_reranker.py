@@ -11,16 +11,39 @@ from mcp_server.dispatcher.cross_repo_coordinator import (
     CrossRepositoryCoordinator,
     SearchContext,
 )
-from mcp_server.indexer.reranker import IReranker
+from mcp_server.indexer.reranker import (
+    IReranker,
+    RerankItem,
+    RerankResult,
+    Result,
+    SearchResult,
+)
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager
 
 
 class FakeReranker(IReranker):
-    """Reranker that reverses the order of documents."""
+    """Canonical reranker that reverses order (RERANKEND-migrated contract).
 
-    async def rerank(self, query: str, documents: List[str], top_k: int):
-        n = len(documents)
-        return list(reversed(range(n)))[:top_k]
+    Post-RERANKEND, the coordinator drives ``IReranker.rerank(query, results,
+    top_k)`` and consumes a ``Result[RerankResult]`` — correlating results back
+    by each ``RerankItem.original_rank``. (The pre-migration fake returned a bare
+    index list, encoding the very ``documents=``/index-return bug this phase
+    fixes.)
+    """
+
+    async def rerank(self, query: str, results: List[SearchResult], top_k: int):
+        n = len(results)
+        order = list(reversed(range(n)))[:top_k]
+        items = [
+            RerankItem(
+                original_result=results[original_rank],
+                rerank_score=float(n - new_rank),
+                original_rank=original_rank,
+                new_rank=new_rank,
+            )
+            for new_rank, original_rank in enumerate(order)
+        ]
+        return Result.ok(RerankResult(results=items, metadata={"reranker": "fake"}))
 
 
 @pytest.fixture

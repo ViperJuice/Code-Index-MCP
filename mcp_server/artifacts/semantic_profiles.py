@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
+from ..interfaces.inference_contracts import (
+    COMPATIBILITY_CRITICAL_FIELDS,
+    EmbeddingResponseV1,
+    EmbeddingRole,
+    ExpectedProfile,
+    ProvenanceAuthority,
+    ProvenanceField,
+    validate_profile,
+)
 from .semantic_namespace import SemanticNamespaceResolver
 
 
@@ -132,7 +142,7 @@ class SemanticProfile:
             "chunker_version": self.chunker_version,
             "compatibility_fingerprint": self.compatibility_fingerprint,
             "reranker_defaults": self.reranker_defaults,
-            "build_metadata": self.build_metadata,
+            "build_metadata": _redact_secret_fields(self.build_metadata),
         }
 
 
@@ -208,6 +218,77 @@ class SemanticProfileRegistry:
                 profile_id: profile.to_dict() for profile_id, profile in self._profiles.items()
             },
         }
+
+
+# Substrings that mark a build_metadata key as holding a raw secret VALUE.
+_SECRET_KEY_MARKERS = (
+    "api_key",
+    "apikey",
+    "secret",
+    "token",
+    "password",
+    "passwd",
+    "bearer",
+    "authorization",
+    "credential",
+    "access_key",
+    "private_key",
+)
+
+# Suffixes that mark a key as holding a secret REFERENCE (e.g. an env var name),
+# never the secret itself. These are preserved verbatim.
+_SECRET_REFERENCE_SUFFIXES = (
+    "_env",
+    "_ref",
+    "_name",
+    "_var",
+    "_reference",
+    "_key_id",
+    "_key_ref",
+)
+
+_REDACTED_PLACEHOLDER = "***redacted***"
+
+
+def _looks_like_secret_reference(key: str) -> bool:
+    """True when the key names a secret reference (env var name) not a value."""
+    return key.lower().endswith(_SECRET_REFERENCE_SUFFIXES)
+
+
+def _redact_secret_fields(metadata: Any) -> Any:
+    """Redact any credential-bearing field from a metadata structure.
+
+    Any key whose name looks like it holds a raw secret value
+    (``*api_key*``, bearer/authorization/token/secret/password/credential) is
+    replaced with a redaction placeholder. Secret-REFERENCE names (keys ending
+    in ``_env``/``_ref``/``_name`` etc.) and any ``Bearer <token>`` string
+    values are also handled. Nested mappings AND nested lists/tuples are redacted
+    recursively (e.g. ``[{"api_key": "..."}]`` or
+    ``[["Authorization", "Bearer ..."]]``) so no secret survives serialization
+    via ``to_dict`` or artifact export.
+    """
+    if isinstance(metadata, Mapping):
+        redacted: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            key_str = str(key)
+            lowered = key_str.lower()
+            is_secret_key = any(marker in lowered for marker in _SECRET_KEY_MARKERS)
+            if is_secret_key and not _looks_like_secret_reference(key_str):
+                redacted[key] = _REDACTED_PLACEHOLDER
+            else:
+                # Recurse into the value so secrets nested in mappings, lists,
+                # or tuples (or a bare ``Bearer <token>`` string) are redacted.
+                redacted[key] = _redact_secret_fields(value)
+        return redacted
+
+    if isinstance(metadata, (list, tuple)):
+        redacted_items = [_redact_secret_fields(item) for item in metadata]
+        return tuple(redacted_items) if isinstance(metadata, tuple) else redacted_items
+
+    if isinstance(metadata, str) and metadata.strip().lower().startswith("bearer "):
+        return _REDACTED_PLACEHOLDER
+
+    return metadata
 
 
 def _compute_compatibility_fingerprint(canonical_payload: Mapping[str, Any]) -> str:
@@ -322,3 +403,158 @@ def get_primary_semantic_profile_metadata(
 
     profile_id = next(iter(profiles.keys()))
     return profile_id, profiles[profile_id]
+
+
+# =====================================================================
+# Provenance attestation (IF-0-EMBEDPROV-1)
+# =====================================================================
+
+# The reconciliation remediation, named verbatim in every fail-closed diagnostic
+# so an operator is always told exactly how to recover.
+REINDEX_REMEDIATION = (
+    "Run an operator-authorized reindex to rebuild the index under the attested "
+    "provider profile (or probe-revalidate the live endpoint via "
+    "SemanticIndexer.reconcile_existing_collection)."
+)
+
+@dataclass
+class ProfileAttestation:
+    """Outcome of reconciling a provider response against a semantic profile.
+
+    ``ok`` is fail-closed: any compatibility-critical field that is neither
+    server-``reported`` nor operator-``declared`` (i.e. still ``unknown`` after the
+    declared overlay), or whose server-reported value mismatches the profile,
+    makes ``ok`` False. ``derived`` records, per compatibility-critical field, the
+    value the index should be stamped with (server-reported values replace assumed
+    ones) and the authority/source it came from.
+    """
+
+    ok: bool
+    failures: List[str] = field(default_factory=list)
+    checked_fields: List[str] = field(default_factory=list)
+    derived: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    reported_fields: List[str] = field(default_factory=list)
+    role: Optional[str] = None
+    remediation: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "failures": list(self.failures),
+            "checked_fields": list(self.checked_fields),
+            "derived": {name: dict(entry) for name, entry in self.derived.items()},
+            "reported_fields": list(self.reported_fields),
+            "role": self.role,
+            "remediation": self.remediation,
+        }
+
+    def failure_reason(self, *, subject: str = "embedding profile") -> str:
+        """Human-actionable diagnostic that always NAMES the remediation."""
+        detail = "; ".join(self.failures) or "provenance validation failed"
+        remediation = self.remediation or REINDEX_REMEDIATION
+        return (
+            f"Provenance attestation failed for {subject}: {detail}. "
+            f"Refusing to write vectors under an unverified profile. {remediation}"
+        )
+
+
+def build_expected_profile(profile: Any, *, role: Optional[EmbeddingRole] = None) -> ExpectedProfile:
+    """Build an :class:`ExpectedProfile` from a semantic profile's assumed values."""
+    return ExpectedProfile(
+        served_model_id=getattr(profile, "model_name", None),
+        model_revision=getattr(profile, "model_version", None),
+        dimension=getattr(profile, "vector_dimension", None),
+        normalization=getattr(profile, "normalization_policy", None),
+        role=role,
+        processor_id=None,
+    )
+
+
+def _overlay_declared(
+    response: EmbeddingResponseV1, expected: ExpectedProfile
+) -> EmbeddingResponseV1:
+    """Return a copy of ``response`` with unknown critical fields declared.
+
+    A compatibility-critical field the provider left ``unknown`` is explicitly
+    upgraded to ``declared`` using the operator's profile value — never silently
+    assumed and never fabricated as ``reported``. A field the profile also cannot
+    supply stays ``unknown`` so it fails closed. The original response is not
+    mutated.
+    """
+    effective = copy.copy(response)
+    for name in COMPATIBILITY_CRITICAL_FIELDS:
+        pf = response.provenance_field(name)
+        if pf.authority == ProvenanceAuthority.UNKNOWN:
+            declared_value = expected.expected_value(name)
+            if declared_value is not None:
+                setattr(effective, name, ProvenanceField.declared(declared_value))
+    return effective
+
+
+def attest_embedding_response(
+    profile: Any,
+    response: EmbeddingResponseV1,
+    *,
+    role: Optional[EmbeddingRole] = None,
+    remediation: str = REINDEX_REMEDIATION,
+) -> ProfileAttestation:
+    """Attest a provider ``embedding-response.v1`` against a semantic profile.
+
+    Server-``reported`` values are the highest authority and are carried into the
+    derived profile (replacing the assumed value). Fields the provider cannot
+    report are explicitly ``declared`` from profile config. Any compatibility-
+    critical field that remains ``unknown``, or whose reported value mismatches the
+    profile, fails closed (``ok=False``) with a remediation-naming diagnostic.
+    """
+    expected = build_expected_profile(profile, role=role)
+    effective = _overlay_declared(response, expected)
+    result = validate_profile(expected, effective)
+
+    derived: Dict[str, Dict[str, Any]] = {}
+    reported_fields: List[str] = []
+    for name in COMPATIBILITY_CRITICAL_FIELDS:
+        pf = effective.provenance_field(name)
+        if pf.authority == ProvenanceAuthority.REPORTED:
+            source = "reported"
+            reported_fields.append(name)
+        elif pf.authority == ProvenanceAuthority.DECLARED:
+            source = "declared"
+        else:
+            source = "unknown"
+        derived[name] = {
+            "value": pf.value,
+            "authority": pf.authority.value,
+            "source": source,
+        }
+
+    return ProfileAttestation(
+        ok=result.ok,
+        failures=result.failures,
+        checked_fields=result.checked_fields,
+        derived=derived,
+        reported_fields=reported_fields,
+        role=_resolve_role_string(role, response),
+        remediation=None if result.ok else remediation,
+    )
+
+
+def _resolve_role_string(
+    role: Optional[EmbeddingRole], response: EmbeddingResponseV1
+) -> Optional[str]:
+    """Resolve the attestation's recorded role to an actual role STRING.
+
+    Honors the explicit ``role=`` argument when supplied (never overriding the
+    caller's intent with the response's own tag), and otherwise falls back to the
+    response's ``role`` provenance value. In both cases the result is the plain
+    role string (e.g. ``"document"``) — never an :class:`EmbeddingRole` repr like
+    ``"EmbeddingRole.DOCUMENT"`` and never a raw :class:`ProvenanceField`.
+    """
+    if role is not None:
+        return role.value if isinstance(role, EmbeddingRole) else str(role)
+
+    raw = response.role.value if isinstance(response.role, ProvenanceField) else response.role
+    if isinstance(raw, EmbeddingRole):
+        return raw.value
+    if isinstance(raw, str):
+        return raw
+    return None

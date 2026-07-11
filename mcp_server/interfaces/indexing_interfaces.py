@@ -418,51 +418,25 @@ class IIncrementalIndexer(ABC):
 # ========================================
 # Reranking Interfaces
 # ========================================
-
-
-@dataclass
-class RerankResult:
-    """Result from reranking operation"""
-
-    original_result: SearchResult
-    rerank_score: float
-    original_rank: int
-    new_rank: int
-    explanation: Optional[str] = None
-
-
-class IReranker(ABC):
-    """Interface for reranking search results"""
-
-    @abstractmethod
-    async def rerank(
-        self, query: str, results: List[SearchResult], top_k: Optional[int] = None
-    ) -> Result[List[RerankResult]]:
-        """Rerank search results based on relevance to query"""
-
-    @abstractmethod
-    async def initialize(self, config: Dict[str, Any]) -> Result[None]:
-        """Initialize the reranker with configuration"""
-
-    @abstractmethod
-    async def shutdown(self) -> Result[None]:
-        """Shutdown the reranker and clean up resources"""
-
-    @abstractmethod
-    def get_capabilities(self) -> Dict[str, Any]:
-        """Get reranker capabilities and metadata"""
-
-
-class IRerankerFactory(ABC):
-    """Factory for creating reranker instances"""
-
-    @abstractmethod
-    def create_reranker(self, reranker_type: str, config: Dict[str, Any]) -> IReranker:
-        """Create a reranker instance"""
-
-    @abstractmethod
-    def get_available_rerankers(self) -> List[str]:
-        """Get list of available reranker types"""
+#
+# CONSOLIDATED (RERANKEND / IF-0-RERANKEND-1): there is now exactly ONE canonical
+# reranker interface, the async ``IReranker`` defined in
+# ``mcp_server.indexer.reranker``. This module previously declared a DUPLICATE
+# ``IReranker`` / ``RerankResult`` / ``IRerankerFactory`` here; those are now
+# re-exported from the canonical module so this remains a valid import site for
+# existing callers while pointing at a single source of truth. Prefer importing
+# these directly from ``mcp_server.indexer.reranker`` in new code.
+#
+# ``RerankResult`` here now refers to the canonical container
+# (``{results: List[RerankItem], metadata: dict}``); the per-item shape is
+# ``RerankItem`` (also re-exported). The de-facto return convention is
+# ``Result[RerankResult]`` — see the reranker module docstring.
+from mcp_server.indexer.reranker import (  # noqa: E402,F401  (re-export for consolidation)
+    IReranker,
+    IRerankerFactory,
+    RerankItem,
+    RerankResult,
+)
 
 
 # ========================================

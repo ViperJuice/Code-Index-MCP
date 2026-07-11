@@ -36,6 +36,24 @@ from mcp_server.storage.sqlite_store import (  # noqa: F401  (patched by tests; 
 logger = logging.getLogger(__name__)
 
 
+# Redact bearer/api-key/token-like substrings from exception text before it is
+# stored in rerank diagnostics or written to logs. Kept small and local to avoid
+# a circular import back into the dispatcher module.
+_SECRET_REDACTION_PATTERN = re.compile(
+    r"(?i)"
+    r"(?:bearer\s+[A-Za-z0-9._\-]+)"
+    r"|(?:(?:api[_-]?key|apikey|token|secret|password|authorization)\s*[=:]\s*[^\s,;'\"]+)"
+    r"|(?:sk-[A-Za-z0-9]{6,})"
+)
+
+
+def _redact_secrets(text: Optional[str]) -> Optional[str]:
+    """Strip credential-like substrings from *text* before diagnostics/logging."""
+    if not text:
+        return text
+    return _SECRET_REDACTION_PATTERN.sub("[REDACTED]", str(text))
+
+
 @dataclass
 class SearchContext:
     """Context for cross-repository search operations."""
@@ -108,6 +126,9 @@ class CrossRepositoryCoordinator:
         self.enable_semantic = enable_semantic
         self.enable_reranking = enable_reranking
 
+        # Structured outcome of the most recent rerank attempt (RERANKEND).
+        self.last_rerank_diagnostics = None
+
         # Initialize reranker: injected > factory > None
         if reranker is not None:
             self.reranker: Optional[Reranker] = reranker
@@ -157,7 +178,11 @@ class CrossRepositoryCoordinator:
             List of aggregated results
         """
         start_time = datetime.now()
-        logger.info(f"Starting cross-repository search: {context.query}")
+        logger.info(
+            "Starting cross-repository search (query_chars=%d, type=%s)",
+            len(context.query or ""),
+            context.search_type,
+        )
 
         # Get search strategy
         strategy = self._strategies.get(context.search_type, self._strategies["symbol"])
@@ -349,27 +374,123 @@ class CrossRepositoryCoordinator:
     async def _rerank_results(
         self, results: List[AggregatedResult], context: SearchContext
     ) -> List[AggregatedResult]:
-        """Rerank results using semantic reranker."""
-        if not results:
+        """Rerank results using the canonical :class:`IReranker` interface.
+
+        Drives ``IReranker.rerank(query, results, top_k)`` (positional canonical
+        signature) which returns a ``Result[RerankResult]``. Results are
+        correlated back to their :class:`AggregatedResult` by each
+        ``RerankItem.original_rank`` — NOT by a bare index list (the pre-migration
+        code incorrectly passed ``documents=`` and expected an index list, which
+        no concrete canonical reranker returns). A truthful structured outcome is
+        recorded on ``last_rerank_diagnostics``; it carries ids/counts/providers
+        only, never query or document text.
+        """
+        from mcp_server.indexer.reranker import (
+            RerankDiagnostics,
+            RerankOutcome,
+        )
+        from mcp_server.indexer.reranker import SearchResult as RerankSearchResult
+
+        if self.reranker is None:
+            # NOT_CONFIGURED is reserved for the absent-reranker case only.
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.NOT_CONFIGURED,
+                candidate_count=len(results),
+                returned_count=len(results),
+            )
             return results
 
-        # Prepare documents for reranking
-        documents = []
-        for result in results:
-            # Create document representation
-            doc = self._create_document_repr(result.content, context.search_type)
-            documents.append(doc)
+        if not results:
+            # A reranker IS configured; there is nothing to rerank. That is an
+            # ATTEMPTED (empty) outcome, never NOT_CONFIGURED.
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.ATTEMPTED,
+                candidate_count=0,
+                returned_count=0,
+            )
+            return results
 
-        # Perform reranking
-        reranked_indices = await self.reranker.rerank(
-            query=context.query, documents=documents, top_k=min(len(results), context.max_results)
-        )
+        # Build canonical SearchResult candidates; the document representation is
+        # carried as the reranker snippet text.
+        candidates = [
+            RerankSearchResult(
+                file_path=str(result.content.get("file", "") if isinstance(result.content, dict) else ""),
+                start_line=0,
+                end_line=0,
+                column=0,
+                snippet=self._create_document_repr(result.content, context.search_type),
+                match_type=context.search_type,
+                score=float(getattr(result, "score", 0.0) or 0.0),
+            )
+            for result in results
+        ]
+        top_k = min(len(results), context.max_results)
 
-        # Reorder results
-        reranked_results = []
-        for idx in reranked_indices:
-            if idx < len(results):
+        try:
+            # `initialize` is an optional BaseReranker detail, not part of the
+            # canonical IReranker contract; call it once if present.
+            if not getattr(self, "_reranker_initialized", False) and hasattr(
+                self.reranker, "initialize"
+            ):
+                init_result = await self.reranker.initialize({})
+                if not init_result.is_success:
+                    _err = _redact_secrets(str(init_result.error))
+                    logger.warning("Reranker initialization failed: %s", _err)
+                    self.last_rerank_diagnostics = RerankDiagnostics(
+                        outcome=RerankOutcome.FAILED,
+                        error=_err,
+                        candidate_count=len(results),
+                        returned_count=len(results),
+                    )
+                    return results
+            self._reranker_initialized = True
+
+            rerank_result = await self.reranker.rerank(context.query, candidates, top_k)
+        except Exception as exc:
+            record_handled_error(__name__, exc)
+            _err = _redact_secrets(str(exc))
+            logger.warning("Reranking failed, returning scored order: %s", _err)
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.FAILED,
+                error=_err,
+                candidate_count=len(results),
+                returned_count=len(results),
+            )
+            return results
+
+        if not getattr(rerank_result, "is_success", False) or not getattr(
+            rerank_result, "data", None
+        ):
+            _err = _redact_secrets(str(getattr(rerank_result, "error", "no data")))
+            logger.warning("Reranking returned no data: %s", _err)
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.FAILED,
+                error=_err,
+                candidate_count=len(results),
+                returned_count=len(results),
+            )
+            return results
+
+        # Reorder original AggregatedResults by each item's original_rank.
+        reranked_results: List[AggregatedResult] = []
+        for item in rerank_result.data.results:
+            idx = item.original_rank
+            if 0 <= idx < len(results):
                 reranked_results.append(results[idx])
+
+        reordered = [id(r) for r in reranked_results] != [
+            id(r) for r in results[: len(reranked_results)]
+        ]
+        provider = None
+        metadata = getattr(rerank_result.data, "metadata", None) or {}
+        provider = metadata.get("provider") or metadata.get("reranker")
+        self.last_rerank_diagnostics = RerankDiagnostics(
+            outcome=RerankOutcome.SUCCEEDED if reordered else RerankOutcome.ATTEMPTED,
+            provider=provider,
+            candidate_count=len(results),
+            returned_count=len(reranked_results),
+            reordered=reordered,
+        )
 
         return reranked_results
 

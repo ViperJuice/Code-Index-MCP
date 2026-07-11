@@ -47,6 +47,9 @@ class _FakeQdrantClient:
             )
         )
 
+    def create_collection(self, *, collection_name, vectors_config):
+        self.collections[collection_name] = (vectors_config.size, vectors_config.distance)
+
     def recreate_collection(self, *, collection_name, vectors_config):
         self.collections[collection_name] = (vectors_config.size, vectors_config.distance)
 
@@ -392,3 +395,84 @@ def test_ensure_qdrant_collection_blocks_shape_mismatch_when_recreate_disallowed
 
     assert result.status == "blocked"
     assert result.actual_dimension == 1024
+
+
+def _bare_reconcile_indexer(client, *, active_dimension: int):
+    """A SemanticIndexer wired for the reconcile path without the heavy __init__.
+
+    Attestation is stubbed to succeed (compatible probe); the collection-shape
+    validation and recreate/persist behavior under test are the REAL methods.
+    """
+    indexer = SemanticIndexer.__new__(SemanticIndexer)
+    indexer._qdrant_available = True
+    indexer.qdrant = client
+    indexer.collection = "semantic-oss-high"
+    indexer.embedding_dimension = active_dimension
+    indexer.distance_metric = "cosine"
+    indexer._writes_prepared = False
+    indexer._attestation = None
+
+    writes: list = []
+    attestation = SimpleNamespace(ok=True, to_dict=lambda: {"ok": True})
+    indexer._provider_supports_provenance = lambda: True
+    indexer._attest_active_profile = lambda **_kw: attestation
+    indexer._attested_metadata = lambda _att: {
+        "attested": True,
+        "model_dimension": indexer.embedding_dimension,
+    }
+    indexer._atomic_write_metadata = lambda meta: writes.append(meta)
+    return indexer, writes
+
+
+def test_reconcile_compatible_probe_over_profile_migrated_shape_requires_reindex():
+    """N1: a COMPATIBLE probe over a profile-migrated (dimension-changed) collection
+    must NOT persist attested metadata over the stale shape.
+
+    Repro: active profile is now 8-d and the provider attests OK, but the existing
+    collection is the stale 16-d v9 one. Without ``allow_reindex`` the reconcile must
+    return ``reindex_required`` and mutate/persist nothing; with ``allow_reindex`` it
+    recreates to the active shape FIRST, then persists under the verified attestation.
+    """
+    cosine = SemanticIndexer.resolve_qdrant_distance("cosine")
+
+    # ---- allow_reindex=False: reindex_required, nothing persisted / mutated ----
+    client = _FakeQdrantClient()
+    client.collections["semantic-oss-high"] = (16, cosine)  # stale v9 16-d shape
+    indexer, writes = _bare_reconcile_indexer(client, active_dimension=8)
+
+    result = indexer.reconcile_existing_collection()
+
+    assert result["status"] == "reindex_required"
+    assert "reindex" in result["message"].lower()
+    # The bug was persisting attested=True (model_dimension=8) over the 16-d shape.
+    assert writes == []
+    assert client.collections["semantic-oss-high"] == (16, cosine)  # untouched
+    assert indexer._writes_prepared is False
+
+    # ---- allow_reindex=True: recreate to active shape, THEN persist attested ----
+    client = _FakeQdrantClient()
+    client.collections["semantic-oss-high"] = (16, cosine)
+    indexer, writes = _bare_reconcile_indexer(client, active_dimension=8)
+
+    result = indexer.reconcile_existing_collection(allow_reindex=True)
+
+    assert result["status"] == "reindexed"
+    assert client.collections["semantic-oss-high"] == (8, cosine)  # rebuilt to active dim
+    # Persisted exactly once, AFTER the recreate (so never over the stale shape).
+    assert writes == [{"attested": True, "model_dimension": 8}]
+    assert indexer._writes_prepared is True
+
+
+def test_reconcile_compatible_probe_matching_shape_still_reconciles():
+    """Guard: the N1 shape gate does not disturb the normal compatible path when the
+    live collection already matches the active shape."""
+    cosine = SemanticIndexer.resolve_qdrant_distance("cosine")
+    client = _FakeQdrantClient()
+    client.collections["semantic-oss-high"] = (8, cosine)  # already at active shape
+    indexer, writes = _bare_reconcile_indexer(client, active_dimension=8)
+
+    result = indexer.reconcile_existing_collection()
+
+    assert result["status"] == "reconciled"
+    assert writes == [{"attested": True, "model_dimension": 8}]
+    assert indexer._writes_prepared is True

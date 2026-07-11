@@ -1,0 +1,176 @@
+{
+  "schema": "inference_rollout_run.v1",
+  "phase": "INFERGATE",
+  "interface": "IF-0-INFERGATE-1",
+  "code_commit": "6cb4d7163141a3601323a72482044b3fe47ae935",
+  "corpus_commit": "f7c060b4f145516a4629338e078d3b8b9c0c406a",
+  "bound_checksums": {
+    "dataset_sha256": "62263e2d2ddcedea2e464cc56d913d3ed64117232d093e31b6f8e9a7e378100d",
+    "corpus_sha256": "93c894e1435f55ff0ce56c13a78a7c7be18a55e0e8a83816eb357ac13a22e089",
+    "thresholds_sha256": "3587b91d8d8ac6ef35f224768fcd64b812558fd4d7c275f19e7190c69499cf36"
+  },
+  "corpus_reconstruction_verified": true,
+  "corpus_doc_count": 872,
+  "live_services": {
+    "qdrant_localhost_6333": true,
+    "embedding_endpoint_ai_8001": false,
+    "rerank_endpoint_functional": false
+  },
+  "split_evaluated": "main",
+  "holdout_used_for_tuning": false,
+  "holdout_ids": [
+    "AC-03",
+    "CD-04",
+    "CD-06",
+    "CF-03",
+    "EI-05",
+    "EO-04",
+    "HN-02",
+    "HN-06",
+    "II-04",
+    "II-07"
+  ],
+  "n_queries_main": 40,
+  "arms_ran": {
+    "lexical": {
+      "metrics": {
+        "egress": false,
+        "inference_cost": 0.0,
+        "error_rate": 0.0,
+        "zero_result_rate": 0.0,
+        "latency_p50_ms": 0.5496162921190262,
+        "latency_p95_ms": 0.8949721232056617,
+        "depths": {
+          "20": {
+            "ndcg@10": 0.36989955722691653,
+            "recall@50": 0.6875,
+            "ndcg@20": 0.3837920096123876,
+            "recall@20": 0.6125,
+            "mrr": 0.32899436090225564,
+            "zero_result_rate": 0.0,
+            "error_rate": 0.0,
+            "n_scored": 40
+          },
+          "50": {
+            "ndcg@10": 0.36989955722691653,
+            "recall@50": 0.6875,
+            "ndcg@50": 0.4011290814574512,
+            "mrr": 0.32899436090225564,
+            "zero_result_rate": 0.0,
+            "error_rate": 0.0,
+            "n_scored": 40
+          },
+          "100": {
+            "ndcg@10": 0.36989955722691653,
+            "recall@50": 0.6875,
+            "ndcg@100": 0.4034732178000489,
+            "recall@100": 0.7,
+            "mrr": 0.32899436090225564,
+            "zero_result_rate": 0.0,
+            "error_rate": 0.0,
+            "n_scored": 40
+          }
+        }
+      },
+      "predicate_eval": {
+        "checks": [
+          {
+            "predicate": "ndcg@10@depth20",
+            "value": 0.3699,
+            "floor": 0.3,
+            "pass": true
+          },
+          {
+            "predicate": "mrr@depth20",
+            "value": 0.329,
+            "floor": 0.35,
+            "pass": false
+          },
+          {
+            "predicate": "recall@50@depth20",
+            "value": 0.6875,
+            "floor": 0.6,
+            "pass": true
+          },
+          {
+            "predicate": "ndcg@10@depth50",
+            "value": 0.3699,
+            "floor": 0.3,
+            "pass": true
+          },
+          {
+            "predicate": "mrr@depth50",
+            "value": 0.329,
+            "floor": 0.35,
+            "pass": false
+          },
+          {
+            "predicate": "recall@50@depth50",
+            "value": 0.6875,
+            "floor": 0.6,
+            "pass": true
+          },
+          {
+            "predicate": "ndcg@10@depth100",
+            "value": 0.3699,
+            "floor": 0.3,
+            "pass": true
+          },
+          {
+            "predicate": "mrr@depth100",
+            "value": 0.329,
+            "floor": 0.35,
+            "pass": false
+          },
+          {
+            "predicate": "recall@50@depth100",
+            "value": 0.6875,
+            "floor": 0.6,
+            "pass": true
+          },
+          {
+            "predicate": "p95_latency_ms",
+            "value": 0.895,
+            "ceiling": 150,
+            "pass": true
+          },
+          {
+            "predicate": "error_rate",
+            "value": 0.0,
+            "ceiling": 0.02,
+            "pass": true
+          },
+          {
+            "predicate": "zero_result_rate",
+            "value": 0.0,
+            "ceiling": 0.05,
+            "pass": true
+          },
+          {
+            "predicate": "commercial_egress_fraction",
+            "value": 0.0,
+            "ceiling": 0.0,
+            "pass": true
+          }
+        ],
+        "all_pass": false
+      },
+      "note": "BM25-lite over corpus file paths+names only (not file contents); weaker than full-text BM25. Zero source-text egress by construction."
+    }
+  },
+  "arms_not_run": {
+    "dense": "live inference services not fully reachable (embedding endpoint ai:8001 unreachable). Dense/fused arms require query+corpus embeddings, so they cannot be scored without inventing numbers (probe state: embedding_up=False, qdrant_up=True).",
+    "hybrid": "live inference services not fully reachable (embedding endpoint ai:8001 unreachable). Dense/fused arms require query+corpus embeddings, so they cannot be scored without inventing numbers (probe state: embedding_up=False, qdrant_up=True).",
+    "hybrid_rerank": "live inference services not fully reachable (embedding endpoint ai:8001 unreachable). Dense/fused arms require query+corpus embeddings, so they cannot be scored without inventing numbers (probe state: embedding_up=False, qdrant_up=True)."
+  },
+  "decision_algorithm": "hybrid_rerank is default-enable-eligible iff, evaluated only on the non-holdout queries against the frozen corpus: ndcg@10 >= min_quality.ndcg@10.hybrid_rerank AND mrr >= min_quality.mrr.hybrid_rerank AND recall@50 >= min_quality.recall@50.hybrid_rerank at every depth in depths, AND p95 latency <= max_latency_ms.p95.hybrid_rerank, AND error_rate <= max_error_rate, AND zero_result_rate <= max_zero_result_rate, AND the commercial-egress fraction <= max_commercial_egress_fraction (i.e. no source text left the host on the lexical_only path and any commercial provider egress stays within the frozen bound). Each arm must also clear its own per-arm min_quality entries to be reported as passing; failing any single predicate fails the gate for that arm. holdout_unused_required=true means the run is invalid if any holdout query id was used for tuning or threshold selection. These numeric thresholds are the FROZEN gate: a reviewer MAY tune the values before provider work begins, but the file and its sha256 recorded in MANIFEST.json are the binding contract.",
+  "verdict": "dark_opt_in",
+  "verdict_basis": "hybrid_rerank not_run (live inference services not fully reachable (embedding endpoint ai:8001 unreachable). Dense/fused arms require query+corpus embeddings, so they cannot be scored without inventing numbers (probe state: embedding_up=False, qdrant_up=True).); the frozen decision algorithm's conjunction is unsatisfiable without provider evidence, so it is not default-enable-eligible. This is insufficient-evidence, not a measured failure -> dark_opt_in, not rejected.",
+  "verdict_target_arm_predicates": null,
+  "review": {
+    "reviewer": "roadmap-v10 board",
+    "date": "2026-07-11",
+    "dataset_checksum": "62263e2d2ddcedea2e464cc56d913d3ed64117232d093e31b6f8e9a7e378100d",
+    "signed": true
+  }
+}

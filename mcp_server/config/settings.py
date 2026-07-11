@@ -6,9 +6,11 @@ import json
 import os
 import re
 import secrets
+from dataclasses import dataclass
+from enum import Enum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 from urllib.parse import urlparse
 
 import yaml
@@ -789,6 +791,454 @@ class Settings(BaseModel):
             return f"treesitter-chunker@{version('treesitter-chunker')}"
         except PackageNotFoundError:
             return "treesitter-chunker@not-installed"
+
+
+# ---------------------------------------------------------------------------
+# Deployment profiles (IF-0-INFERPROFILES-1)
+# ---------------------------------------------------------------------------
+#
+# A profile is an explicit, declarative statement of an inference posture: which
+# embedding provider is used, which reranker path is taken, whether commercial
+# source-code egress is involved (with a human-readable disclosure), and whether
+# the profile depends on learned models at all.
+#
+# This registry is intentionally PURE DATA (identifier strings + enums). It does
+# NOT import ``embedding_providers`` or ``reranker`` at module scope: those pull
+# heavy optional dependencies (voyageai, torch) and settings.py is imported
+# broadly. Live construction of a provider/reranker is a caller concern; the
+# registry only declares the wiring so that resolution stays network-free and
+# side-effect-free. In particular, resolving/degrading a profile NEVER touches a
+# Qdrant collection — collection lifecycle stays fail-closed in INFERSAFE's
+# ``ensure_qdrant_collection`` (default ``allow_recreate=False``), and this
+# module never calls it.
+
+
+class DeploymentProfile(str, Enum):
+    """The four supported inference deployment postures."""
+
+    #: Optional local/in-process inference. In-process rerank (FlashRank /
+    #: cross-encoder) via the RERANKEND standalone-profile gate; optional local
+    #: embedding if configured. No commercial egress. Learned models opt-in.
+    STANDALONE_LOCAL = "standalone_local"
+
+    #: Endpoint inference against a private OpenAI-compatible / ai-stack endpoint
+    #: (OpenAI-compatible embeddings + ``EndpointReranker``) plus Qdrant. No
+    #: commercial egress.
+    FLEET_LOCAL = "fleet_local"
+
+    #: Commercial endpoint providers (Voyage embeddings / Cohere reranking).
+    #: MUST be opt-in and is visibly marked as source-code egress.
+    COMMERCIAL = "commercial"
+
+    #: No learned-model dependency at all: BM25 / symbol search only. This is the
+    #: dependency-free path and the safe degradation target.
+    LEXICAL_ONLY = "lexical_only"
+
+
+class RerankerPath(str, Enum):
+    """Which reranker construction path a profile declares."""
+
+    #: No reranking (lexical/symbol ordering only).
+    NONE = "none"
+
+    #: In-process reranker behind ``RerankerFactory.create_standalone_reranker``
+    #: (requires ``standalone_profile=True``).
+    STANDALONE_IN_PROCESS = "standalone_in_process"
+
+    #: ``EndpointReranker`` over the ``rerank.v1`` wire contract (private stack).
+    ENDPOINT = "endpoint"
+
+    #: Commercial endpoint reranker (Cohere ``/v2/rerank`` adapter). Egress.
+    COMMERCIAL_ENDPOINT = "commercial_endpoint"
+
+
+#: Safe default posture. Deliberately the dependency-free, no-egress profile so
+#: that neither commercial egress nor learned-model dependency is ever selected
+#: implicitly (INFERGATE owns any default-enablement decision).
+DEFAULT_DEPLOYMENT_PROFILE = DeploymentProfile.LEXICAL_ONLY
+
+_NO_EGRESS_DISCLOSURE = "No source-code egress: inference stays on operator-controlled infrastructure."
+
+
+class CommercialEgressNotOptedIn(ValueError):
+    """Raised when a commercial (source-code egress) profile is selected without
+    an explicit opt-in. Commercial egress is never implicit."""
+
+
+@dataclass(frozen=True)
+class DeploymentProfileContract:
+    """Declarative contract for one deployment profile.
+
+    Attributes:
+        profile: The :class:`DeploymentProfile` this contract describes.
+        embedding_provider: Embedding provider *name string* (as understood by
+            ``create_embedding_provider``), or ``None`` when the profile uses no
+            embedding provider (``lexical_only``).
+        embedding_provider_locality: Human label for where embeddings run
+            (``"local"``, ``"private_endpoint"``, ``"commercial"``, ``"none"``).
+        reranker_path: Which :class:`RerankerPath` the profile declares.
+        requires_learned_models: Whether the profile depends on any learned model
+            (embedding or reranker). ``lexical_only`` is the only ``False``.
+        commercial_egress: Whether resolving this profile sends source code to a
+            third-party commercial API.
+        egress_disclosure: Human-readable disclosure string (always present).
+        fallback_profile: Profile to degrade to on provider unavailability, or
+            ``None`` if the profile is already the terminal fallback. Fallbacks
+            never escalate into commercial egress.
+        description: Operator-facing one-line description.
+    """
+
+    profile: DeploymentProfile
+    embedding_provider: Optional[str]
+    embedding_provider_locality: str
+    reranker_path: RerankerPath
+    requires_learned_models: bool
+    commercial_egress: bool
+    egress_disclosure: str
+    fallback_profile: Optional[DeploymentProfile]
+    description: str
+
+    @property
+    def is_lexical_only(self) -> bool:
+        return self.profile is DeploymentProfile.LEXICAL_ONLY
+
+
+#: The frozen profile registry. Keep this declarative; add construction logic in
+#: callers, not here.
+DEPLOYMENT_PROFILES: Dict[DeploymentProfile, DeploymentProfileContract] = {
+    DeploymentProfile.STANDALONE_LOCAL: DeploymentProfileContract(
+        profile=DeploymentProfile.STANDALONE_LOCAL,
+        embedding_provider="openai_compatible",
+        embedding_provider_locality="local",
+        reranker_path=RerankerPath.STANDALONE_IN_PROCESS,
+        requires_learned_models=True,
+        commercial_egress=False,
+        egress_disclosure=_NO_EGRESS_DISCLOSURE,
+        fallback_profile=DeploymentProfile.LEXICAL_ONLY,
+        description=(
+            "Optional local/in-process inference (in-process FlashRank / "
+            "cross-encoder rerank via the standalone profile flag; local "
+            "embedding if configured). Learned models are opt-in."
+        ),
+    ),
+    DeploymentProfile.FLEET_LOCAL: DeploymentProfileContract(
+        profile=DeploymentProfile.FLEET_LOCAL,
+        embedding_provider="openai_compatible",
+        embedding_provider_locality="private_endpoint",
+        reranker_path=RerankerPath.ENDPOINT,
+        requires_learned_models=True,
+        commercial_egress=False,
+        egress_disclosure=_NO_EGRESS_DISCLOSURE,
+        fallback_profile=DeploymentProfile.LEXICAL_ONLY,
+        description=(
+            "Endpoint inference via a private OpenAI-compatible / ai-stack "
+            "endpoint (OpenAI-compatible embeddings + EndpointReranker) plus "
+            "Qdrant. No commercial egress."
+        ),
+    ),
+    DeploymentProfile.COMMERCIAL: DeploymentProfileContract(
+        profile=DeploymentProfile.COMMERCIAL,
+        embedding_provider="voyage",
+        embedding_provider_locality="commercial",
+        reranker_path=RerankerPath.COMMERCIAL_ENDPOINT,
+        requires_learned_models=True,
+        commercial_egress=True,
+        egress_disclosure=(
+            "SOURCE-CODE EGRESS: source code is sent to third-party commercial "
+            "APIs (Voyage AI embeddings and/or Cohere reranking). This profile "
+            "must be explicitly opted into and is never selected implicitly."
+        ),
+        fallback_profile=DeploymentProfile.LEXICAL_ONLY,
+        description=(
+            "Commercial endpoint providers (Voyage / Cohere). Opt-in only and "
+            "visibly marked as source-code egress."
+        ),
+    ),
+    DeploymentProfile.LEXICAL_ONLY: DeploymentProfileContract(
+        profile=DeploymentProfile.LEXICAL_ONLY,
+        embedding_provider=None,
+        embedding_provider_locality="none",
+        reranker_path=RerankerPath.NONE,
+        requires_learned_models=False,
+        commercial_egress=False,
+        egress_disclosure=_NO_EGRESS_DISCLOSURE,
+        fallback_profile=None,
+        description=(
+            "No learned-model dependency at all (BM25 / symbol search only). "
+            "Dependency-free path and the safe degradation target."
+        ),
+    ),
+}
+
+
+def _coerce_profile(profile: "DeploymentProfile | str") -> DeploymentProfile:
+    """Coerce a string or enum into a :class:`DeploymentProfile`."""
+    if isinstance(profile, DeploymentProfile):
+        return profile
+    try:
+        return DeploymentProfile(str(profile).strip().lower())
+    except ValueError as exc:
+        valid = ", ".join(p.value for p in DeploymentProfile)
+        raise ValueError(
+            f"Unknown deployment profile {profile!r}. Valid profiles: {valid}."
+        ) from exc
+
+
+def resolve_deployment_profile(
+    profile: "DeploymentProfile | str" = DEFAULT_DEPLOYMENT_PROFILE,
+    *,
+    allow_commercial: bool = False,
+) -> DeploymentProfileContract:
+    """Resolve a deployment profile name/enum into its declarative contract.
+
+    Commercial egress is never implicit: selecting the ``commercial`` profile
+    requires ``allow_commercial=True`` (the operator's explicit opt-in). Any
+    other profile resolves without egress.
+
+    Args:
+        profile: Profile name string or :class:`DeploymentProfile`. Defaults to
+            the safe, dependency-free :data:`DEFAULT_DEPLOYMENT_PROFILE`.
+        allow_commercial: Must be ``True`` to resolve the ``commercial`` profile.
+
+    Returns:
+        The frozen :class:`DeploymentProfileContract` for the profile.
+
+    Raises:
+        ValueError: on an unknown profile name.
+        CommercialEgressNotOptedIn: when a commercial-egress profile is selected
+            without ``allow_commercial=True``.
+    """
+    resolved = _coerce_profile(profile)
+    contract = DEPLOYMENT_PROFILES[resolved]
+    if contract.commercial_egress and not allow_commercial:
+        raise CommercialEgressNotOptedIn(
+            f"Profile '{resolved.value}' involves source-code egress and must be "
+            "opted into explicitly (allow_commercial=True). "
+            f"{contract.egress_disclosure}"
+        )
+    return contract
+
+
+#: Env var naming the active deployment profile (value is a ``DeploymentProfile``
+#: string, e.g. ``"fleet_local"``). Absent -> the safe ``lexical_only`` default.
+ACTIVE_PROFILE_ENV = "MCP_DEPLOYMENT_PROFILE"
+
+#: Env var that operators must set truthy (e.g. ``1``) to opt into commercial
+#: source-code egress. Absent/falsey -> commercial resolution is refused.
+ALLOW_COMMERCIAL_EGRESS_ENV = "MCP_ALLOW_COMMERCIAL_EGRESS"
+
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _env_truthy(value: Optional[str]) -> bool:
+    """Return ``True`` when *value* is an explicit truthy opt-in token."""
+    return value is not None and value.strip().lower() in _TRUTHY
+
+
+def resolve_active_deployment_profile(
+    env: Optional[Mapping[str, str]] = None,
+) -> DeploymentProfileContract:
+    """Resolve the *active* deployment profile from the environment.
+
+    This is the stable entry point that the semantic-indexer and dispatcher
+    lanes call to gate live provider/reranker construction. It reads the active
+    profile name from :data:`ACTIVE_PROFILE_ENV` (``MCP_DEPLOYMENT_PROFILE``),
+    defaulting to the safe, dependency-free :data:`DEFAULT_DEPLOYMENT_PROFILE`
+    (``lexical_only``) when unset.
+
+    Commercial egress is never implicit: selecting the ``commercial`` profile
+    requires the operator to have explicitly opted in via
+    :data:`ALLOW_COMMERCIAL_EGRESS_ENV` (``MCP_ALLOW_COMMERCIAL_EGRESS=1``).
+    Without that opt-in, resolving ``commercial`` raises
+    :class:`CommercialEgressNotOptedIn`.
+
+    Args:
+        env: Optional environment mapping to read from (defaults to
+            ``os.environ``). Injectable so callers/tests need not mutate the
+            process environment.
+
+    Returns:
+        The frozen :class:`DeploymentProfileContract` for the active profile.
+
+    Raises:
+        ValueError: when ``MCP_DEPLOYMENT_PROFILE`` names an unknown profile.
+        CommercialEgressNotOptedIn: when ``commercial`` is selected without the
+            explicit ``MCP_ALLOW_COMMERCIAL_EGRESS`` opt-in.
+    """
+    environ = os.environ if env is None else env
+    profile_name = environ.get(ACTIVE_PROFILE_ENV, DEFAULT_DEPLOYMENT_PROFILE.value)
+    allow_commercial = _env_truthy(environ.get(ALLOW_COMMERCIAL_EGRESS_ENV))
+    return resolve_deployment_profile(profile_name, allow_commercial=allow_commercial)
+
+
+def deployment_profile_is_explicitly_set(
+    env: Optional[Mapping[str, str]] = None,
+) -> bool:
+    """Return ``True`` only when the operator explicitly selected a profile.
+
+    This is the LEGACY discriminator: :func:`resolve_active_deployment_profile`
+    defaults an unset environment to ``lexical_only`` (the safe *contract*
+    default), but enforcement lanes must distinguish "operator never opted into
+    the profile system" (env var absent) from "operator explicitly chose
+    lexical_only". Only the former preserves pre-existing, unrestricted behavior.
+    """
+    environ = os.environ if env is None else env
+    return ACTIVE_PROFILE_ENV in environ
+
+
+def commercial_egress_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
+    """Return ``True`` when constructing a commercial (egress) provider is allowed.
+
+    Backward-compatible policy:
+
+    * Profile **unset** (env var absent) -> ``True`` (LEGACY: the operator never
+      opted into the profile system, so preserve pre-existing behavior where a
+      configured commercial provider builds without restriction).
+    * Profile **explicitly** set to ``commercial`` **with**
+      ``MCP_ALLOW_COMMERCIAL_EGRESS=1`` -> ``True`` (explicit opt-in).
+    * Profile explicitly set to any other value, or ``commercial`` without the
+      opt-in flag -> ``False``.
+
+    Never raises: an unknown explicit profile name is treated as not permitting
+    commercial egress (fail-closed). Use :func:`resolve_active_deployment_profile`
+    when a raising contract check is desired.
+    """
+    if not deployment_profile_is_explicitly_set(env):
+        return True  # LEGACY: unset -> allow (pre-existing behavior).
+    environ = os.environ if env is None else env
+    try:
+        profile = _coerce_profile(environ.get(ACTIVE_PROFILE_ENV, ""))
+    except ValueError:
+        return False  # Unknown explicit profile: fail closed.
+    contract = DEPLOYMENT_PROFILES[profile]
+    if not contract.commercial_egress:
+        return False
+    return _env_truthy(environ.get(ALLOW_COMMERCIAL_EGRESS_ENV))
+
+
+def learned_models_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
+    """Return ``True`` unless the profile is EXPLICITLY ``lexical_only``.
+
+    ``lexical_only`` is the only profile that forbids ALL learned providers and
+    rerankers (BM25 / symbol search only). When the profile is unset (legacy) or
+    set to any learned-model profile, learned providers are permitted. An unknown
+    explicit profile name is not ``lexical_only`` and so is permitted here (the
+    contract resolver raises on it elsewhere).
+    """
+    if not deployment_profile_is_explicitly_set(env):
+        return True  # LEGACY: unset -> allow.
+    environ = os.environ if env is None else env
+    try:
+        profile = _coerce_profile(environ.get(ACTIVE_PROFILE_ENV, ""))
+    except ValueError:
+        return True
+    return profile is not DeploymentProfile.LEXICAL_ONLY
+
+
+@dataclass(frozen=True)
+class DegradationDiagnostic:
+    """Structured diagnostic describing the ACTUAL path a resolution took.
+
+    ``degraded`` is ``True`` when the requested profile's provider was
+    unavailable and the resolver fell back. The diagnostic always names both the
+    failed component and the requested/active profiles so an operator can see the
+    real path taken. ``collection_mutated`` documents the invariant that a
+    provider outage must never mutate collection metadata (this resolver never
+    touches a collection; INFERSAFE's fail-closed ``ensure_qdrant_collection``
+    enforces the same on the write path).
+    """
+
+    requested_profile: DeploymentProfile
+    active_profile: DeploymentProfile
+    degraded: bool
+    failed_component: Optional[str]
+    reason: Optional[str]
+    actual_path: str
+    collection_mutated: bool = False
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "requested_profile": self.requested_profile.value,
+            "active_profile": self.active_profile.value,
+            "degraded": self.degraded,
+            "failed_component": self.failed_component,
+            "reason": self.reason,
+            "actual_path": self.actual_path,
+            "collection_mutated": self.collection_mutated,
+        }
+
+
+def apply_degradation_policy(
+    contract: DeploymentProfileContract,
+    *,
+    probe: Optional[Callable[[], None]] = None,
+) -> Tuple[DeploymentProfileContract, DegradationDiagnostic]:
+    """Apply the documented degradation policy for a resolved profile.
+
+    The policy: probe the profile's inference provider; if it is unavailable,
+    degrade to the profile's declared ``fallback_profile`` (always the
+    dependency-free ``lexical_only`` for learned-model profiles) and emit a
+    diagnostic naming the failed component and the actual path taken. A provider
+    outage NEVER escalates into a commercial-egress profile, and this function
+    performs NO collection mutation (no create/recreate) — it is pure config
+    resolution, composing with INFERSAFE's fail-closed collection lifecycle.
+
+    Args:
+        contract: The already-resolved profile contract (from
+            :func:`resolve_deployment_profile`).
+        probe: Optional zero-arg callable that raises when the profile's provider
+            is unavailable. When ``None``, the profile is assumed healthy.
+
+    Returns:
+        ``(active_contract, diagnostic)``. On success ``active_contract`` is the
+        input contract; on degradation it is the fallback contract.
+    """
+    component = contract.embedding_provider or contract.reranker_path.value
+
+    if probe is None:
+        return contract, DegradationDiagnostic(
+            requested_profile=contract.profile,
+            active_profile=contract.profile,
+            degraded=False,
+            failed_component=None,
+            reason=None,
+            actual_path=f"{contract.profile.value} (provider assumed available)",
+            collection_mutated=False,
+        )
+
+    try:
+        probe()
+    except Exception as exc:  # noqa: BLE001 - policy degrades on any provider fault
+        fallback = contract.fallback_profile or DeploymentProfile.LEXICAL_ONLY
+        fallback_contract = DEPLOYMENT_PROFILES[fallback]
+        # Invariant: degradation must never escalate into commercial egress.
+        if fallback_contract.commercial_egress:
+            raise AssertionError(
+                "degradation fallback must never be a commercial-egress profile"
+            )
+        actual_path = (
+            f"{contract.profile.value} -> {fallback.value} "
+            f"(component '{component}' unavailable)"
+        )
+        return fallback_contract, DegradationDiagnostic(
+            requested_profile=contract.profile,
+            active_profile=fallback,
+            degraded=True,
+            failed_component=component,
+            reason=f"{type(exc).__name__}: {exc}",
+            actual_path=actual_path,
+            collection_mutated=False,
+        )
+
+    return contract, DegradationDiagnostic(
+        requested_profile=contract.profile,
+        active_profile=contract.profile,
+        degraded=False,
+        failed_component=None,
+        reason=None,
+        actual_path=f"{contract.profile.value} (provider available)",
+        collection_mutated=False,
+    )
 
 
 # Global settings instance
