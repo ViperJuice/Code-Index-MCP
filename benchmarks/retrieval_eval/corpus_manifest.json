@@ -1,0 +1,19 @@
+{
+  "repo": "Code-Index-MCP",
+  "commit": "f7c060b4f145516a4629338e078d3b8b9c0c406a",
+  "included_globs": [
+    "mcp_server/**/*.py",
+    "docs/**/*.md",
+    "examples/**/*.py",
+    "tests/**/*.py",
+    "benchmarks/**/*.py",
+    "*.md",
+    "*.yaml",
+    "*.yml",
+    "pyproject.toml",
+    "package-lock.json"
+  ],
+  "doc_count": 872,
+  "corpus_sha256": "93c894e1435f55ff0ce56c13a78a7c7be18a55e0e8a83816eb357ac13a22e089",
+  "corpus_sha256_algorithm": "sha256 of the UTF-8 bytes of the sorted included relative paths joined by a single newline (\\n), no trailing newline"
+}

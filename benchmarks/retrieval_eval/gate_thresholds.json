@@ -1,0 +1,47 @@
+{
+  "version": "gate.v1",
+  "arms": [
+    "lexical",
+    "dense",
+    "hybrid",
+    "hybrid_rerank"
+  ],
+  "depths": [
+    20,
+    50,
+    100
+  ],
+  "min_quality": {
+    "ndcg@10": {
+      "lexical": 0.3,
+      "dense": 0.35,
+      "hybrid": 0.45,
+      "hybrid_rerank": 0.55
+    },
+    "mrr": {
+      "lexical": 0.35,
+      "dense": 0.4,
+      "hybrid": 0.5,
+      "hybrid_rerank": 0.6
+    },
+    "recall@50": {
+      "lexical": 0.6,
+      "dense": 0.65,
+      "hybrid": 0.75,
+      "hybrid_rerank": 0.8
+    }
+  },
+  "max_latency_ms": {
+    "p95": {
+      "lexical": 150,
+      "dense": 400,
+      "hybrid": 600,
+      "hybrid_rerank": 1200
+    }
+  },
+  "max_error_rate": 0.02,
+  "max_zero_result_rate": 0.05,
+  "max_commercial_egress_fraction": 0.0,
+  "holdout_unused_required": true,
+  "decision_algorithm": "hybrid_rerank is default-enable-eligible iff, evaluated only on the non-holdout queries against the frozen corpus: ndcg@10 >= min_quality.ndcg@10.hybrid_rerank AND mrr >= min_quality.mrr.hybrid_rerank AND recall@50 >= min_quality.recall@50.hybrid_rerank at every depth in depths, AND p95 latency <= max_latency_ms.p95.hybrid_rerank, AND error_rate <= max_error_rate, AND zero_result_rate <= max_zero_result_rate, AND the commercial-egress fraction <= max_commercial_egress_fraction (i.e. no source text left the host on the lexical_only path and any commercial provider egress stays within the frozen bound). Each arm must also clear its own per-arm min_quality entries to be reported as passing; failing any single predicate fails the gate for that arm. holdout_unused_required=true means the run is invalid if any holdout query id was used for tuning or threshold selection. These numeric thresholds are the FROZEN gate: a reviewer MAY tune the values before provider work begins, but the file and its sha256 recorded in MANIFEST.json are the binding contract."
+}
