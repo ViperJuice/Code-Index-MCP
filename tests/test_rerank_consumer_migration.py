@@ -241,3 +241,37 @@ async def test_cross_repo_failure_logs_no_query_or_doc_text(caplog):
     assert coord.last_rerank_diagnostics.outcome is RerankOutcome.FAILED
     assert QUERY_SENTINEL not in caplog.text
     assert DOC_SENTINEL not in caplog.text
+
+
+# --------------------------------------------------------------------------
+# 5. Empty candidates with a CONFIGURED reranker are ATTEMPTED, not
+#    NOT_CONFIGURED (NOT_CONFIGURED is reserved for the absent-reranker case).
+# --------------------------------------------------------------------------
+async def test_hybrid_empty_candidates_configured_reranker_is_attempted():
+    hs = HybridSearch.__new__(HybridSearch)
+    hs.reranker = EndpointReranker(ReversingTransport(), provider="fake-endpoint")
+    hs.reranking_settings = types.SimpleNamespace(top_k=10, enabled=True)
+    hs.last_rerank_diagnostics = None
+
+    out = await hs._rerank_results("find the thing", [])
+
+    assert out == []
+    diag = hs.last_rerank_diagnostics
+    assert diag.outcome is not RerankOutcome.NOT_CONFIGURED
+    assert diag.outcome is RerankOutcome.ATTEMPTED
+    assert diag.candidate_count == 0
+
+
+async def test_cross_repo_empty_candidates_configured_reranker_is_attempted():
+    coord = CrossRepositoryCoordinator.__new__(CrossRepositoryCoordinator)
+    coord.reranker = EndpointReranker(ReversingTransport(), provider="fake-endpoint")
+    coord.last_rerank_diagnostics = None
+
+    context = SearchContext(query="find the thing", search_type="symbol", max_results=10)
+    out = await coord._rerank_results([], context)
+
+    assert out == []
+    diag = coord.last_rerank_diagnostics
+    assert diag.outcome is not RerankOutcome.NOT_CONFIGURED
+    assert diag.outcome is RerankOutcome.ATTEMPTED
+    assert diag.candidate_count == 0

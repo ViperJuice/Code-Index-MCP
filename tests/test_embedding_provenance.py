@@ -436,6 +436,127 @@ def test_query_provenance_passes_when_compatible(tmp_path):
     ix._check_query_provenance(ok_resp)
 
 
+def _profile_variant(**overrides):
+    payload = {
+        "provider": "openai_compatible",
+        "model_name": "srv-model",
+        "model_version": "v1",
+        "vector_dimension": 8,
+        "distance_metric": "cosine",
+        "normalization_policy": "none",
+        "chunk_schema_version": "v1",
+        "chunker_version": "chunker@1",
+        "build_metadata": {"collection_name": "semantic-oss-high"},
+    }
+    payload.update(overrides)
+    return SemanticProfile.from_dict("oss-high", payload)
+
+
+def test_query_provenance_fails_closed_on_model_revision_drift(tmp_path):
+    """Same dimension + same served model, but a model_revision bump -> fail closed."""
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    ix._prepare_for_writes()  # persists record at model_version 'v1'
+
+    drifted = _make_indexer(
+        tmp_path,
+        _FakeProvenanceProvider(_openai_response),
+        dim=8,
+        profile=_profile_variant(model_version="v2"),
+    )
+    drifted.metadata_file = ix.metadata_file  # same persisted v1 record
+    query_resp = _openai_response(["q"], "query", dimension=8)
+    with pytest.raises(RuntimeError, match="incompatible"):
+        drifted._check_query_provenance(query_resp)
+
+
+def test_query_provenance_fails_closed_on_normalization_drift(tmp_path):
+    """Same dimension + model + revision, but a normalization-policy change."""
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    ix._prepare_for_writes()  # persists record at normalization 'none'
+
+    drifted = _make_indexer(
+        tmp_path,
+        _FakeProvenanceProvider(_openai_response),
+        dim=8,
+        profile=_profile_variant(normalization_policy="l2"),
+    )
+    drifted.metadata_file = ix.metadata_file
+    query_resp = _openai_response(["q"], "query", dimension=8)
+    with pytest.raises(RuntimeError, match="incompatible"):
+        drifted._check_query_provenance(query_resp)
+
+
+def test_query_provenance_fails_closed_on_fingerprint_drift(tmp_path):
+    """Same dimension/model/revision/normalization, but a compatibility-fingerprint
+    drift (here a chunker_version bump) still fails closed."""
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    ix._prepare_for_writes()
+
+    drifted = _make_indexer(
+        tmp_path,
+        _FakeProvenanceProvider(_openai_response),
+        dim=8,
+        profile=_profile_variant(chunker_version="chunker@2"),
+    )
+    drifted.metadata_file = ix.metadata_file
+    # Fingerprint differs even though dim/model/revision/normalization all match.
+    assert drifted.compatibility_fingerprint != ix.compatibility_fingerprint
+    query_resp = _openai_response(["q"], "query", dimension=8)
+    with pytest.raises(RuntimeError, match="incompatible"):
+        drifted._check_query_provenance(query_resp)
+
+
+# ===========================================================================
+# 7. _attested_metadata fail-closed guard
+# ===========================================================================
+
+
+def test_attested_metadata_raises_on_failed_attestation(tmp_path):
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response))
+    failed = attest_embedding_response(
+        _profile(dim=8, model="srv-model"),
+        _openai_response(["a"], "document", served_model="rogue-model", dimension=8),
+    )
+    assert failed.ok is False
+    with pytest.raises(RuntimeError, match="failed attestation"):
+        ix._attested_metadata(failed)
+
+
+# ===========================================================================
+# 8. Real __init__ defers all mutation until the attested write gate
+# ===========================================================================
+
+
+def test_real_init_defers_mutation_for_provenance_provider(tmp_path, monkeypatch):
+    """Constructing through the REAL __init__ (not __new__) with a provenance-capable
+    provider must create ZERO qdrant state and write NO metadata before attestation."""
+    recording = _RecordingQdrant()
+    provider = _FailingProvider()  # provenance-capable, but embed would fail
+
+    monkeypatch.setattr(
+        "mcp_server.utils.semantic_indexer.create_embedding_provider",
+        lambda **kwargs: provider,
+    )
+
+    def _fake_init_qdrant(self, qdrant_path):
+        self._qdrant_available = True
+        self._connection_mode = "memory"
+        return recording
+
+    monkeypatch.setattr(SemanticIndexer, "_init_qdrant_client", _fake_init_qdrant)
+    monkeypatch.chdir(tmp_path)  # metadata_file is the relative '.index_metadata.json'
+
+    ix = SemanticIndexer(profile=_profile(dim=8), qdrant_path=":memory:")
+
+    # No collection created, no upserts, no assumed metadata written, gate shut.
+    assert recording.calls == []
+    assert recording.upserts == []
+    assert not (tmp_path / ".index_metadata.json").exists()
+    assert ix._writes_prepared is False
+    # The failing provider was never invoked during construction.
+    assert provider.calls == 0
+
+
 # ===========================================================================
 # 6. Reconciliation path for pre-provenance collections
 # ===========================================================================
@@ -464,19 +585,69 @@ def test_reconcile_incompatible_names_remediation_without_mutation(tmp_path):
     assert all(kind != "recreate" for kind, _ in ix.qdrant.calls)
 
 
-def test_reconcile_allow_reindex_recreates(tmp_path):
+def test_reconcile_allow_reindex_failed_attestation_recreates_but_stays_fail_closed(tmp_path):
+    """allow_reindex on a FAILED attestation must DELETE+recreate the collection and
+    RE-ATTEST, but never open the write gate or persist attested metadata when the
+    re-attestation still fails (the provider genuinely mismatches the profile)."""
+
     def factory(texts, input_type):
+        # Endpoint deterministically serves a rogue model, so both the initial
+        # attestation and the re-attestation fail.
         return _openai_response(texts, input_type, served_model="rogue-model", dimension=8)
 
     ix = _make_indexer(tmp_path, _FakeProvenanceProvider(factory))
-    # Pre-existing mismatched collection so ensure(allow_recreate) must recreate.
+    # Pre-existing SAME-DIMENSION collection: a shape-only recreate would NOT
+    # catch this drift, so the unconditional delete+recreate is what must fire.
     ix.qdrant.collections["semantic-oss-high"] = (
-        4096,
+        8,
         SemanticIndexer.resolve_qdrant_distance("cosine"),
     )
+
     result = ix.reconcile_existing_collection(allow_reindex=True)
+
+    # The collection was destructively rebuilt (even at matching dimension)...
+    assert ("recreate", "semantic-oss-high") in ix.qdrant.calls
+    # ...but the re-attestation failed, so the path stays fail-closed.
+    assert result["status"] == "reindex_failed"
+    assert "reindex" in result["message"].lower()
+    # Write gate NEVER opened on a failed attestation.
+    assert ix._writes_prepared is False
+    assert ix._attestation is None
+    # No attested metadata persisted (nothing with attested=True / ok=False).
+    if (tmp_path / ".index_metadata.json").exists():
+        persisted = json.loads((tmp_path / ".index_metadata.json").read_text())
+        assert persisted.get("semantic_attestation", {}).get("ok") is not False
+        for record in (persisted.get("semantic_profiles") or {}).values():
+            assert record.get("attested") is not True
+    # Two probes: the initial attestation and the re-attestation after recreate.
+    assert len(ix.embedding_client.calls) == 2
+
+
+def test_reconcile_allow_reindex_succeeds_when_reattest_recovers(tmp_path):
+    """If a fresh re-attestation succeeds after the destructive rebuild, the gate
+    opens under the newly verified profile and status is 'reindexed'."""
+    state = {"probe": 0}
+
+    def factory(texts, input_type):
+        state["probe"] += 1
+        # First probe drifts (fails); the rebuilt/re-probed endpoint recovers.
+        served = "rogue-model" if state["probe"] == 1 else "srv-model"
+        return _openai_response(texts, input_type, served_model=served, dimension=8)
+
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(factory))
+    ix.qdrant.collections["semantic-oss-high"] = (
+        8,
+        SemanticIndexer.resolve_qdrant_distance("cosine"),
+    )
+
+    result = ix.reconcile_existing_collection(allow_reindex=True)
+
     assert result["status"] == "reindexed"
     assert ("recreate", "semantic-oss-high") in ix.qdrant.calls
+    assert ix._writes_prepared is True
+    persisted = json.loads((tmp_path / ".index_metadata.json").read_text())
+    assert persisted["semantic_attestation"]["ok"] is True
+    assert persisted["semantic_profiles"]["oss-high"]["attested"] is True
 
 
 def test_reconcile_unattestable_for_legacy_provider(tmp_path):

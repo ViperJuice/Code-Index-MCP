@@ -36,6 +36,24 @@ from mcp_server.storage.sqlite_store import (  # noqa: F401  (patched by tests; 
 logger = logging.getLogger(__name__)
 
 
+# Redact bearer/api-key/token-like substrings from exception text before it is
+# stored in rerank diagnostics or written to logs. Kept small and local to avoid
+# a circular import back into the dispatcher module.
+_SECRET_REDACTION_PATTERN = re.compile(
+    r"(?i)"
+    r"(?:bearer\s+[A-Za-z0-9._\-]+)"
+    r"|(?:(?:api[_-]?key|apikey|token|secret|password|authorization)\s*[=:]\s*[^\s,;'\"]+)"
+    r"|(?:sk-[A-Za-z0-9]{6,})"
+)
+
+
+def _redact_secrets(text: Optional[str]) -> Optional[str]:
+    """Strip credential-like substrings from *text* before diagnostics/logging."""
+    if not text:
+        return text
+    return _SECRET_REDACTION_PATTERN.sub("[REDACTED]", str(text))
+
+
 @dataclass
 class SearchContext:
     """Context for cross-repository search operations."""
@@ -160,7 +178,11 @@ class CrossRepositoryCoordinator:
             List of aggregated results
         """
         start_time = datetime.now()
-        logger.info(f"Starting cross-repository search: {context.query}")
+        logger.info(
+            "Starting cross-repository search (query_chars=%d, type=%s)",
+            len(context.query or ""),
+            context.search_type,
+        )
 
         # Get search strategy
         strategy = self._strategies.get(context.search_type, self._strategies["symbol"])
@@ -369,9 +391,20 @@ class CrossRepositoryCoordinator:
         )
         from mcp_server.indexer.reranker import SearchResult as RerankSearchResult
 
-        if not results:
+        if self.reranker is None:
+            # NOT_CONFIGURED is reserved for the absent-reranker case only.
             self.last_rerank_diagnostics = RerankDiagnostics(
                 outcome=RerankOutcome.NOT_CONFIGURED,
+                candidate_count=len(results),
+                returned_count=len(results),
+            )
+            return results
+
+        if not results:
+            # A reranker IS configured; there is nothing to rerank. That is an
+            # ATTEMPTED (empty) outcome, never NOT_CONFIGURED.
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.ATTEMPTED,
                 candidate_count=0,
                 returned_count=0,
             )
@@ -401,10 +434,11 @@ class CrossRepositoryCoordinator:
             ):
                 init_result = await self.reranker.initialize({})
                 if not init_result.is_success:
-                    logger.warning(f"Reranker initialization failed: {init_result.error}")
+                    _err = _redact_secrets(str(init_result.error))
+                    logger.warning("Reranker initialization failed: %s", _err)
                     self.last_rerank_diagnostics = RerankDiagnostics(
                         outcome=RerankOutcome.FAILED,
-                        error=str(init_result.error),
+                        error=_err,
                         candidate_count=len(results),
                         returned_count=len(results),
                     )
@@ -414,10 +448,11 @@ class CrossRepositoryCoordinator:
             rerank_result = await self.reranker.rerank(context.query, candidates, top_k)
         except Exception as exc:
             record_handled_error(__name__, exc)
-            logger.warning(f"Reranking failed, returning scored order: {exc}")
+            _err = _redact_secrets(str(exc))
+            logger.warning("Reranking failed, returning scored order: %s", _err)
             self.last_rerank_diagnostics = RerankDiagnostics(
                 outcome=RerankOutcome.FAILED,
-                error=str(exc),
+                error=_err,
                 candidate_count=len(results),
                 returned_count=len(results),
             )
@@ -426,12 +461,11 @@ class CrossRepositoryCoordinator:
         if not getattr(rerank_result, "is_success", False) or not getattr(
             rerank_result, "data", None
         ):
-            logger.warning(
-                f"Reranking returned no data: {getattr(rerank_result, 'error', None)}"
-            )
+            _err = _redact_secrets(str(getattr(rerank_result, "error", "no data")))
+            logger.warning("Reranking returned no data: %s", _err)
             self.last_rerank_diagnostics = RerankDiagnostics(
                 outcome=RerankOutcome.FAILED,
-                error=str(getattr(rerank_result, "error", "no data")),
+                error=_err,
                 candidate_count=len(results),
                 returned_count=len(results),
             )

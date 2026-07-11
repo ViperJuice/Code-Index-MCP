@@ -59,8 +59,18 @@ class _FakeVoyageClient:
 
 
 class _FakeEmbeddingItem:
-    def __init__(self, embedding: List[float]) -> None:
+    """Mimics an OpenAI embeddings response item: ``.embedding`` + server ``.index``.
+
+    ``index`` may be omitted (``_MISSING``) to simulate a server item that does
+    not carry an index at all.
+    """
+
+    _MISSING = object()
+
+    def __init__(self, embedding: List[float], index=_MISSING) -> None:
         self.embedding = embedding
+        if index is not _FakeEmbeddingItem._MISSING:
+            self.index = index
 
 
 class _FakeOpenAIResponse:
@@ -70,20 +80,44 @@ class _FakeOpenAIResponse:
 
 
 class _FakeOpenAIEmbeddings:
-    def __init__(self, dimension: int, served_model: str) -> None:
+    """Fake ``client.embeddings`` whose per-item vectors are position-tagged.
+
+    Each returned vector encodes the request position it belongs to (its first
+    component is ``float(position)``), so a test can prove that the vector for
+    request position *p* actually lands at output position *p* regardless of the
+    order the items are returned in.
+
+    ``index_override`` lets a test scramble/duplicate/omit/blow out the
+    server-assigned indices independently of the vectors' true positions.
+    """
+
+    def __init__(self, dimension: int, served_model: str, index_override=None) -> None:
         self.dimension = dimension
         self.served_model = served_model
+        self.index_override = index_override
         self.last_kwargs = None
+
+    def _vector_for(self, position: int) -> List[float]:
+        # First component is the true request position; rest pads to dimension.
+        return [float(position)] + [0.0] * (self.dimension - 1)
 
     def create(self, model, input):
         self.last_kwargs = {"model": model, "input": input}
-        data = [_FakeEmbeddingItem([float(i)] * self.dimension) for i, _ in enumerate(input)]
+        n = len(input)
+        if self.index_override is not None:
+            pairs = self.index_override(n)  # list of (server_index, true_position)
+        else:
+            pairs = [(pos, pos) for pos in range(n)]
+        data = [
+            _FakeEmbeddingItem(self._vector_for(true_pos), index=server_index)
+            for server_index, true_pos in pairs
+        ]
         return _FakeOpenAIResponse(data=data, model=self.served_model)
 
 
 class _FakeOpenAIClient:
-    def __init__(self, dimension: int, served_model: str) -> None:
-        self.embeddings = _FakeOpenAIEmbeddings(dimension, served_model)
+    def __init__(self, dimension: int, served_model: str, index_override=None) -> None:
+        self.embeddings = _FakeOpenAIEmbeddings(dimension, served_model, index_override)
 
 
 # ---------------------------------------------------------------------------
@@ -100,9 +134,15 @@ def _make_voyage(model_name="voyage-3", dimension=4, normalization=None):
     return p
 
 
-def _make_openai(model_name="qwen-embed", dimension=4, served_model="srv-qwen-embed", normalization=None):
+def _make_openai(
+    model_name="qwen-embed",
+    dimension=4,
+    served_model="srv-qwen-embed",
+    normalization=None,
+    index_override=None,
+):
     p = OpenAICompatibleEmbeddingProvider.__new__(OpenAICompatibleEmbeddingProvider)
-    p.client = _FakeOpenAIClient(dimension, served_model)
+    p.client = _FakeOpenAIClient(dimension, served_model, index_override)
     p.model_name = model_name
     p.vector_dimension = dimension
     p.normalization = normalization
@@ -165,7 +205,10 @@ def test_openai_emits_valid_response_with_correct_authority():
     assert resp.dimension.value == 4
     assert resp.normalization.authority is ProvenanceAuthority.DECLARED
     assert resp.normalization.value == "l2"
-    assert resp.role.authority is ProvenanceAuthority.REPORTED
+    # Role is declared (config/local), NOT server-reported: input_type never
+    # reaches the /v1/embeddings endpoint. Value is still preserved.
+    assert resp.role.authority is ProvenanceAuthority.DECLARED
+    assert resp.role.value == "query"
 
     assert len(resp.items) == 3
     for idx, item in enumerate(resp.items):
@@ -235,7 +278,8 @@ def test_openai_capability():
     assert cap.supports_role(EmbeddingRole.DOCUMENT)
     assert cap.can_report("served_model_id") is True
     assert cap.can_report("dimension") is True
-    assert cap.can_report("role") is True
+    # Role is not server-reported for the OpenAI-compatible provider.
+    assert cap.can_report("role") is False
     assert cap.can_report("model_revision") is False
     assert cap.can_report("normalization") is False
     assert cap.can_report("processor_id") is False
@@ -292,3 +336,105 @@ def test_openai_embed_backcompat_raises_on_dimension_mismatch():
     p.vector_dimension = 8  # served vectors are len 4, expectation is 8
     with pytest.raises(RuntimeError, match="dimension mismatch"):
         p.embed(["a"], input_type="document")
+
+
+# ---------------------------------------------------------------------------
+# 5. Server ``index`` is honored, not fabricated (bijection is real)
+# ---------------------------------------------------------------------------
+#
+# Each fake vector's first component is the *true* request position it answers
+# (see ``_FakeOpenAIEmbeddings._vector_for``). So ``resp.items[p].vector[0]``
+# proves which request the vector at output position ``p`` actually belongs to.
+_MISSING_INDEX = _FakeEmbeddingItem._MISSING
+
+
+def _reversed_but_correctly_indexed(n):
+    """response.data returned in reverse order, each item keeping its TRUE server index.
+
+    A provider that trusts enumeration order (the old bug) would misattach every
+    vector; a provider that honors the server ``index`` reconstructs request order.
+    """
+    return [(pos, pos) for pos in reversed(range(n))]
+
+
+def test_openai_reordered_response_maps_vectors_to_correct_positions():
+    p = _make_openai(dimension=4, index_override=_reversed_but_correctly_indexed)
+    resp = p.embed_with_provenance(["a", "b", "c"], input_type="document")
+
+    # Output is in request order and each vector lands on its own request.
+    assert [item.index for item in resp.items] == [0, 1, 2]
+    for pos, item in enumerate(resp.items):
+        assert item.vector[0] == float(pos), (
+            f"vector at output position {pos} belongs to request "
+            f"{item.vector[0]} -- silent misattachment"
+        )
+    # Downstream _validate_embedding_response contract: item.index == position.
+    assert all(item.index == pos for pos, item in enumerate(resp.items))
+
+
+def test_openai_missing_server_index_raises():
+    def _one_missing(n):
+        pairs = [(pos, pos) for pos in range(n)]
+        pairs[1] = (_MISSING_INDEX, 1)  # second item carries no ``index`` at all
+        return pairs
+
+    p = _make_openai(dimension=4, index_override=_one_missing)
+    with pytest.raises(RuntimeError, match="index"):
+        p.embed_with_provenance(["a", "b", "c"], input_type="document")
+
+
+def test_openai_duplicate_server_index_raises():
+    def _duplicate(n):
+        # indices [0, 0, 2] -> right arity, but 1 is missing and 0 duplicated.
+        return [(0, 0), (0, 1), (2, 2)]
+
+    p = _make_openai(dimension=4, index_override=_duplicate)
+    with pytest.raises(RuntimeError, match="duplicate"):
+        p.embed_with_provenance(["a", "b", "c"], input_type="document")
+
+
+def test_openai_out_of_range_server_index_raises():
+    def _out_of_range(n):
+        # index 5 for a 2-input request is out of [0, 2).
+        return [(0, 0), (5, 1)]
+
+    p = _make_openai(dimension=4, index_override=_out_of_range)
+    with pytest.raises(RuntimeError, match="out of range"):
+        p.embed_with_provenance(["a", "b"], input_type="document")
+
+
+def test_openai_arity_mismatch_raises():
+    def _short(n):
+        # Return one fewer item than requested.
+        return [(pos, pos) for pos in range(n - 1)]
+
+    p = _make_openai(dimension=4, index_override=_short)
+    with pytest.raises(RuntimeError, match="arity mismatch"):
+        p.embed_with_provenance(["a", "b", "c"], input_type="document")
+
+
+# ---------------------------------------------------------------------------
+# 6. OpenAI role authority is ``declared`` (not ``reported``), value preserved
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("input_type,expected", [("query", "query"), ("document", "document")])
+def test_openai_role_authority_is_declared_value_preserved(input_type, expected):
+    p = _make_openai()
+    resp = p.embed_with_provenance(["x"], input_type=input_type)
+
+    # Authority is declared -- the endpoint never saw the role.
+    assert resp.role.authority is ProvenanceAuthority.DECLARED
+    # Value is still carried end to end.
+    assert resp.role.value == expected
+    assert resp.role.value == EmbeddingRole(expected).value
+    # input_type was recorded locally, never sent to the endpoint.
+    assert p.last_input_type == input_type
+    assert "input_type" not in p.client.embeddings.last_kwargs
+
+
+def test_openai_capability_says_role_not_reported():
+    cap = _make_openai().capability()
+    assert cap.can_report("role") is False
+    assert cap.supports_role(EmbeddingRole.QUERY)
+    assert cap.supports_role(EmbeddingRole.DOCUMENT)

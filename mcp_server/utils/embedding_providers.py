@@ -178,10 +178,12 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
 
     The response echoes the served model id (``response.model``) so
     ``served_model_id`` is ``reported``; ``dimension`` is ``reported`` (measured
-    from the returned vector); ``role`` is ``reported`` (we record the role we
-    were asked to embed for). The API supplies no immutable revision, so
-    ``model_revision`` is ``unknown``; ``normalization`` is ``declared`` from
-    config (else ``unknown``).
+    from the returned vector). ``role`` is ``declared`` (config/local): the
+    ``/v1/embeddings`` request carries only ``{model, input}`` -- ``input_type``
+    never reaches the endpoint and the endpoint does not vary behavior by role,
+    so the role is a locally-remembered value the server never attested. The API
+    supplies no immutable revision, so ``model_revision`` is ``unknown``;
+    ``normalization`` is ``declared`` from config (else ``unknown``).
     """
 
     def __init__(
@@ -212,8 +214,8 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
         self.model_name = model_name
         self.vector_dimension = vector_dimension
         self.normalization = normalization
-        # Records the role we were last asked to embed for (input_type is used,
-        # not discarded, so the role is preserved into the response).
+        # Records the role we were last asked to embed for. The role is preserved
+        # into the response as a *declared* value; the endpoint never sees it.
         self.last_input_type: Optional[str] = None
 
     @property
@@ -229,7 +231,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
                 "model_revision": False,  # API supplies no immutable revision
                 "dimension": True,  # measured from returned vector
                 "normalization": False,  # declared from config, else unknown
-                "role": True,  # recorded from input_type we were asked for
+                "role": False,  # input_type never reaches the endpoint; role is declared
                 "processor_id": False,
             },
         )
@@ -238,14 +240,60 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
         self, texts: Sequence[str], input_type: str = "document"
     ) -> EmbeddingResponseV1:
         role = _role_from_input_type(input_type)
-        # Use (record) input_type rather than discarding it.
+        # Record input_type locally. It is NOT sent to the endpoint (the request
+        # below carries only {model, input}); the role is preserved as a declared
+        # value, never a server-attested one.
         self.last_input_type = input_type
 
+        texts_list = list(texts)
+        request_size = len(texts_list)
+
         started = time.perf_counter()
-        response = self.client.embeddings.create(model=self.model_name, input=list(texts))
+        response = self.client.embeddings.create(model=self.model_name, input=texts_list)
         latency_ms = (time.perf_counter() - started) * 1000.0
 
-        vectors = [item.embedding for item in response.data]
+        # Fail closed on the request<->response index mapping. Each response item
+        # carries the server-assigned ``index`` naming which request position it
+        # answers. We MUST honor that index instead of the enumeration order of
+        # ``response.data`` (which may be reordered): otherwise a reordered batch
+        # silently misattaches a vector to the wrong input. Missing / duplicate /
+        # out-of-range / arity-mismatched indices raise rather than renumber.
+        raw_items = list(getattr(response, "data", []) or [])
+        if len(raw_items) != request_size:
+            raise RuntimeError(
+                "OpenAI-compatible embedding arity mismatch for model "
+                f"{self.model_name}: requested {request_size} inputs but the "
+                f"response carried {len(raw_items)} items. Refusing to "
+                "positionally attach a partial/short embedding batch."
+            )
+
+        by_index: dict[int, list] = {}
+        for position, item in enumerate(raw_items):
+            server_index = getattr(item, "index", None)
+            if not isinstance(server_index, int) or isinstance(server_index, bool):
+                raise RuntimeError(
+                    "OpenAI-compatible embedding response item at position "
+                    f"{position} lacks a usable integer server ``index`` "
+                    f"(got {server_index!r}); refusing to renumber and risk "
+                    "misattaching a vector to the wrong input."
+                )
+            if not (0 <= server_index < request_size):
+                raise RuntimeError(
+                    "OpenAI-compatible embedding response index is out of range: "
+                    f"item at position {position} carries index {server_index} "
+                    f"but only [0, {request_size}) is valid."
+                )
+            if server_index in by_index:
+                raise RuntimeError(
+                    "OpenAI-compatible embedding response has a duplicate server "
+                    f"index {server_index}; a one-to-one request<->vector mapping "
+                    "is required."
+                )
+            by_index[server_index] = item.embedding
+
+        # ``by_index`` now has exactly ``request_size`` unique in-range indices
+        # (arity + range + duplicate checks passed), so this covers 0..n-1.
+        vectors = [by_index[i] for i in range(request_size)]
 
         if vectors:
             first_len = len(vectors[0])
@@ -284,7 +332,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
             model_revision=ProvenanceField.unknown(),
             dimension=ProvenanceField.reported(dimension),
             normalization=normalization,
-            role=ProvenanceField.reported(role.value),
+            role=ProvenanceField.declared(role.value),
             processor_id=ProvenanceField.unknown(),
             items=items,
             latency_ms=latency_ms,

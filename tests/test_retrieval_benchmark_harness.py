@@ -254,13 +254,18 @@ def test_smoke_run_full_schema(tmp_path):
         }
         for depth in ("20", "50"):
             m = arm_res["depths"][depth]
-            assert set(m) >= {"ndcg", "mrr", "recall", "zero_result_rate", "error_rate"}
+            # Fixed-k gate metrics + per-depth metrics are all present under
+            # their explicit names.
+            assert set(m) >= {"ndcg@10", "recall@50", "mrr", "zero_result_rate", "error_rate"}
+            assert f"ndcg@{depth}" in m
+            assert f"recall@{depth}" in m
     assert result["arms"]["dense"]["egress"] is True
     assert result["arms"]["lexical"]["egress"] is False
 
-    # lexical arm perfectly ranks the single relevant doc first for both queries.
+    # lexical arm perfectly ranks the single relevant doc first for both queries,
+    # so both the fixed ndcg@10 and mrr are 1.0.
     assert result["arms"]["lexical"]["depths"]["20"]["mrr"] == pytest.approx(1.0)
-    assert result["arms"]["lexical"]["depths"]["20"]["ndcg"] == pytest.approx(1.0)
+    assert result["arms"]["lexical"]["depths"]["20"]["ndcg@10"] == pytest.approx(1.0)
 
     # Per-channel diagnostics for the fused (hybrid) arm are DERIVED from the
     # single-channel arms. docA for q1: lexical rank 1, dense rank 2.
@@ -297,6 +302,38 @@ def test_run_error_and_zero_result_rates(tmp_path):
 def test_arm_and_depth_constants():
     assert ARMS == ("lexical", "dense", "hybrid", "hybrid_rerank")
     assert DEPTHS == (20, 50, 100)
+
+
+def test_fixed_k_vs_per_depth_metrics(tmp_path):
+    """The gate-named metrics ``ndcg@10`` / ``recall@50`` are FIXED-k — computed
+    at k=10 / k=50 regardless of the candidate depth — while ``ndcg@{d}`` /
+    ``recall@{d}`` follow the depth. Placing the single relevant doc at 1-indexed
+    rank 30 makes the distinction observable (inside top-50, outside top-20 and
+    top-10)."""
+    frozen = load_frozen_eval(_write_eval_dir(tmp_path))
+
+    def deep_arm(query):
+        # relevant doc at 1-indexed rank 30, padded with non-relevant filler.
+        relevant = query["relevant_doc_ids"][0]
+        return [f"filler-{i}" for i in range(29)] + [relevant] + ["filler-tail"]
+
+    harness = RetrievalBenchmarkHarness(frozen, {"lexical": ArmSpec(deep_arm)}, depths=[20, 50])
+    depths = harness.run(split="main")["arms"]["lexical"]["depths"]
+
+    # Fixed-k metrics are depth-independent: identical across depth buckets.
+    assert depths["20"]["ndcg@10"] == pytest.approx(depths["50"]["ndcg@10"])
+    assert depths["20"]["recall@50"] == pytest.approx(depths["50"]["recall@50"])
+    # rank 30 is outside top-10 -> ndcg@10 == 0, but inside top-50 -> recall@50 == 1.
+    assert depths["20"]["ndcg@10"] == pytest.approx(0.0)
+    assert depths["20"]["recall@50"] == pytest.approx(1.0)
+
+    # Per-depth metrics DO track the candidate depth.
+    # depth 20: relevant (rank 30) is beyond 20 -> both zero.
+    assert depths["20"]["ndcg@20"] == pytest.approx(0.0)
+    assert depths["20"]["recall@20"] == pytest.approx(0.0)
+    # depth 50: relevant (rank 30) is within 50 -> recovered.
+    assert depths["50"]["recall@50"] == pytest.approx(1.0)
+    assert depths["50"]["ndcg@50"] == pytest.approx(1.0 / math.log2(31))
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +380,9 @@ def test_load_frozen_eval_real_dataset():
         }
         for depth in DEPTHS:
             m = arm_res["depths"][str(depth)]
-            assert set(m) >= {"ndcg", "mrr", "recall", "zero_result_rate", "error_rate"}
+            assert set(m) >= {"ndcg@10", "recall@50", "mrr", "zero_result_rate", "error_rate"}
+            assert f"ndcg@{depth}" in m
+            assert f"recall@{depth}" in m
 
     # Result must be JSON-serializable.
     json.dumps(result)

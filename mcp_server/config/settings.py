@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 from urllib.parse import urlparse
 
 import yaml
@@ -1017,6 +1017,58 @@ def resolve_deployment_profile(
             f"{contract.egress_disclosure}"
         )
     return contract
+
+
+#: Env var naming the active deployment profile (value is a ``DeploymentProfile``
+#: string, e.g. ``"fleet_local"``). Absent -> the safe ``lexical_only`` default.
+ACTIVE_PROFILE_ENV = "MCP_DEPLOYMENT_PROFILE"
+
+#: Env var that operators must set truthy (e.g. ``1``) to opt into commercial
+#: source-code egress. Absent/falsey -> commercial resolution is refused.
+ALLOW_COMMERCIAL_EGRESS_ENV = "MCP_ALLOW_COMMERCIAL_EGRESS"
+
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _env_truthy(value: Optional[str]) -> bool:
+    """Return ``True`` when *value* is an explicit truthy opt-in token."""
+    return value is not None and value.strip().lower() in _TRUTHY
+
+
+def resolve_active_deployment_profile(
+    env: Optional[Mapping[str, str]] = None,
+) -> DeploymentProfileContract:
+    """Resolve the *active* deployment profile from the environment.
+
+    This is the stable entry point that the semantic-indexer and dispatcher
+    lanes call to gate live provider/reranker construction. It reads the active
+    profile name from :data:`ACTIVE_PROFILE_ENV` (``MCP_DEPLOYMENT_PROFILE``),
+    defaulting to the safe, dependency-free :data:`DEFAULT_DEPLOYMENT_PROFILE`
+    (``lexical_only``) when unset.
+
+    Commercial egress is never implicit: selecting the ``commercial`` profile
+    requires the operator to have explicitly opted in via
+    :data:`ALLOW_COMMERCIAL_EGRESS_ENV` (``MCP_ALLOW_COMMERCIAL_EGRESS=1``).
+    Without that opt-in, resolving ``commercial`` raises
+    :class:`CommercialEgressNotOptedIn`.
+
+    Args:
+        env: Optional environment mapping to read from (defaults to
+            ``os.environ``). Injectable so callers/tests need not mutate the
+            process environment.
+
+    Returns:
+        The frozen :class:`DeploymentProfileContract` for the active profile.
+
+    Raises:
+        ValueError: when ``MCP_DEPLOYMENT_PROFILE`` names an unknown profile.
+        CommercialEgressNotOptedIn: when ``commercial`` is selected without the
+            explicit ``MCP_ALLOW_COMMERCIAL_EGRESS`` opt-in.
+    """
+    environ = os.environ if env is None else env
+    profile_name = environ.get(ACTIVE_PROFILE_ENV, DEFAULT_DEPLOYMENT_PROFILE.value)
+    allow_commercial = _env_truthy(environ.get(ALLOW_COMMERCIAL_EGRESS_ENV))
+    return resolve_deployment_profile(profile_name, allow_commercial=allow_commercial)
 
 
 @dataclass(frozen=True)

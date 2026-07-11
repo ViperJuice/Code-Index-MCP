@@ -23,6 +23,7 @@ from mcp_server.config.settings import (
     DeploymentProfileContract,
     RerankerPath,
     apply_degradation_policy,
+    resolve_active_deployment_profile,
     resolve_deployment_profile,
 )
 
@@ -145,6 +146,50 @@ def test_default_resolution_is_never_commercial():
 def test_unknown_profile_raises():
     with pytest.raises(ValueError):
         resolve_deployment_profile("nonexistent_profile")
+
+
+# ---------------------------------------------------------------------------
+# Active-profile resolver (env-driven entry point for consuming lanes)
+# ---------------------------------------------------------------------------
+
+
+def test_active_profile_defaults_to_lexical_only():
+    # Empty env -> the safe, dependency-free, no-egress default.
+    contract = resolve_active_deployment_profile(env={})
+    assert contract.profile is DeploymentProfile.LEXICAL_ONLY
+    assert contract.commercial_egress is False
+    assert contract.requires_learned_models is False
+
+
+def test_active_profile_reads_named_profile():
+    contract = resolve_active_deployment_profile(env={"MCP_DEPLOYMENT_PROFILE": "fleet_local"})
+    assert contract.profile is DeploymentProfile.FLEET_LOCAL
+    assert contract.embedding_provider == "openai_compatible"
+    assert contract.commercial_egress is False
+
+
+def test_active_profile_commercial_without_optin_raises():
+    with pytest.raises(CommercialEgressNotOptedIn):
+        resolve_active_deployment_profile(env={"MCP_DEPLOYMENT_PROFILE": "commercial"})
+    # An explicitly falsey opt-in is still a refusal.
+    with pytest.raises(CommercialEgressNotOptedIn):
+        resolve_active_deployment_profile(
+            env={"MCP_DEPLOYMENT_PROFILE": "commercial", "MCP_ALLOW_COMMERCIAL_EGRESS": "0"}
+        )
+
+
+def test_active_profile_commercial_with_optin_resolves():
+    contract = resolve_active_deployment_profile(
+        env={"MCP_DEPLOYMENT_PROFILE": "commercial", "MCP_ALLOW_COMMERCIAL_EGRESS": "1"}
+    )
+    assert contract.profile is DeploymentProfile.COMMERCIAL
+    assert contract.commercial_egress is True
+    assert contract.embedding_provider == "voyage"
+
+
+def test_active_profile_unknown_name_raises():
+    with pytest.raises(ValueError):
+        resolve_active_deployment_profile(env={"MCP_DEPLOYMENT_PROFILE": "bogus_profile"})
 
 
 # ---------------------------------------------------------------------------

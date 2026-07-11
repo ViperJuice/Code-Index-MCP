@@ -31,6 +31,7 @@ from mcp_server.indexer.reranker import (
     RerankResult,
     SearchResult,
     SyncRerankerAdapter,
+    VoyageReranker,
     run_coroutine_sync,
 )
 from mcp_server.interfaces import indexing_interfaces
@@ -377,3 +378,157 @@ def test_in_process_standalone_unknown_name_raises():
     factory = RerankerFactory()
     with pytest.raises(ValueError, match="Unknown in-process"):
         factory.create_standalone_reranker("nope", standalone_profile=True)
+
+
+# --------------------------------------------------------------------------
+# Bridge timeout enforcement (no-running-loop fast path)
+# --------------------------------------------------------------------------
+
+
+def test_run_coroutine_sync_fast_path_enforces_timeout():
+    """A slow coroutine + ``timeout=`` must raise on the no-running-loop path.
+
+    This is the case that was previously unenforced: the fast path called
+    ``run_until_complete(coro)`` and ignored ``timeout`` entirely.
+    """
+
+    async def slow():
+        await asyncio.sleep(5.0)
+        return "should never get here"
+
+    # No loop running in this thread -> fast path; timeout must fire.
+    with pytest.raises(asyncio.TimeoutError):
+        run_coroutine_sync(slow(), timeout=0.05)
+
+
+def test_run_coroutine_sync_fast_path_does_not_clobber_prior_loop():
+    """The fast path must RESTORE the calling thread's pre-existing loop.
+
+    Previously ``finally: set_event_loop(None)`` destroyed any non-running loop
+    already bound to the thread.
+    """
+    prior = asyncio.new_event_loop()
+    asyncio.set_event_loop(prior)
+    try:
+
+        async def coro():
+            return 7
+
+        assert run_coroutine_sync(coro()) == 7
+        # The bridge's private loop must not have replaced ``prior``.
+        assert asyncio.get_event_loop_policy().get_event_loop() is prior
+    finally:
+        asyncio.set_event_loop(None)
+        prior.close()
+
+
+# --------------------------------------------------------------------------
+# EndpointReranker: sync transport runs OFF the event loop
+# --------------------------------------------------------------------------
+
+
+def test_endpoint_transport_runs_off_event_loop():
+    """A blocking transport must not stall the running loop (no deadlock).
+
+    The transport blocks until a concurrent loop task releases it. If the
+    transport ran inline on the loop, the releasing task would never run and the
+    gate would never be set -> deadlock.
+    """
+    import threading
+
+    gate = threading.Event()
+
+    def blocking_transport(request_dict):
+        # Block until the still-responsive loop releases us.
+        assert gate.wait(timeout=5.0), "transport not released -> event loop blocked"
+        return _fake_transport({0: 0.9, 1: 0.5, 2: 0.1}, reorder=False)(request_dict)
+
+    reranker = EndpointReranker(blocking_transport, provider="fake")
+
+    async def outer():
+        task = asyncio.create_task(reranker.rerank("q", _results(3), top_k=3))
+        # Yield so rerank reaches the (off-loop) transport call.
+        await asyncio.sleep(0.05)
+        # Only reachable if the loop was NOT blocked by the transport.
+        gate.set()
+        return await task
+
+    result = asyncio.run(outer())
+    assert result.is_success
+    assert result.data.results[0].original_result.file_path == "alpha.py"
+
+
+# --------------------------------------------------------------------------
+# Sync-trio reranker failure signal (last_error contract)
+# --------------------------------------------------------------------------
+
+
+def test_sync_reranker_last_error_signals_swallowed_failure():
+    """A swallowed failure sets ``.last_error``; a success resets it to None.
+
+    Also verifies redaction: secret-like substrings never reach ``last_error``.
+    """
+    # Bypass __init__ so the test needs no real voyageai client/API key.
+    r = VoyageReranker.__new__(VoyageReranker)
+    r._model = "rerank-2"
+    r.last_error = None
+
+    class _BoomClient:
+        def rerank(self, **_kwargs):
+            raise RuntimeError("auth failed: bearer sk-supersecrettoken123456")
+
+    r._client = _BoomClient()
+    cands = [{"snippet": "alpha"}, {"snippet": "beta"}]
+
+    out = r.rerank("q", cands, top_k=2)
+    # Original order preserved so callers don't break.
+    assert out == cands[:2]
+    # Failure signalled.
+    assert r.last_error is not None
+    assert "RuntimeError" in r.last_error
+    # Secret scrubbed — no bearer token / api-key material leaks through.
+    assert "sk-supersecrettoken123456" not in r.last_error
+    assert "supersecrettoken" not in r.last_error
+
+    class _OkResult:
+        def __init__(self, index):
+            self.index = index
+
+    class _OkClient:
+        def rerank(self, **_kwargs):
+            class _Resp:
+                results = [_OkResult(0), _OkResult(1)]
+
+            return _Resp()
+
+    r._client = _OkClient()
+    out2 = r.rerank("q", cands, top_k=2)
+    assert out2 == [cands[0], cands[1]]
+    # A successful rerank clears the prior failure signal.
+    assert r.last_error is None
+
+
+# --------------------------------------------------------------------------
+# Cohere adapter: out-of-range provider index is a hard error
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad_index", [5, -1])
+def test_cohere_adapter_raises_on_out_of_range_index(bad_index):
+    def send(_body):
+        # Malformed provider response: index outside the candidate range.
+        return {"results": [{"index": bad_index, "relevance_score": 0.9}]}
+
+    adapter = CohereV2RerankAdapter(send)
+    request_dict = {
+        "contract_version": "rerank.v1",
+        "request_id": "r1",
+        "query": "q",
+        "candidates": [
+            {"candidate_id": "cand-0", "text": "alpha"},
+            {"candidate_id": "cand-1", "text": "beta"},
+        ],
+        "top_k": 2,
+    }
+    with pytest.raises(IndexError):
+        adapter(request_dict)

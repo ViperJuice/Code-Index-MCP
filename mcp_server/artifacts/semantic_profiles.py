@@ -256,32 +256,39 @@ def _looks_like_secret_reference(key: str) -> bool:
 
 
 def _redact_secret_fields(metadata: Any) -> Any:
-    """Redact any credential-bearing field from a metadata mapping.
+    """Redact any credential-bearing field from a metadata structure.
 
     Any key whose name looks like it holds a raw secret value
     (``*api_key*``, bearer/authorization/token/secret/password/credential) is
     replaced with a redaction placeholder. Secret-REFERENCE names (keys ending
     in ``_env``/``_ref``/``_name`` etc.) and any ``Bearer <token>`` string
-    values are also handled. Nested mappings are redacted recursively so no
-    secret survives serialization via ``to_dict`` or artifact export.
+    values are also handled. Nested mappings AND nested lists/tuples are redacted
+    recursively (e.g. ``[{"api_key": "..."}]`` or
+    ``[["Authorization", "Bearer ..."]]``) so no secret survives serialization
+    via ``to_dict`` or artifact export.
     """
-    if not isinstance(metadata, Mapping):
-        return metadata
+    if isinstance(metadata, Mapping):
+        redacted: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            key_str = str(key)
+            lowered = key_str.lower()
+            is_secret_key = any(marker in lowered for marker in _SECRET_KEY_MARKERS)
+            if is_secret_key and not _looks_like_secret_reference(key_str):
+                redacted[key] = _REDACTED_PLACEHOLDER
+            else:
+                # Recurse into the value so secrets nested in mappings, lists,
+                # or tuples (or a bare ``Bearer <token>`` string) are redacted.
+                redacted[key] = _redact_secret_fields(value)
+        return redacted
 
-    redacted: Dict[str, Any] = {}
-    for key, value in metadata.items():
-        key_str = str(key)
-        lowered = key_str.lower()
-        is_secret_key = any(marker in lowered for marker in _SECRET_KEY_MARKERS)
-        if is_secret_key and not _looks_like_secret_reference(key_str):
-            redacted[key] = _REDACTED_PLACEHOLDER
-        elif isinstance(value, Mapping):
-            redacted[key] = _redact_secret_fields(value)
-        elif isinstance(value, str) and value.strip().lower().startswith("bearer "):
-            redacted[key] = _REDACTED_PLACEHOLDER
-        else:
-            redacted[key] = value
-    return redacted
+    if isinstance(metadata, (list, tuple)):
+        redacted_items = [_redact_secret_fields(item) for item in metadata]
+        return tuple(redacted_items) if isinstance(metadata, tuple) else redacted_items
+
+    if isinstance(metadata, str) and metadata.strip().lower().startswith("bearer "):
+        return _REDACTED_PLACEHOLDER
+
+    return metadata
 
 
 def _compute_compatibility_fingerprint(canonical_payload: Mapping[str, Any]) -> str:
@@ -410,16 +417,6 @@ REINDEX_REMEDIATION = (
     "SemanticIndexer.reconcile_existing_collection)."
 )
 
-# Maps a provenance field name (on ``embedding-response.v1`` / ``ExpectedProfile``)
-# to the attribute that carries its assumed value on a ``SemanticProfile``.
-_PROVENANCE_TO_PROFILE_ATTR: Dict[str, str] = {
-    "served_model_id": "model_name",
-    "model_revision": "model_version",
-    "dimension": "vector_dimension",
-    "normalization": "normalization_policy",
-}
-
-
 @dataclass
 class ProfileAttestation:
     """Outcome of reconciling a provider response against a semantic profile.
@@ -536,6 +533,28 @@ def attest_embedding_response(
         checked_fields=result.checked_fields,
         derived=derived,
         reported_fields=reported_fields,
-        role=response.role.value if isinstance(response.role, ProvenanceField) else None,
+        role=_resolve_role_string(role, response),
         remediation=None if result.ok else remediation,
     )
+
+
+def _resolve_role_string(
+    role: Optional[EmbeddingRole], response: EmbeddingResponseV1
+) -> Optional[str]:
+    """Resolve the attestation's recorded role to an actual role STRING.
+
+    Honors the explicit ``role=`` argument when supplied (never overriding the
+    caller's intent with the response's own tag), and otherwise falls back to the
+    response's ``role`` provenance value. In both cases the result is the plain
+    role string (e.g. ``"document"``) — never an :class:`EmbeddingRole` repr like
+    ``"EmbeddingRole.DOCUMENT"`` and never a raw :class:`ProvenanceField`.
+    """
+    if role is not None:
+        return role.value if isinstance(role, EmbeddingRole) else str(role)
+
+    raw = response.role.value if isinstance(response.role, ProvenanceField) else response.role
+    if isinstance(raw, EmbeddingRole):
+        return raw.value
+    if isinstance(raw, str):
+        return raw
+    return None

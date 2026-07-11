@@ -80,6 +80,39 @@ def test_registry_export_redacts_secret_values():
     assert exported["openai_api_key_env"] == "OPENAI_API_KEY"
 
 
+def test_to_dict_redacts_secrets_nested_in_lists_and_tuples():
+    """Secrets buried inside lists/tuples (not just mappings) must not leak."""
+    payload = _payload_with_secret()
+    payload["build_metadata"]["header_pairs"] = [
+        ["Authorization", f"Bearer {SENTINEL}"],
+        ["X-Trace", "keep-me"],
+    ]
+    payload["build_metadata"]["provider_pool"] = [
+        {"api_key": SENTINEL, "endpoint": "https://vllm.internal"},
+    ]
+    payload["build_metadata"]["nested_tuple"] = (
+        {"service_token": SENTINEL},
+        "harmless-tail",
+    )
+
+    profile = SemanticProfile.from_dict("oss-high", payload)
+    serialized = profile.to_dict()
+
+    # No secret survives ANY serialization path.
+    assert SENTINEL not in json.dumps(serialized)
+
+    build_metadata = serialized["build_metadata"]
+    # Bearer token inside a nested list is redacted; the header NAME survives.
+    assert build_metadata["header_pairs"][0][0] == "Authorization"
+    assert build_metadata["header_pairs"][0][1] == "***redacted***"
+    assert build_metadata["header_pairs"][1] == ["X-Trace", "keep-me"]
+    # api_key inside a list-of-dicts is redacted; non-secret siblings survive.
+    assert build_metadata["provider_pool"][0]["api_key"] == "***redacted***"
+    assert build_metadata["provider_pool"][0]["endpoint"] == "https://vllm.internal"
+    # Secret inside a dict nested in a tuple is redacted.
+    assert build_metadata["nested_tuple"][0]["service_token"] == "***redacted***"
+
+
 def test_profile_without_build_metadata_serializes_cleanly():
     payload = _payload_with_secret()
     payload.pop("build_metadata")

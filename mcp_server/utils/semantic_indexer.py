@@ -116,6 +116,12 @@ class CollectionEnsureResult:
         }
 
 
+def _is_already_exists_error(exc: BaseException) -> bool:
+    """True when a create failure is a benign concurrent 'already exists' race."""
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return "already exists" in text or "conflict" in text
+
+
 def ensure_qdrant_collection(
     client: Any,
     *,
@@ -137,21 +143,30 @@ def ensure_qdrant_collection(
     if not exists:
         # Non-destructive create: never call recreate_collection here so a stale
         # exists-check can never wipe a live collection created concurrently.
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config=models.VectorParams(
-                size=expected_dimension,
-                distance=expected_distance,
-            ),
-        )
-        return CollectionEnsureResult(
-            status="created",
-            collection_name=collection_name,
-            expected_dimension=expected_dimension,
-            expected_distance_metric=expected_distance.value,
-            actual_dimension=expected_dimension,
-            actual_distance_metric=expected_distance.value,
-        )
+        try:
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=models.VectorParams(
+                    size=expected_dimension,
+                    distance=expected_distance,
+                ),
+            )
+        except Exception as exc:
+            # A concurrent writer may have created the collection between our
+            # exists-check and this create. Tolerate ONLY that race: fall through
+            # to re-verify the now-existing collection's shape (still fail-closed
+            # on a mismatch). Any other create error surfaces unchanged.
+            if not _is_already_exists_error(exc):
+                raise
+        else:
+            return CollectionEnsureResult(
+                status="created",
+                collection_name=collection_name,
+                expected_dimension=expected_dimension,
+                expected_distance_metric=expected_distance.value,
+                actual_dimension=expected_dimension,
+                actual_distance_metric=expected_distance.value,
+            )
 
     collection_info = client.get_collection(collection_name)
     vectors_config = collection_info.config.params.vectors
@@ -278,6 +293,11 @@ class SemanticIndexer:
         _build_metadata = self.semantic_profile.build_metadata or {}
         _api_key_env = _build_metadata.get("openai_api_key_env")
         _resolved_api_key = os.environ.get(_api_key_env) if _api_key_env else None
+        # Profile-gated commercial egress: only build a commercial (source-code
+        # egress) embedding provider when the active deployment profile permits it
+        # (explicit opt-in). Local / private-endpoint providers and the default
+        # lexical_only profile are unaffected.
+        self._enforce_commercial_egress_policy(self.semantic_profile.provider)
         self.embedding_client = create_embedding_provider(
             provider_name=self.semantic_profile.provider,
             model_name=self.embedding_model,
@@ -293,8 +313,17 @@ class SemanticIndexer:
         # path, strictly before any point write (IF-0-EMBEDPROV-1).
         self._writes_prepared = False
         self._attestation: Optional[ProfileAttestation] = None
-        self._ensure_collection()
-        self._update_metadata()
+        # For provenance-capable providers, DEFER collection creation and the
+        # assumed-metadata write to the attested write gate (``_prepare_for_writes``)
+        # so live construction never creates a collection or stamps assumed
+        # metadata BEFORE attestation (a later attestation failure would otherwise
+        # leave an orphaned collection + assumed metadata). Non-mutating
+        # inspect/reconcile/query paths still construct cleanly. Legacy bare-``embed``
+        # providers cannot be attested, so preserve their construct-time behavior
+        # exactly — the write gate special-cases them as a no-op.
+        if not self._provider_supports_provenance():
+            self._ensure_collection()
+            self._update_metadata()
 
     def _resolve_semantic_profile(
         self,
@@ -354,6 +383,49 @@ class SemanticIndexer:
             profile_id=self.semantic_profile.profile_id,
             lineage_id=effective_lineage,
         )
+
+    # Embedding providers that egress source code to a third-party commercial
+    # API. Building one of these is only permitted under a deployment profile
+    # that opts into commercial egress.
+    _COMMERCIAL_EMBEDDING_PROVIDERS = frozenset({"voyage", "voyageai"})
+
+    def _resolve_active_deployment_contract(self) -> Optional[Any]:
+        """Resolve the active deployment-profile contract, guarded defensively.
+
+        The ``resolve_active_deployment_profile`` symbol is owned by the settings
+        lane and may not have landed yet. If it cannot be imported we return
+        ``None`` (an intentional TRANSITIONAL fail-open until that lane lands — the
+        default profile is lexical_only/non-commercial and commercial providers are
+        never configured implicitly). A resolver that EXISTS but raises (e.g.
+        ``CommercialEgressNotOptedIn`` for a commercial profile without opt-in) is
+        propagated so the egress policy stays fail-closed once the lane is present.
+        """
+        try:
+            from mcp_server.config.settings import resolve_active_deployment_profile
+        except ImportError:
+            return None
+        return resolve_active_deployment_profile()
+
+    def _enforce_commercial_egress_policy(self, provider_name: str) -> None:
+        """Refuse to build a commercial provider unless the active profile allows it."""
+        normalized = (provider_name or "").strip().lower()
+        if normalized not in self._COMMERCIAL_EMBEDDING_PROVIDERS:
+            return  # Local / private-endpoint provider: always permitted.
+
+        contract = self._resolve_active_deployment_contract()
+        if contract is None:
+            return  # Settings lane not present yet: transitional guard.
+
+        if not getattr(contract, "commercial_egress", False):
+            profile = getattr(contract, "profile", None)
+            profile_label = getattr(profile, "value", profile)
+            raise RuntimeError(
+                f"Embedding provider '{provider_name}' performs source-code egress to a "
+                f"third-party commercial API, but the active deployment profile "
+                f"'{profile_label}' does not permit commercial egress. Select the "
+                "commercial profile with an explicit opt-in (e.g. "
+                "MCP_DEPLOYMENT_PROFILE=commercial) to authorize it."
+            )
 
     # ------------------------------------------------------------------
     def _provider_supports_provenance(self) -> bool:
@@ -1270,7 +1342,19 @@ class SemanticIndexer:
         return attest_embedding_response(self.semantic_profile, response, role=role)
 
     def _attested_metadata(self, attestation: ProfileAttestation) -> Dict[str, Any]:
-        """Build the durable metadata payload stamped with attestation provenance."""
+        """Build the durable metadata payload stamped with attestation provenance.
+
+        Fail-closed guard: this stamps ``attested=True`` and copies server-derived
+        provenance, so it MUST never run on a failed attestation. A failed
+        attestation stamped as attested would open the write gate under an
+        unverified profile — refuse it outright.
+        """
+        if not attestation.ok:
+            raise RuntimeError(
+                "_attested_metadata refuses to stamp attested metadata from a "
+                "failed attestation (attestation.ok is False): "
+                + attestation.failure_reason()
+            )
         metadata = self._build_metadata()
         attestation_block = attestation.to_dict()
         attestation_block["attested_at"] = datetime.now().isoformat()
@@ -1395,6 +1479,77 @@ class SemanticIndexer:
                 f"{REINDEX_REMEDIATION}"
             )
 
+        # Dimension and served-model id alone are too weak: a same-dim, same-model
+        # model_revision bump, a normalization-policy change, or any other
+        # compatibility-critical drift produces vectors that are silently wrong to
+        # compare. Cross-check every remaining compatibility-critical provenance
+        # (model_revision, normalization) plus the profile compatibility
+        # fingerprint against the attested/persisted index record; fail closed on
+        # any mismatch.
+        indexed_revision = record.get("model_version")
+        query_revision = attestation.derived.get("model_revision", {}).get("value")
+        if (
+            isinstance(indexed_revision, str)
+            and isinstance(query_revision, str)
+            and indexed_revision != query_revision
+        ):
+            raise RuntimeError(
+                "Query embedding provenance is incompatible with the indexed "
+                f"vectors: index was built at model revision {indexed_revision!r} but "
+                f"the query model reports revision {query_revision!r}. Refusing to "
+                f"search across incompatible vector spaces. {REINDEX_REMEDIATION}"
+            )
+
+        indexed_norm = record.get("normalization_policy")
+        query_norm = attestation.derived.get("normalization", {}).get("value")
+        if (
+            isinstance(indexed_norm, str)
+            and isinstance(query_norm, str)
+            and indexed_norm != query_norm
+        ):
+            raise RuntimeError(
+                "Query embedding provenance is incompatible with the indexed "
+                f"vectors: index was built under normalization {indexed_norm!r} but "
+                f"the query model reports normalization {query_norm!r}. Refusing to "
+                f"search across incompatible vector spaces. {REINDEX_REMEDIATION}"
+            )
+
+        indexed_fingerprint = record.get("compatibility_fingerprint")
+        query_fingerprint = self.compatibility_fingerprint
+        if (
+            isinstance(indexed_fingerprint, str)
+            and isinstance(query_fingerprint, str)
+            and indexed_fingerprint != query_fingerprint
+        ):
+            raise RuntimeError(
+                "Query embedding provenance is incompatible with the indexed "
+                f"vectors: index compatibility fingerprint {indexed_fingerprint!r} "
+                f"does not match the active query profile fingerprint "
+                f"{query_fingerprint!r}. Refusing to search across incompatible "
+                f"vector spaces. {REINDEX_REMEDIATION}"
+            )
+
+    # ------------------------------------------------------------------
+    def _recreate_collection_for_reindex(self) -> None:
+        """Unconditionally clear and rebuild an EMPTY collection to the active shape.
+
+        Unlike ``_ensure_collection(allow_recreate=True)`` — which only recreates on
+        a SHAPE mismatch and therefore misses same-dimension model drift — this
+        always deletes-and-recreates, so no vector written under a stale/unverified
+        profile can survive an operator-authorized reindex. This is an explicitly
+        destructive, operator-authorized path.
+        """
+        if not self._qdrant_available:
+            raise RuntimeError("Qdrant is not available - cannot rebuild collection")
+        expected_distance = self.resolve_qdrant_distance(self.distance_metric)
+        self.qdrant.recreate_collection(
+            collection_name=self.collection,
+            vectors_config=models.VectorParams(
+                size=self.embedding_dimension,
+                distance=expected_distance,
+            ),
+        )
+
     # ------------------------------------------------------------------
     def reconcile_existing_collection(
         self, *, probe_texts: Optional[List[str]] = None, allow_reindex: bool = False
@@ -1439,11 +1594,32 @@ class SemanticIndexer:
                 "attestation": attestation.to_dict(),
             }
             if allow_reindex:
-                # Operator authorized destructive rebuild to the attested shape.
-                self._atomic_write_metadata(self._attested_metadata(attestation))
-                self._ensure_collection(allow_recreate=True)
+                # Operator authorized a destructive rebuild. The prior failed
+                # attestation must NEVER open the write gate or persist attested
+                # metadata (that would mix old+new-model vectors and disable the
+                # fail-closed gate). Unconditionally DELETE+recreate the collection
+                # — a shape-only recreate would miss same-dimension model drift —
+                # then require a FRESH successful re-attestation before persisting
+                # or opening the gate.
+                self._recreate_collection_for_reindex()
+                reattest = self._attest_active_profile(probe_texts=probe_texts)
+                if not reattest.ok:
+                    # Re-attest still fails: leave an empty, ungated collection and
+                    # fail closed. Nothing further is mutated (no attested metadata,
+                    # write gate stays shut).
+                    result["status"] = "reindex_failed"
+                    result["message"] = reattest.failure_reason(
+                        subject=f"rebuilt collection '{self.collection}'"
+                    )
+                    result["attestation"] = reattest.to_dict()
+                    return result
+                # Fresh attestation succeeded: persist attested profile and open
+                # the write gate under the verified profile.
+                self._atomic_write_metadata(self._attested_metadata(reattest))
+                self._attestation = reattest
                 self._writes_prepared = True
                 result["status"] = "reindexed"
+                result["attestation"] = reattest.to_dict()
             return result
 
         # Compatible: revalidate + re-persist as attested.

@@ -212,6 +212,71 @@ def _get_lexical_timeout_seconds() -> float:
         return 20.0
 
 
+#: Default per-request timeout (seconds) for the endpoint reranker transport so a
+#: hung transport can never block the search path forever.
+_DEFAULT_RERANK_TIMEOUT_S = 30.0
+
+
+def _get_endpoint_rerank_timeout_seconds() -> float:
+    """Return the endpoint reranker timeout from ``MCP_RERANK_TIMEOUT_S``.
+
+    Falls back to :data:`_DEFAULT_RERANK_TIMEOUT_S` (30s) on an unset or
+    unparseable value; clamps to a >=1s floor.
+    """
+    raw = os.getenv("MCP_RERANK_TIMEOUT_S")
+    if raw is None:
+        return _DEFAULT_RERANK_TIMEOUT_S
+    try:
+        return max(float(raw), 1.0)
+    except (ValueError, TypeError):
+        return _DEFAULT_RERANK_TIMEOUT_S
+
+
+#: Reranker types that route source-code text to a third-party commercial API and
+#: therefore require the active deployment profile to permit commercial egress.
+_COMMERCIAL_RERANKER_TYPES = frozenset({"voyage", "cohere"})
+
+
+# Redact bearer tokens, api keys, and token-like substrings before any exception
+# text enters rerank diagnostics or logs. Kept deliberately small and defensive.
+_SECRET_REDACTION_PATTERN = re.compile(
+    r"(?i)"
+    r"(?:bearer\s+[A-Za-z0-9._\-]+)"
+    r"|(?:(?:api[_-]?key|apikey|token|secret|password|authorization)\s*[=:]\s*[^\s,;'\"]+)"
+    r"|(?:sk-[A-Za-z0-9]{6,})"
+)
+
+
+def _redact_secrets(text: Optional[str]) -> Optional[str]:
+    """Strip bearer/api-key/token-like substrings from *text*.
+
+    Applied to exception messages before they are stored in diagnostics or
+    written to logs so a leaked credential in a provider error can't surface.
+    """
+    if not text:
+        return text
+    return _SECRET_REDACTION_PATTERN.sub("[REDACTED]", str(text))
+
+
+def _active_profile_permits_commercial() -> bool:
+    """Return ``True`` only when the active deployment profile permits commercial
+    (source-code egress) inference.
+
+    Fail-closed: any import/resolution error (including
+    :class:`CommercialEgressNotOptedIn` when a commercial profile is selected
+    without the explicit opt-in) yields ``False`` so a commercial reranker is
+    never constructed by accident.
+    """
+    try:
+        from ..config.settings import resolve_active_deployment_profile
+    except Exception:  # pragma: no cover - settings contract always importable
+        return False
+    try:
+        contract = resolve_active_deployment_profile()
+    except Exception:
+        return False
+    return bool(getattr(contract, "commercial_egress", False))
+
 # Path segment penalties for lexical (BM25/fuzzy) results.
 # FTS5 scores are negative; adding a positive penalty degrades rank.
 _PATH_PENALTY_RULES: List[Tuple[str, float]] = [
@@ -1430,6 +1495,14 @@ class EnhancedDispatcher:
             VoyageReranker,
         )
 
+        if reranker_type in _COMMERCIAL_RERANKER_TYPES and not _active_profile_permits_commercial():
+            logger.warning(
+                "Commercial reranker '%s' requested but the active deployment "
+                "profile does not permit commercial egress; disabling reranker",
+                reranker_type,
+            )
+            return None
+
         if reranker_type == "voyage":
             voyage_model = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2")
             logger.info(f"Reranker initialized: VoyageReranker model={voyage_model}")
@@ -1452,7 +1525,9 @@ class EnhancedDispatcher:
             provider = os.getenv("RERANK_ENDPOINT_PROVIDER", "endpoint")
             endpoint = EndpointReranker(endpoint_rerank_transport, provider=provider)
             logger.info(f"Reranker initialized: EndpointReranker provider={provider}")
-            return self.wrap_endpoint_reranker(endpoint)
+            return self.wrap_endpoint_reranker(
+                endpoint, timeout=_get_endpoint_rerank_timeout_seconds()
+            )
         logger.warning(f"Unknown reranker_type '{reranker_type}', disabling reranker")
         return None
 
@@ -1529,7 +1604,10 @@ class EnhancedDispatcher:
             reranked = self._reranker.rerank(query, filtered, limit)
         except Exception as e:
             duration_ms = (_time.perf_counter() - _start) * 1000.0
-            logger.warning(f"_apply_reranker failed, returning original order: {e}")
+            logger.warning(
+                "_apply_reranker failed, returning original order: %s",
+                _redact_secrets(str(e)),
+            )
             self._record_rerank_diagnostics(
                 RerankDiagnostics(
                     outcome=RerankOutcome.FAILED,
@@ -1537,7 +1615,7 @@ class EnhancedDispatcher:
                     candidate_count=len(filtered),
                     returned_count=min(len(candidates), limit),
                     duration_ms=duration_ms,
-                    error=str(e),
+                    error=_redact_secrets(str(e)),
                 )
             )
             return candidates[:limit]
@@ -1558,6 +1636,25 @@ class EnhancedDispatcher:
                     returned_count=len(reranked),
                     reordered=reordered,
                     duration_ms=duration_ms,
+                )
+            )
+            return reranked
+
+        # A sync reranker MAY swallow a provider failure and return the original
+        # order while surfacing the reason via `last_error`. That is a FAILED
+        # outcome, NOT a no-op ATTEMPTED — otherwise a masked failure masquerades
+        # as a benign unchanged ordering.
+        last_error = getattr(self._reranker, "last_error", None)
+        if last_error is not None:
+            self._record_rerank_diagnostics(
+                RerankDiagnostics(
+                    outcome=RerankOutcome.FAILED,
+                    provider=provider,
+                    candidate_count=len(filtered),
+                    returned_count=len(reranked),
+                    reordered=reordered,
+                    duration_ms=duration_ms,
+                    error=_redact_secrets(str(last_error)),
                 )
             )
             return reranked
@@ -1949,7 +2046,11 @@ class EnhancedDispatcher:
                 )
 
             if semantic and _semantic_indexer:
-                logger.info(f"Using semantic indexer for query: {query}")
+                logger.info(
+                    "Using semantic indexer (query_chars=%d, limit=%d)",
+                    len(query or ""),
+                    limit,
+                )
                 try:
                     semantic_results = _semantic_indexer.search(query=query, limit=limit)
                     candidates = []

@@ -742,6 +742,30 @@ class HybridReranker(BaseReranker):
         return capabilities
 
 
+import re as _re
+
+# Substrings that look like secrets (bearer tokens / api keys) are scrubbed from
+# any error string exposed via ``last_error`` so the dispatcher lane never sees a
+# credential. Candidate/query text is NEVER put in ``last_error``.
+_SECRET_PATTERNS = [
+    _re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]+"),
+    _re.compile(r"(?i)(api[_-]?key|token|secret|authorization)\s*[=:]\s*[^\s,;]+"),
+    _re.compile(r"\bsk-[A-Za-z0-9._\-]{8,}"),
+    _re.compile(r"\bpa-[A-Za-z0-9._\-]{8,}"),
+]
+
+
+def _redact_error(exc: BaseException) -> str:
+    """Return a redacted ``"<ExcType>: <message>"`` string safe for ``last_error``.
+
+    Strips bearer/api-key-like substrings; carries no candidate/query text.
+    """
+    msg = f"{type(exc).__name__}: {exc}"
+    for pat in _SECRET_PATTERNS:
+        msg = pat.sub("[REDACTED]", msg)
+    return msg
+
+
 class VoyageReranker:
     """Synchronous Voyage AI reranker using voyageai.Client.rerank().
 
@@ -756,6 +780,8 @@ class VoyageReranker:
 
         self._client = voyageai.Client(api_key=api_key) if api_key else voyageai.Client()
         self._model = model
+        #: Dispatcher-lane failure signal: None = ok, str = a swallowed failure.
+        self.last_error: Optional[str] = None
 
     def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
         """Reorder candidates by Voyage relevance score.
@@ -764,6 +790,7 @@ class VoyageReranker:
         then `snippet`, then `file` path.  Falls back to original order on
         empty documents or any API error.
         """
+        self.last_error = None
         documents = [
             c.get("_rerank_doc") or c.get("snippet") or c.get("file", "") for c in candidates
         ]
@@ -775,6 +802,7 @@ class VoyageReranker:
             )
             return [candidates[r.index] for r in result.results]
         except Exception as e:
+            self.last_error = _redact_error(e)
             logger.warning(f"VoyageReranker.rerank() failed, using original order: {e}")
             return candidates[:top_k]
 
@@ -789,6 +817,8 @@ class FlashRankReranker:
     def __init__(self, model: str = "ms-marco-MiniLM-L-12-v2"):
         self._model_name = model
         self._ranker = None
+        #: Dispatcher-lane failure signal: None = ok, str = a swallowed failure.
+        self.last_error: Optional[str] = None
 
     def _load(self):
         if self._ranker is None:
@@ -802,9 +832,11 @@ class FlashRankReranker:
         Document text preference order: ``_rerank_doc``, then ``snippet``, then
         ``file`` path.  Falls back to original order on import error or exception.
         """
+        self.last_error = None
         try:
             self._load()
-        except ImportError:
+        except ImportError as e:
+            self.last_error = _redact_error(e)
             logger.warning("FlashRankReranker: flashrank not installed, using original order")
             return candidates[:top_k]
         try:
@@ -821,6 +853,7 @@ class FlashRankReranker:
             results = self._ranker.rerank(request)
             return [candidates[r["id"]] for r in results[:top_k]]
         except Exception as e:
+            self.last_error = _redact_error(e)
             logger.warning(f"FlashRankReranker.rerank() failed, using original order: {e}")
             return candidates[:top_k]
 
@@ -835,6 +868,8 @@ class CrossEncoderReranker:
     def __init__(self, model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
         self._model_name = model
         self._model = None
+        #: Dispatcher-lane failure signal: None = ok, str = a swallowed failure.
+        self.last_error: Optional[str] = None
 
     def _load(self):
         if self._model is None:
@@ -847,9 +882,11 @@ class CrossEncoderReranker:
 
         Falls back to original order on import error or exception.
         """
+        self.last_error = None
         try:
             self._load()
-        except ImportError:
+        except ImportError as e:
+            self.last_error = _redact_error(e)
             logger.warning(
                 "CrossEncoderReranker: sentence-transformers not installed, using original order"
             )
@@ -863,6 +900,7 @@ class CrossEncoderReranker:
             indexed = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
             return [candidates[i] for i, _ in indexed[:top_k]]
         except Exception as e:
+            self.last_error = _redact_error(e)
             logger.warning(f"CrossEncoderReranker.rerank() failed, using original order: {e}")
             return candidates[:top_k]
 
@@ -910,13 +948,23 @@ def run_coroutine_sync(coro: Awaitable[_T], *, timeout: Optional[float] = None) 
         loop_running = False
 
     if not loop_running:
-        # Fast path: safe to own the loop on this thread.
+        # Fast path: safe to own the loop on this thread. Preserve any
+        # pre-existing (non-running) loop bound to this thread and RESTORE it in
+        # ``finally`` — never clobber it with ``set_event_loop(None)``.
+        try:
+            prior_loop: Optional[asyncio.AbstractEventLoop] = (
+                asyncio.get_event_loop_policy().get_event_loop()
+            )
+        except Exception:  # noqa: BLE001 - no bound loop / policy raised
+            prior_loop = None
         loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(loop)
+            if timeout is not None:
+                return loop.run_until_complete(asyncio.wait_for(coro, timeout))
             return loop.run_until_complete(coro)
         finally:
-            asyncio.set_event_loop(None)
+            asyncio.set_event_loop(prior_loop)
             loop.close()
 
     # A loop is already running here; drive the coroutine on a private loop in a
@@ -926,7 +974,12 @@ def run_coroutine_sync(coro: Awaitable[_T], *, timeout: Optional[float] = None) 
     def _runner() -> None:
         worker_loop = asyncio.new_event_loop()
         try:
-            box["value"] = worker_loop.run_until_complete(coro)
+            if timeout is not None:
+                box["value"] = worker_loop.run_until_complete(
+                    asyncio.wait_for(coro, timeout)
+                )
+            else:
+                box["value"] = worker_loop.run_until_complete(coro)
         except BaseException as exc:  # noqa: BLE001 - re-raised on caller thread
             box["error"] = exc
         finally:
@@ -1062,7 +1115,10 @@ class EndpointReranker(IReranker):
         )
 
         started = time.perf_counter()
-        response = RerankResponse.from_dict(self._transport(request.to_dict()))
+        # Run the synchronous transport off the event loop so blocking network
+        # I/O never stalls the running loop (IF-0-RERANKEND-1).
+        raw_response = await asyncio.to_thread(self._transport, request.to_dict())
+        response = RerankResponse.from_dict(raw_response)
         duration_ms = (time.perf_counter() - started) * 1000.0
 
         # Wire-contract validation: missing / duplicated / unknown ids RAISE.
@@ -1229,6 +1285,12 @@ class CohereV2RerankAdapter:
         scored = 0
         for item in cohere_response.get("results", []):
             index = item["index"]
+            # Guard against a malformed provider index: a negative or
+            # out-of-range value would silently wrap via ``ids[index]``.
+            if not (0 <= index < len(ids)):
+                raise IndexError(
+                    f"Cohere result index {index} out of range for {len(ids)} candidates"
+                )
             score = item.get("relevance_score")
             status = (
                 RerankOutcome.SUCCEEDED if score is not None else RerankOutcome.FAILED

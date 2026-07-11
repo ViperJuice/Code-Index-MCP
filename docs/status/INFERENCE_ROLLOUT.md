@@ -53,18 +53,34 @@ Evaluated on the **non-holdout (`main`) split only** — 40 queries — against 
 frozen corpus (872 documents). Numbers are reported **as-is**; the ranker was
 **not** iterated to clear any threshold.
 
-| Depth | ndcg@10 | mrr | recall@50 | zero-result | error |
-| --- | --- | --- | --- | --- | --- |
-| 20 | 0.3838 | 0.3290 | 0.6125 | 0.0 | 0.0 |
-| 50 | 0.4011 | 0.3290 | 0.6875 | 0.0 | 0.0 |
-| 100 | 0.4035 | 0.3290 | 0.7000 | 0.0 | 0.0 |
+The gate compares against **fixed-k** metrics — the exact cutoffs the frozen
+thresholds name (`ndcg@10`, `recall@50`), computed at k=10 / k=50 **independent
+of the candidate depth**. (An earlier harness scored ndcg/recall at the
+candidate depth `d` and then labeled the depth-20 value `ndcg@10`; the fixed-k
+metrics below remove that mislabeling and are what the gate now reads.)
 
-p95 latency: 0.73 ms · error rate: 0.0 · zero-result rate: 0.0 · commercial
+| Metric (fixed-k) | Value | Floor (lexical) | Clears |
+| --- | --- | --- | --- |
+| ndcg@10 | 0.3699 | 0.30 | yes |
+| recall@50 | 0.6875 | 0.60 | yes |
+| mrr | 0.3290 | 0.35 | **no** |
+
+Per-depth diagnostics are retained under their **true** names (`ndcg@d` /
+`recall@d`) — never relabeled as the fixed-k metrics:
+
+| Candidate depth d | ndcg@d | recall@d |
+| --- | --- | --- |
+| 20 | 0.3838 | 0.6125 |
+| 50 | 0.4011 | 0.6875 |
+| 100 | 0.4035 | 0.7000 |
+
+p95 latency: 0.86 ms · error rate: 0.0 · zero-result rate: 0.0 · commercial
 egress fraction: 0.0.
 
-The lexical arm clears its frozen ndcg@10 (≥0.30) and recall@50 (≥0.60) floors
-and all operational/egress bounds, but its mrr (0.329) is **below** the lexical
-mrr floor (0.35). This is reported honestly and **does not move the verdict** —
+The lexical arm clears its frozen ndcg@10 (0.3699 ≥ 0.30) and recall@50
+(0.6875 ≥ 0.60) floors and all operational/egress bounds, but its mrr (0.329) is
+**below** the lexical mrr floor (0.35). This is reported honestly and **does not
+move the verdict** —
 the gate decision is about `hybrid_rerank` default-enablement, not the lexical
 arm, and the lexical arm ranks path tokens only (weaker than full-text BM25).
 
@@ -82,7 +98,7 @@ The frozen corpus path list was independently **reconstructed from the pinned
 corpus commit and its digest matched `corpus_sha256`** (872 docs), confirming
 the lexical arm ran against the real frozen corpus.
 
-- code commit (this run): `da948650edad080ed12ee5f9eda0f7638499a045`
+- code commit (this run): `b299005ffd457b5921e14476c97bde28cde206db`
 - corpus commit (pinned, distinct from code commit): `f7c060b4f145516a4629338e078d3b8b9c0c406a`
 - provider revision: none — no live embedding/rerank provider was exercised.
 

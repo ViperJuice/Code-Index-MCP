@@ -44,6 +44,19 @@ CHANNEL_ARMS: Tuple[str, ...] = ("lexical", "dense")
 #: Candidate depths at which each arm is scored.
 DEPTHS: Tuple[int, ...] = (20, 50, 100)
 
+#: Fixed cutoffs the frozen gate thresholds name. ``ndcg@10`` and ``recall@50``
+#: are ALWAYS computed at these k's, independent of the candidate depth, so the
+#: gate compares like-for-like against ``min_quality.ndcg@10`` / ``recall@50``.
+#: (The earlier harness scored ndcg/recall at the candidate depth ``d`` and then
+#: mislabeled the depth-20 value as ``ndcg@10`` — this constant removes that
+#: ambiguity.)
+NDCG_FIXED_K = 10
+RECALL_FIXED_K = 50
+
+#: The metric keys carrying the fixed-k values in every depth summary.
+NDCG_FIXED_KEY = f"ndcg@{NDCG_FIXED_K}"
+RECALL_FIXED_KEY = f"recall@{RECALL_FIXED_K}"
+
 #: Frozen eval file names read by :func:`load_frozen_eval`.
 QUERIES_FILE = "queries.jsonl"
 CORPUS_FILE = "corpus_manifest.json"
@@ -437,7 +450,7 @@ class RetrievalBenchmarkHarness:
 
         for arm_name in ordered:
             spec = self.arms[arm_name]
-            depth_stats = {d: _DepthAccumulator() for d in self.depths}
+            depth_stats = {d: _DepthAccumulator(depth=d) for d in self.depths}
             latencies: List[float] = []
             errors = 0
             zero_results = 0
@@ -474,11 +487,19 @@ class RetrievalBenchmarkHarness:
                     if channels:
                         per_channel.setdefault(arm_name, {})[qid] = _per_channel_diagnostics(ranked_ids, channels)
 
+                # Fixed-k metrics named by the frozen thresholds: computed ONCE
+                # per query at their fixed cutoff, independent of candidate depth.
+                ndcg_fixed = ndcg_at_k(ranked_ids, relevance, NDCG_FIXED_K)
+                recall_fixed = recall_at_k(ranked_ids, relevant_ids, RECALL_FIXED_K)
+                rr = reciprocal_rank(ranked_ids, relevant_ids)
+
                 for d in self.depths:
                     depth_stats[d].add(
-                        ndcg=ndcg_at_k(ranked_ids, relevance, d),
-                        rr=reciprocal_rank(ranked_ids, relevant_ids),
-                        recall=recall_at_k(ranked_ids, relevant_ids, d),
+                        ndcg_fixed=ndcg_fixed,
+                        recall_fixed=recall_fixed,
+                        ndcg_depth=ndcg_at_k(ranked_ids, relevance, d),
+                        recall_depth=recall_at_k(ranked_ids, relevant_ids, d),
+                        rr=rr,
                         zero_result=(len(ranked_ids) == 0),
                     )
 
@@ -510,18 +531,44 @@ class RetrievalBenchmarkHarness:
 
 @dataclass
 class _DepthAccumulator:
-    """Accumulates metric values at one depth across queries."""
+    """Accumulates metric values for one candidate depth across queries.
 
-    ndcgs: List[float] = field(default_factory=list)
+    Two families of metric are tracked and reported under EXPLICIT, distinct
+    keys so nothing is mislabeled:
+
+    * Fixed-k metrics named by the frozen gate thresholds — ``ndcg@10`` and
+      ``recall@50`` — computed at their fixed cutoff regardless of this
+      accumulator's candidate ``depth``. These are what the gate compares
+      against ``min_quality.ndcg@10`` / ``recall@50``.
+    * Per-depth metrics — ``ndcg@{depth}`` and ``recall@{depth}`` — the quality
+      at this accumulator's candidate depth, kept for diagnostics.
+
+    ``mrr`` is depth-independent (reciprocal rank scans the full ranking).
+    """
+
+    depth: int
+    ndcg_fixed: List[float] = field(default_factory=list)
+    recall_fixed: List[float] = field(default_factory=list)
+    ndcg_depth: List[float] = field(default_factory=list)
+    recall_depth: List[float] = field(default_factory=list)
     rrs: List[float] = field(default_factory=list)
-    recalls: List[float] = field(default_factory=list)
     zero_results: int = 0
     errors: int = 0
 
-    def add(self, ndcg: float, rr: float, recall: float, zero_result: bool) -> None:
-        self.ndcgs.append(ndcg)
+    def add(
+        self,
+        ndcg_fixed: float,
+        recall_fixed: float,
+        ndcg_depth: float,
+        recall_depth: float,
+        rr: float,
+        zero_result: bool,
+    ) -> None:
+        self.ndcg_fixed.append(ndcg_fixed)
+        self.recall_fixed.append(recall_fixed)
+        self.ndcg_depth.append(ndcg_depth)
+        self.recall_depth.append(recall_depth)
         self.rrs.append(rr)
-        self.recalls.append(recall)
         if zero_result:
             self.zero_results += 1
 
@@ -532,12 +579,16 @@ class _DepthAccumulator:
         def mean(xs: List[float]) -> float:
             return float(np.mean(xs)) if xs else 0.0
 
-        scored = len(self.ndcgs)
+        scored = len(self.ndcg_fixed)
         total = scored + self.errors
         return {
-            "ndcg": mean(self.ndcgs),
+            # Fixed-k metrics the gate thresholds name (depth-independent).
+            NDCG_FIXED_KEY: mean(self.ndcg_fixed),
+            RECALL_FIXED_KEY: mean(self.recall_fixed),
+            # Per-depth metrics at this accumulator's candidate depth.
+            f"ndcg@{self.depth}": mean(self.ndcg_depth),
+            f"recall@{self.depth}": mean(self.recall_depth),
             "mrr": mean(self.rrs),
-            "recall": mean(self.recalls),
             "zero_result_rate": (self.zero_results / total) if total else 0.0,
             "error_rate": (self.errors / total) if total else 0.0,
             "n_scored": scored,

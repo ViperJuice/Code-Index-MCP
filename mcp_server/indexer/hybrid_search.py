@@ -520,11 +520,22 @@ class HybridSearch:
         """Rerank search results using the configured reranker."""
         from .reranker import RerankDiagnostics, RerankOutcome
 
-        if not self.reranker or not results:
+        if not self.reranker:
+            # NOT_CONFIGURED is reserved for the absent-reranker case only.
             self.last_rerank_diagnostics = RerankDiagnostics(
                 outcome=RerankOutcome.NOT_CONFIGURED,
                 candidate_count=len(results),
                 returned_count=len(results),
+            )
+            return results
+
+        if not results:
+            # A reranker IS configured; there is simply nothing to rerank. That is
+            # an ATTEMPTED (empty) outcome, never NOT_CONFIGURED.
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.ATTEMPTED,
+                candidate_count=0,
+                returned_count=0,
             )
             return results
 

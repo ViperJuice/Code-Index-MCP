@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 import socket
 import subprocess
@@ -173,6 +174,143 @@ def probe(host: str, port: int, timeout: float = 3.0) -> bool:
         return False
 
 
+def not_run_reason(embed_up: bool, qdrant_up: bool, host: str, port: int) -> str:
+    """Truthful, probe-derived reason string for the arms that could not run.
+
+    The reason names *which* service was unreachable (never a hardcoded claim),
+    so the artifact never asserts a service is down when a probe says it is up.
+    """
+    missing: List[str] = []
+    if not embed_up:
+        missing.append(f"embedding endpoint {host}:{port} unreachable")
+    if not qdrant_up:
+        missing.append("Qdrant localhost:6333 unreachable")
+    return (
+        "live inference services not fully reachable "
+        f"({'; '.join(missing) or 'no service reachable'}). "
+        "Dense/fused arms require query+corpus embeddings"
+        + (" and a Qdrant vector search" if not qdrant_up else "")
+        + ", so they cannot be scored without inventing numbers "
+        f"(probe state: embedding_up={embed_up}, qdrant_up={qdrant_up})."
+    )
+
+
+def build_provider_arms(
+    corpus: List[str],
+    ranker: "BM25PathRanker",
+    *,
+    embed_base_url: str,
+    embed_model: str,
+    embed_api_key: str,
+    embed_dim: int,
+    qdrant_host: str,
+    qdrant_port: int,
+    collection: str,
+    rerank_url: str,
+    top_k: int,
+) -> Dict[str, ArmSpec]:
+    """Construct the LIVE ``dense`` / ``hybrid`` / ``hybrid_rerank`` arms.
+
+    Every embedding/qdrant/reranker import happens lazily inside this function so
+    the offline down-path (this environment) never touches those optional heavy
+    dependencies — the driver still imports and produces an artifact when the
+    services are down. This is only called when BOTH the embedding endpoint and
+    Qdrant probes report up.
+
+    * ``dense`` — embed the query via the OpenAI-compatible provider, then Qdrant
+      vector search; map hits back to corpus-relative doc ids.
+    * ``hybrid`` — reciprocal-rank fusion of the lexical and dense rankings.
+    * ``hybrid_rerank`` — the hybrid candidates reranked via ``EndpointReranker``
+      over the ``rerank.v1`` wire contract.
+
+    All three are private-endpoint (non-commercial) egress: ``egress=False``.
+    """
+    import json as _json
+    import urllib.request as _urlreq
+
+    from qdrant_client import QdrantClient
+
+    from mcp_server.indexer.reranker import (
+        EndpointReranker,
+        SearchResult,
+        run_coroutine_sync,
+    )
+    from mcp_server.utils.embedding_providers import create_embedding_provider
+
+    provider = create_embedding_provider(
+        "openai_compatible",
+        embed_model,
+        embed_dim,
+        api_key=embed_api_key,
+        base_url=embed_base_url,
+    )
+    client = QdrantClient(host=qdrant_host, port=qdrant_port)
+
+    def _embed_query(text: str) -> List[float]:
+        return provider.embed([text], input_type="query")[0]
+
+    def _dense_hits(text: str, limit: int) -> List[tuple]:
+        vector = _embed_query(text)
+        hits = client.search(collection_name=collection, query_vector=vector, limit=limit)
+        out: List[tuple] = []
+        for hit in hits:
+            payload = dict(getattr(hit, "payload", None) or {})
+            doc = payload.get("relative_path") or payload.get("file")
+            if doc:
+                out.append((doc, float(getattr(hit, "score", 0.0))))
+        return out
+
+    def dense_arm(query: Mapping[str, Any]) -> List[tuple]:
+        return _dense_hits(query["query"], top_k)
+
+    def _rrf(rankings: List[List[str]], k: int = 60) -> List[str]:
+        scores: Dict[str, float] = {}
+        for ranking in rankings:
+            for rank, doc in enumerate(ranking):
+                scores[doc] = scores.get(doc, 0.0) + 1.0 / (k + rank + 1)
+        return [d for d, _ in sorted(scores.items(), key=lambda x: (-x[1], x[0]))]
+
+    def hybrid_arm(query: Mapping[str, Any]) -> List[str]:
+        lex = ranker.rank(query["query"])[:top_k]
+        dense = [doc for doc, _ in _dense_hits(query["query"], top_k)]
+        return _rrf([lex, dense])
+
+    def _transport(request: Dict[str, Any]) -> Dict[str, Any]:
+        body = _json.dumps(request).encode()
+        req = _urlreq.Request(
+            rerank_url, data=body, headers={"Content-Type": "application/json"}
+        )
+        with _urlreq.urlopen(req, timeout=30) as resp:  # noqa: S310 - operator endpoint
+            return _json.loads(resp.read().decode())
+
+    reranker = EndpointReranker(_transport, provider="endpoint")
+
+    def hybrid_rerank_arm(query: Mapping[str, Any]) -> List[str]:
+        fused = hybrid_arm(query)[:top_k]
+        results = [
+            SearchResult(
+                file_path=doc,
+                start_line=1,
+                end_line=1,
+                column=0,
+                snippet=doc,
+                match_type="semantic",
+                score=0.0,
+                context=None,
+            )
+            for doc in fused
+        ]
+        outcome = run_coroutine_sync(reranker.rerank(query["query"], results, top_k=top_k))
+        rr = getattr(outcome, "data", outcome)
+        return [item.original_result.file_path for item in rr.results]
+
+    return {
+        "dense": ArmSpec(fn=dense_arm, inference_cost=0.0, egress=False),
+        "hybrid": ArmSpec(fn=hybrid_arm, inference_cost=0.0, egress=False),
+        "hybrid_rerank": ArmSpec(fn=hybrid_rerank_arm, inference_cost=0.0, egress=False),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Verdict, computed FROM the frozen decision algorithm
 # ---------------------------------------------------------------------------
@@ -191,11 +329,14 @@ def evaluate_arm_predicates(arm: str, arm_result: Dict[str, Any], thr: Mapping[s
         return mq[metric].get(arm)
 
     for depth, dstats in arm_result["depths"].items():
-        for metric, key in (("ndcg@10", "ndcg"), ("mrr", "mrr"), ("recall@50", "recall")):
+        # Compare like-for-like: the gate names FIXED-k metrics (ndcg@10 /
+        # recall@50), so read those exact keys from the summary rather than the
+        # candidate-depth values. mrr is depth-independent.
+        for metric in ("ndcg@10", "mrr", "recall@50"):
             floor = need(metric)
             if floor is None:
                 continue
-            val = dstats[key]
+            val = dstats[metric]
             checks.append({
                 "predicate": f"{metric}@depth{depth}", "value": round(val, 4),
                 "floor": floor, "pass": val >= floor,
@@ -260,27 +401,84 @@ def main() -> None:
         )
 
     qdrant_up = probe("localhost", 6333)
-    embed_up = probe("ai", 8001)
+    embed_host = os.environ.get("SEMANTIC_EMBEDDING_HOST", "ai")
+    embed_port = int(os.environ.get("SEMANTIC_EMBEDDING_PORT", "8001"))
+    embed_up = probe(embed_host, embed_port)
 
     # --- lexical arm (runnable offline) ---
     ranker = BM25PathRanker(corpus)
-    arms = {"lexical": ArmSpec(fn=lambda q: ranker.rank(q["query"]), inference_cost=0.0, egress=False)}
+    arms: Dict[str, ArmSpec] = {
+        "lexical": ArmSpec(fn=lambda q: ranker.rank(q["query"]), inference_cost=0.0, egress=False)
+    }
+
+    # --- provider arms: RUN them iff the embedding endpoint AND Qdrant are both
+    # reachable; otherwise record a truthful, probe-derived not_run reason. The
+    # arms are never unconditionally marked not_run.
+    not_run: Dict[str, str] = {}
+    provider_ready = embed_up and qdrant_up
+    if provider_ready:
+        base_url = os.environ.get("SEMANTIC_EMBEDDING_BASE_URL") or os.environ.get(
+            "OPENAI_API_BASE", f"http://{embed_host}:{embed_port}/v1"
+        )
+        try:
+            arms.update(
+                build_provider_arms(
+                    corpus,
+                    ranker,
+                    embed_base_url=base_url,
+                    embed_model=os.environ.get("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                    embed_api_key=os.environ.get("OPENAI_API_KEY", "vllm-local"),
+                    embed_dim=int(os.environ.get("SEMANTIC_VECTOR_DIMENSION", "1024")),
+                    qdrant_host="localhost",
+                    qdrant_port=6333,
+                    collection=os.environ.get("SEMANTIC_COLLECTION_NAME", "code-embeddings"),
+                    rerank_url=os.environ.get(
+                        "RERANK_ENDPOINT_URL", f"http://{embed_host}:{embed_port}/rerank"
+                    ),
+                    top_k=100,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - honest failure record, not invented metrics
+            reason = (
+                "embedding endpoint and Qdrant probes reported up, but live "
+                f"provider/reranker construction failed: {type(exc).__name__}: {exc}"
+            )
+            for a in PROVIDER_ARMS:
+                not_run[a] = reason
+    else:
+        reason = not_run_reason(embed_up, qdrant_up, embed_host, embed_port)
+        for a in PROVIDER_ARMS:
+            not_run[a] = reason
 
     # main == non-holdout split, per the frozen decision algorithm.
     harness = RetrievalBenchmarkHarness(frozen, arms)
     run = harness.run(split="main")
 
-    not_run: Dict[str, str] = {}
-    reason = (
-        "no live embedding provider reachable (embedding endpoint http://ai:8001/v1 "
-        f"unreachable; Qdrant :6333 reachable={qdrant_up}). Dense/fused arms "
-        "require query+corpus embeddings, so they cannot be scored without "
-        "inventing numbers."
-    )
-    for a in PROVIDER_ARMS:
-        not_run[a] = reason
-
-    lexical_eval = evaluate_arm_predicates("lexical", run["arms"]["lexical"], frozen.thresholds)
+    arm_notes = {
+        "lexical": (
+            "BM25-lite over corpus file paths+names only (not file contents); "
+            "weaker than full-text BM25. Zero source-text egress by construction."
+        ),
+        "dense": (
+            "Dense retrieval: query embedded via the private OpenAI-compatible "
+            "endpoint, then Qdrant vector search. Private-endpoint (non-commercial) "
+            "egress."
+        ),
+        "hybrid": "Reciprocal-rank fusion of the lexical and dense rankings.",
+        "hybrid_rerank": (
+            "Hybrid candidates reranked via EndpointReranker (rerank.v1). "
+            "Private-endpoint (non-commercial) egress."
+        ),
+    }
+    arms_ran = {
+        name: {
+            "metrics": metrics,
+            "predicate_eval": evaluate_arm_predicates(name, metrics, frozen.thresholds),
+            "note": arm_notes.get(name, ""),
+        }
+        for name, metrics in run["arms"].items()
+    }
+    lexical_eval = arms_ran["lexical"]["predicate_eval"]
     verdict = compute_verdict(frozen.thresholds, run["arms"], not_run)
 
     code_commit = subprocess.run(
@@ -302,23 +500,13 @@ def main() -> None:
         "corpus_doc_count": len(corpus),
         "live_services": {
             "qdrant_localhost_6333": qdrant_up,
-            "embedding_endpoint_ai_8001": embed_up,
+            f"embedding_endpoint_{embed_host}_{embed_port}": embed_up,
         },
         "split_evaluated": "main",
         "holdout_used_for_tuning": False,
         "holdout_ids": sorted(frozen.holdout_ids),
         "n_queries_main": run["n_queries"],
-        "arms_ran": {
-            "lexical": {
-                "metrics": run["arms"]["lexical"],
-                "predicate_eval": lexical_eval,
-                "note": (
-                    "BM25-lite over corpus file paths+names only (not file "
-                    "contents); weaker than full-text BM25. Zero source-text "
-                    "egress by construction."
-                ),
-            }
-        },
+        "arms_ran": arms_ran,
         "arms_not_run": not_run,
         "decision_algorithm": frozen.thresholds["decision_algorithm"],
         "verdict": verdict["verdict"],
