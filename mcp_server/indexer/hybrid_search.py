@@ -105,6 +105,8 @@ class HybridSearch:
 
         # Initialize reranker if enabled
         self.reranker: Optional[IReranker] = None
+        # Structured outcome of the most recent rerank attempt (RERANKEND).
+        self.last_rerank_diagnostics = None
         if reranking_settings and reranking_settings.enabled:
             self._initialize_reranker()
 
@@ -516,16 +518,33 @@ class HybridSearch:
 
     async def _rerank_results(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
         """Rerank search results using the configured reranker."""
+        from .reranker import RerankDiagnostics, RerankOutcome
+
         if not self.reranker or not results:
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.NOT_CONFIGURED,
+                candidate_count=len(results),
+                returned_count=len(results),
+            )
             return results
 
         try:
-            # Initialize reranker if not already done
+            # Initialize reranker if not already done. The canonical IReranker
+            # interface only declares `rerank`; `initialize` is an optional
+            # implementation detail (BaseReranker subclasses have it, but e.g.
+            # EndpointReranker does not), so guard on its presence.
             if not hasattr(self, "_reranker_initialized"):
-                init_result = await self.reranker.initialize({})
-                if not init_result.is_success:
-                    logger.error(f"Failed to initialize reranker: {init_result.error}")
-                    return results
+                if hasattr(self.reranker, "initialize"):
+                    init_result = await self.reranker.initialize({})
+                    if not init_result.is_success:
+                        logger.error(f"Failed to initialize reranker: {init_result.error}")
+                        self.last_rerank_diagnostics = RerankDiagnostics(
+                            outcome=RerankOutcome.FAILED,
+                            error=str(init_result.error),
+                            candidate_count=len(results),
+                            returned_count=len(results),
+                        )
+                        return results
                 self._reranker_initialized = True
 
             # Import SearchResult from reranker module to avoid circular dependency
@@ -555,6 +574,12 @@ class HybridSearch:
 
             if not rerank_result.is_success:
                 logger.warning(f"Reranking failed: {rerank_result.error}")
+                self.last_rerank_diagnostics = RerankDiagnostics(
+                    outcome=RerankOutcome.FAILED,
+                    error=str(rerank_result.error),
+                    candidate_count=len(results),
+                    returned_count=len(results),
+                )
                 return results
 
             # Handle the new RerankResult structure
@@ -608,6 +633,28 @@ class HybridSearch:
             # Sort by new rank to ensure proper ordering
             reranked_results.sort(key=lambda x: x.metadata.get("new_rank", float("inf")))
 
+            # Record a truthful structured outcome: a reranking that did not
+            # change the ordering is ATTEMPTED, not SUCCEEDED. Compare by
+            # (filepath, line) keys only — no document text.
+            def _order_key(items):
+                return [(r.filepath, r.metadata.get("line")) for r in items]
+
+            reordered = _order_key(reranked_results) != _order_key(
+                results[: len(reranked_results)]
+            )
+            provider = None
+            if hasattr(rerank_data, "metadata") and rerank_data.metadata:
+                provider = rerank_data.metadata.get("provider") or rerank_data.metadata.get(
+                    "reranker"
+                )
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.SUCCEEDED if reordered else RerankOutcome.ATTEMPTED,
+                provider=provider,
+                candidate_count=len(results),
+                returned_count=len(reranked_results),
+                reordered=reordered,
+            )
+
             # Log reranking metadata if available
             if hasattr(rerank_data, "metadata") and rerank_data.metadata:
                 logger.debug(
@@ -620,6 +667,12 @@ class HybridSearch:
 
         except Exception as e:
             logger.error(f"Error during reranking: {e}", exc_info=True)
+            self.last_rerank_diagnostics = RerankDiagnostics(
+                outcome=RerankOutcome.FAILED,
+                error=str(e),
+                candidate_count=len(results),
+                returned_count=len(results),
+            )
             return results
 
     def _looks_like_code_intent(self, query: str) -> bool:

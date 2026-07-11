@@ -297,6 +297,111 @@ def _run_blocking_with_timeout(func: Any, *, timeout_seconds: float) -> Any:
     return result.get("value")
 
 
+# =====================================================================
+# Reranker semantic-path capability (RERANKEND / IF-0-RERANKEND-1)
+# =====================================================================
+#: Text/lexical rerankers degrade a pure-vector semantic ranking, so they are
+#: skipped by policy on the semantic path. This is the default capability lookup
+#: for reranker *types* the dispatcher builds in-process; individual rerankers
+#: may override it by declaring a ``skips_semantic_path`` attribute (see
+#: :func:`_reranker_skips_semantic_path`). The endpoint (``rerank.v1``) path is
+#: embedding-consistent and does NOT skip.
+TEXT_ONLY_RERANKER_TYPES = frozenset({"flashrank", "cross-encoder"})
+
+
+def _reranker_skips_semantic_path(reranker_type: Optional[str], reranker: Any) -> bool:
+    """Whether ``reranker`` must be skipped on the pure-vector semantic path.
+
+    Explicit capability contract (replaces the historical ad-hoc type-tuple
+    branch): a reranker may DECLARE its policy via a ``skips_semantic_path``
+    attribute; when absent, the decision falls back to the text-only reranker
+    type set. This keeps the semantic-skip decision a stated capability rather
+    than an inline special case, while requiring no change to the read-only
+    reranker classes in ``reranker.py``.
+    """
+    declared = getattr(reranker, "skips_semantic_path", None)
+    if declared is not None:
+        return bool(declared)
+    return reranker_type in TEXT_ONLY_RERANKER_TYPES
+
+
+class _SyncDictEndpointReranker:
+    """Synchronous ``List[Dict]`` facade over an async canonical :class:`IReranker`.
+
+    The dispatcher's sync search path speaks the ``List[Dict]`` candidate shape
+    and the sync ``rerank(query, candidates, top_k) -> List[Dict]`` convention of
+    the in-process trio (Voyage/FlashRank/CrossEncoder). This adapter lets that
+    exact path drive an async endpoint reranker (e.g.
+    :class:`~mcp_server.indexer.reranker.EndpointReranker`) by:
+
+        1. Mapping each candidate dict to a canonical ``SearchResult`` (feeding
+           ``_rerank_doc or snippet or file`` into ``snippet`` for parity with
+           the trio's document-text preference).
+        2. Driving the async reranker through
+           :class:`~mcp_server.indexer.reranker.SyncRerankerAdapter` (which uses
+           the loop-safe ``run_coroutine_sync`` bridge — never ``asyncio.run``
+           inside a running loop).
+        3. Reordering the ORIGINAL dict objects by each ``RerankItem``'s
+           ``original_rank`` so downstream metadata (``_rerank_doc``,
+           ``repository_id``, scores) is preserved.
+
+    Structured outcome signals published by the underlying reranker
+    (``last_outcome`` / ``last_diagnostics`` / ``last_fallback``) are mirrored
+    onto this adapter after each call so the dispatcher's ``_apply_reranker``
+    outcome bookkeeping keeps working unchanged.
+    """
+
+    #: Endpoint reranking is embedding-consistent; it is NOT skipped on the
+    #: semantic path (unlike in-process text rerankers).
+    skips_semantic_path = False
+
+    def __init__(self, async_reranker: Any, *, timeout: Optional[float] = None):
+        from ..indexer.reranker import SyncRerankerAdapter
+
+        self._async = async_reranker
+        self._sync = SyncRerankerAdapter(async_reranker, timeout=timeout)
+        self.last_fallback = None
+        self.last_outcome = None
+        self.last_diagnostics = None
+
+    def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
+        from ..indexer.reranker import SearchResult as RerankSearchResult
+
+        search_results = [
+            RerankSearchResult(
+                file_path=c.get("file", ""),
+                start_line=c.get("line", 0) or 0,
+                end_line=c.get("line", 0) or 0,
+                column=0,
+                snippet=c.get("_rerank_doc") or c.get("snippet") or c.get("file", ""),
+                match_type=c.get("match_type", "endpoint"),
+                score=float(c.get("score", 0.0) or 0.0),
+                context=c.get("context"),
+            )
+            for c in candidates
+        ]
+
+        result = self._sync.rerank(query, search_results, top_k)
+
+        # Mirror any structured signals the async reranker published.
+        self.last_fallback = getattr(self._async, "last_fallback", None)
+        self.last_outcome = getattr(self._async, "last_outcome", None)
+        self.last_diagnostics = getattr(self._async, "last_diagnostics", None)
+
+        if not getattr(result, "is_success", False):
+            # Funnel a contract/provider Result failure into the dispatcher's
+            # FAILED path. The error string is a contract message (no doc text).
+            raise RuntimeError(str(getattr(result, "error", "rerank failed")))
+
+        rerank_result = result.data
+        ordered: List[Dict] = []
+        for item in rerank_result.results:
+            idx = item.original_rank
+            if 0 <= idx < len(candidates):
+                ordered.append(candidates[idx])
+        return ordered[:top_k]
+
+
 class EnhancedDispatcher:
     """Enhanced dispatcher with dynamic plugin loading and advanced routing capabilities."""
 
@@ -348,6 +453,7 @@ class EnhancedDispatcher:
         reranker_type: str = "none",
         plugin_set_registry: Optional[PluginSetRegistry] = None,
         semantic_indexer_registry: Optional[SemanticIndexerRegistry] = None,
+        endpoint_rerank_transport: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
     ):
         """Initialize the enhanced dispatcher.
 
@@ -470,33 +576,19 @@ class EnhancedDispatcher:
         self._last_rerank_diagnostics = None  # type: Optional[Any]
         if reranker_type and reranker_type != "none":
             try:
-                from ..indexer.reranker import (
-                    CrossEncoderReranker,
-                    FlashRankReranker,
-                    VoyageReranker,
+                self._reranker = self._build_reranker(
+                    reranker_type, endpoint_rerank_transport=endpoint_rerank_transport
                 )
-
-                if reranker_type == "voyage":
-                    voyage_model = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2")
-                    self._reranker = VoyageReranker(model=voyage_model)
-                    logger.info(f"Reranker initialized: VoyageReranker model={voyage_model}")
-                elif reranker_type == "flashrank":
-                    flashrank_model = os.getenv("FLASHRANK_MODEL", "ms-marco-MiniLM-L-12-v2")
-                    self._reranker = FlashRankReranker(model=flashrank_model)
-                    logger.info(f"Reranker initialized: FlashRankReranker model={flashrank_model}")
-                elif reranker_type == "cross-encoder":
-                    ce_model = os.getenv(
-                        "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-                    )
-                    self._reranker = CrossEncoderReranker(model=ce_model)
-                    logger.info(f"Reranker initialized: CrossEncoderReranker model={ce_model}")
-                else:
-                    logger.warning(f"Unknown reranker_type '{reranker_type}', disabling reranker")
             except Exception as e:
                 logger.warning(f"Failed to initialize reranker: {e}")
-        # Text-based rerankers degrade pure vector results; skip them on the semantic path.
-        # VoyageReranker ("voyage") is consistent with Voyage embeddings so it is allowed.
-        self._reranker_skips_semantic = reranker_type in ("flashrank", "cross-encoder")
+        # Skip text/lexical rerankers on the pure-vector semantic path. Expressed
+        # as an explicit capability contract (see _reranker_skips_semantic_path):
+        # a reranker may declare `skips_semantic_path`; otherwise the text-only
+        # type set decides. The endpoint (rerank.v1) path is embedding-consistent
+        # and does not skip; VoyageReranker ("voyage") is Voyage-consistent too.
+        self._reranker_skips_semantic = _reranker_skips_semantic_path(
+            reranker_type, self._reranker
+        )
 
         # Initialize legacy plugin list (backward compatibility for callers injecting plugins)
         if plugins:
@@ -1302,6 +1394,67 @@ class EnhancedDispatcher:
         except Exception as e:
             logger.warning(f"Symbol route failed for '{name}': {e}")
             return []
+
+    @classmethod
+    def wrap_endpoint_reranker(
+        cls, async_reranker: Any, *, timeout: Optional[float] = None
+    ) -> "_SyncDictEndpointReranker":
+        """Wrap an async canonical :class:`IReranker` for the sync dispatcher path.
+
+        Returns a :class:`_SyncDictEndpointReranker` that presents the sync
+        ``rerank(query, List[Dict], top_k) -> List[Dict]`` convention while
+        driving ``async_reranker`` through the loop-safe sync/async bridge. This
+        is the single seam used both by ``_build_reranker`` (production wiring)
+        and by tests.
+        """
+        return _SyncDictEndpointReranker(async_reranker, timeout=timeout)
+
+    def _build_reranker(
+        self,
+        reranker_type: str,
+        *,
+        endpoint_rerank_transport: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+    ) -> Optional[Any]:
+        """Construct the reranker object for ``reranker_type`` or ``None``.
+
+        In-process trio (Voyage/FlashRank/CrossEncoder) present the sync
+        ``List[Dict]`` interface directly. The canonical ``endpoint`` type routes
+        through :class:`_SyncDictEndpointReranker` over an injected ``rerank.v1``
+        transport; with no transport it fails safe to ``None`` rather than
+        constructing a broken reranker.
+        """
+        from ..indexer.reranker import (
+            CrossEncoderReranker,
+            EndpointReranker,
+            FlashRankReranker,
+            VoyageReranker,
+        )
+
+        if reranker_type == "voyage":
+            voyage_model = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2")
+            logger.info(f"Reranker initialized: VoyageReranker model={voyage_model}")
+            return VoyageReranker(model=voyage_model)
+        if reranker_type == "flashrank":
+            flashrank_model = os.getenv("FLASHRANK_MODEL", "ms-marco-MiniLM-L-12-v2")
+            logger.info(f"Reranker initialized: FlashRankReranker model={flashrank_model}")
+            return FlashRankReranker(model=flashrank_model)
+        if reranker_type == "cross-encoder":
+            ce_model = os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+            logger.info(f"Reranker initialized: CrossEncoderReranker model={ce_model}")
+            return CrossEncoderReranker(model=ce_model)
+        if reranker_type == "endpoint":
+            if endpoint_rerank_transport is None:
+                logger.warning(
+                    "reranker_type 'endpoint' requires an injected rerank.v1 "
+                    "transport; disabling reranker"
+                )
+                return None
+            provider = os.getenv("RERANK_ENDPOINT_PROVIDER", "endpoint")
+            endpoint = EndpointReranker(endpoint_rerank_transport, provider=provider)
+            logger.info(f"Reranker initialized: EndpointReranker provider={provider}")
+            return self.wrap_endpoint_reranker(endpoint)
+        logger.warning(f"Unknown reranker_type '{reranker_type}', disabling reranker")
+        return None
 
     def _record_rerank_diagnostics(self, diagnostics) -> None:
         """Store and log a structured rerank outcome.
