@@ -2,6 +2,30 @@
 
 # GA RC Evidence
 
+## v1.3.1 Tag Provenance (2026-07-11)
+
+This section records the provenance of the current `v1.3.1` tag so the release
+metadata contract (`tests/test_release_metadata.py::test_release_tag_is_not_reused_locally`)
+can bind the tag to a documented commit. It supersedes, but does not delete, the
+historical `v1.2.0-rc8` GARECUT record retained below.
+
+- Tag: `v1.3.1`.
+- Tag commit: `934eb890144a285bc725a53cc61890bbc2bd643d`.
+- Source: merge of PR
+  [#72](https://github.com/ViperJuice/Code-Index-MCP/pull/72)
+  ("Complete comprehensive hardening v10 and prepare 1.3.1").
+- Underlying evidence: `docs/status/COMPREHENSIVE_HARDENING_V10.md` records the
+  eight-phase v10 hardening (authentication boundaries, repository selection,
+  readiness recovery, summarization contracts, bounded plugin workers, local
+  quality gates, and release preparation), locally verified for controlled beta.
+- Channel posture: `v1.3.1` is **prepared but unpublished** — no external release
+  dispatch, no PyPI publication, and Docker `latest` remains stable-only, matching
+  the `docs/SUPPORT_MATRIX.md` "prepared/not yet published" support facts.
+
+This provenance note is a metadata-only bookkeeping record binding the existing
+`v1.3.1` tag to commit `934eb890144a285bc725a53cc61890bbc2bd643d`; it does not
+itself dispatch or publish a release.
+
 ## Summary
 
 - Evidence captured: `2026-04-25T05:34:39Z`.
