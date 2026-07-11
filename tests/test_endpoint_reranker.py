@@ -532,3 +532,59 @@ def test_cohere_adapter_raises_on_out_of_range_index(bad_index):
     }
     with pytest.raises(IndexError):
         adapter(request_dict)
+
+
+# --------------------------------------------------------------------------
+# CR2: EndpointReranker intrinsic default timeout (bounds DIRECT async
+# consumers even without the dispatcher's external wait_for wrapper).
+# --------------------------------------------------------------------------
+def _slow_transport(latency_s: float):
+    import time as _time
+
+    def transport(request_dict):
+        _time.sleep(latency_s)
+        req = RerankRequest.from_dict(request_dict)
+        return {
+            "contract_version": req.contract_version,
+            "request_id": req.request_id,
+            "provider": "slow",
+            "model_id": "slow-rerank-1",
+            "model_revision": "2026-07-01",
+            "results": [
+                {
+                    "candidate_id": c.candidate_id,
+                    "status": RerankOutcome.SUCCEEDED.value,
+                    "score": 0.5,
+                }
+                for c in req.candidates
+            ],
+            "candidate_count": len(req.candidates),
+            "scored_count": len(req.candidates),
+            "latency_ms": latency_s * 1000.0,
+        }
+
+    return transport
+
+
+async def test_endpoint_reranker_intrinsic_default_timeout(monkeypatch):
+    # No external wait_for wrapper: the EndpointReranker's own default timeout
+    # (read from MCP_RERANK_TIMEOUT_S) must still bound a slow transport.
+    monkeypatch.setenv("MCP_RERANK_TIMEOUT_S", "0.05")
+    reranker = EndpointReranker(_slow_transport(1.0), provider="slow")
+    assert reranker._timeout == 0.05
+    with pytest.raises(asyncio.TimeoutError):
+        await reranker.rerank("q", _results(3))
+
+
+async def test_endpoint_reranker_explicit_timeout_overrides_env(monkeypatch):
+    monkeypatch.setenv("MCP_RERANK_TIMEOUT_S", "99")
+    reranker = EndpointReranker(_slow_transport(1.0), provider="slow", timeout=0.05)
+    assert reranker._timeout == 0.05
+    with pytest.raises(asyncio.TimeoutError):
+        await reranker.rerank("q", _results(3))
+
+
+def test_endpoint_reranker_default_timeout_is_30s(monkeypatch):
+    monkeypatch.delenv("MCP_RERANK_TIMEOUT_S", raising=False)
+    reranker = EndpointReranker(_fake_transport({0: 0.1}), provider="fake")
+    assert reranker._timeout == 30.0

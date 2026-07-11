@@ -275,3 +275,106 @@ async def test_cross_repo_empty_candidates_configured_reranker_is_attempted():
     assert diag.outcome is not RerankOutcome.NOT_CONFIGURED
     assert diag.outcome is RerankOutcome.ATTEMPTED
     assert diag.candidate_count == 0
+
+
+# --------------------------------------------------------------------------
+# CR2: every hybrid failure path (init / rerank-Result / exception) redacts a
+# credential embedded in a provider message before it reaches caplog OR the
+# structured RerankDiagnostics.error field.
+# --------------------------------------------------------------------------
+from mcp_server.indexer.reranker import Result  # noqa: E402
+
+BEARER_SECRET = "sk-SECRET123"
+SECRET_MSG = f"boom Bearer {BEARER_SECRET}"
+
+
+class SecretRaisingTransport:
+    """Fake transport whose exception message embeds a credential."""
+
+    def __call__(self, request_dict: Dict[str, Any]) -> Dict[str, Any]:
+        raise RuntimeError(SECRET_MSG)
+
+
+class _InitFailReranker:
+    """Reranker whose optional initialize() returns a secret-bearing error."""
+
+    async def initialize(self, config):
+        return Result.error(SECRET_MSG)
+
+    async def rerank(self, query, results, top_k=None):  # pragma: no cover - never reached
+        return Result.ok(None)
+
+
+class _RerankResultFailReranker:
+    """Reranker (no initialize) whose rerank() returns a secret-bearing error."""
+
+    async def rerank(self, query, results, top_k=None):
+        return Result(False, None, SECRET_MSG)
+
+
+def _fresh_hybrid(reranker):
+    hs = HybridSearch.__new__(HybridSearch)
+    hs.reranker = reranker
+    hs.reranking_settings = types.SimpleNamespace(top_k=10, enabled=True)
+    hs.last_rerank_diagnostics = None
+    return hs
+
+
+async def test_hybrid_init_failure_redacts_secret(caplog):
+    hs = _fresh_hybrid(_InitFailReranker())
+    with caplog.at_level(logging.DEBUG):
+        out = await hs._rerank_results(QUERY_SENTINEL, _hybrid_results(doc=DOC_SENTINEL))
+
+    assert [r.filepath for r in out] == ["a.py", "b.py", "c.py"]
+    diag = hs.last_rerank_diagnostics
+    assert diag.outcome is RerankOutcome.FAILED
+    assert BEARER_SECRET not in caplog.text
+    assert BEARER_SECRET not in (diag.error or "")
+    assert "[REDACTED]" in (diag.error or "")
+    assert QUERY_SENTINEL not in caplog.text
+    assert DOC_SENTINEL not in caplog.text
+
+
+async def test_hybrid_rerank_result_failure_redacts_secret(caplog):
+    hs = _fresh_hybrid(_RerankResultFailReranker())
+    with caplog.at_level(logging.DEBUG):
+        out = await hs._rerank_results(QUERY_SENTINEL, _hybrid_results(doc=DOC_SENTINEL))
+
+    assert [r.filepath for r in out] == ["a.py", "b.py", "c.py"]
+    diag = hs.last_rerank_diagnostics
+    assert diag.outcome is RerankOutcome.FAILED
+    assert BEARER_SECRET not in caplog.text
+    assert BEARER_SECRET not in (diag.error or "")
+    assert "[REDACTED]" in (diag.error or "")
+    assert QUERY_SENTINEL not in caplog.text
+    assert DOC_SENTINEL not in caplog.text
+
+
+async def test_hybrid_exception_failure_redacts_secret(caplog):
+    hs = _fresh_hybrid(EndpointReranker(SecretRaisingTransport(), provider="fake-endpoint"))
+    with caplog.at_level(logging.DEBUG):
+        out = await hs._rerank_results(QUERY_SENTINEL, _hybrid_results(doc=DOC_SENTINEL))
+
+    assert [r.filepath for r in out] == ["a.py", "b.py", "c.py"]
+    diag = hs.last_rerank_diagnostics
+    assert diag.outcome is RerankOutcome.FAILED
+    assert BEARER_SECRET not in caplog.text
+    assert BEARER_SECRET not in (diag.error or "")
+    assert "[REDACTED]" in (diag.error or "")
+    assert QUERY_SENTINEL not in caplog.text
+    assert DOC_SENTINEL not in caplog.text
+
+
+async def test_dispatcher_failure_redacts_secret(caplog):
+    endpoint = EndpointReranker(SecretRaisingTransport(), provider="fake-endpoint")
+    d = _dispatcher_with(EnhancedDispatcher.wrap_endpoint_reranker(endpoint))
+    with caplog.at_level(logging.DEBUG):
+        out = d._apply_reranker(None, QUERY_SENTINEL, _candidates(doc=DOC_SENTINEL), limit=10)
+
+    assert [c["file"] for c in out] == ["a.py", "b.py", "c.py"]
+    diag = d._last_rerank_diagnostics
+    assert diag.outcome is RerankOutcome.FAILED
+    assert BEARER_SECRET not in caplog.text
+    assert BEARER_SECRET not in (diag.error or "")
+    assert QUERY_SENTINEL not in caplog.text
+    assert DOC_SENTINEL not in caplog.text

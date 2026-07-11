@@ -1071,6 +1071,70 @@ def resolve_active_deployment_profile(
     return resolve_deployment_profile(profile_name, allow_commercial=allow_commercial)
 
 
+def deployment_profile_is_explicitly_set(
+    env: Optional[Mapping[str, str]] = None,
+) -> bool:
+    """Return ``True`` only when the operator explicitly selected a profile.
+
+    This is the LEGACY discriminator: :func:`resolve_active_deployment_profile`
+    defaults an unset environment to ``lexical_only`` (the safe *contract*
+    default), but enforcement lanes must distinguish "operator never opted into
+    the profile system" (env var absent) from "operator explicitly chose
+    lexical_only". Only the former preserves pre-existing, unrestricted behavior.
+    """
+    environ = os.environ if env is None else env
+    return ACTIVE_PROFILE_ENV in environ
+
+
+def commercial_egress_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
+    """Return ``True`` when constructing a commercial (egress) provider is allowed.
+
+    Backward-compatible policy:
+
+    * Profile **unset** (env var absent) -> ``True`` (LEGACY: the operator never
+      opted into the profile system, so preserve pre-existing behavior where a
+      configured commercial provider builds without restriction).
+    * Profile **explicitly** set to ``commercial`` **with**
+      ``MCP_ALLOW_COMMERCIAL_EGRESS=1`` -> ``True`` (explicit opt-in).
+    * Profile explicitly set to any other value, or ``commercial`` without the
+      opt-in flag -> ``False``.
+
+    Never raises: an unknown explicit profile name is treated as not permitting
+    commercial egress (fail-closed). Use :func:`resolve_active_deployment_profile`
+    when a raising contract check is desired.
+    """
+    if not deployment_profile_is_explicitly_set(env):
+        return True  # LEGACY: unset -> allow (pre-existing behavior).
+    environ = os.environ if env is None else env
+    try:
+        profile = _coerce_profile(environ.get(ACTIVE_PROFILE_ENV, ""))
+    except ValueError:
+        return False  # Unknown explicit profile: fail closed.
+    contract = DEPLOYMENT_PROFILES[profile]
+    if not contract.commercial_egress:
+        return False
+    return _env_truthy(environ.get(ALLOW_COMMERCIAL_EGRESS_ENV))
+
+
+def learned_models_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
+    """Return ``True`` unless the profile is EXPLICITLY ``lexical_only``.
+
+    ``lexical_only`` is the only profile that forbids ALL learned providers and
+    rerankers (BM25 / symbol search only). When the profile is unset (legacy) or
+    set to any learned-model profile, learned providers are permitted. An unknown
+    explicit profile name is not ``lexical_only`` and so is permitted here (the
+    contract resolver raises on it elsewhere).
+    """
+    if not deployment_profile_is_explicitly_set(env):
+        return True  # LEGACY: unset -> allow.
+    environ = os.environ if env is None else env
+    try:
+        profile = _coerce_profile(environ.get(ACTIVE_PROFILE_ENV, ""))
+    except ValueError:
+        return True
+    return profile is not DeploymentProfile.LEXICAL_ONLY
+
+
 @dataclass(frozen=True)
 class DegradationDiagnostic:
     """Structured diagnostic describing the ACTUAL path a resolution took.

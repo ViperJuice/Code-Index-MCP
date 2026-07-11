@@ -6,14 +6,22 @@ Reproducible driver for the retrieval-rollout gate. It:
 1. Loads and *verifies* the BENCHFREEZE-frozen eval set (the freeze gate).
 2. Reconstructs the frozen corpus path list from the pinned commit and asserts
    its ``corpus_sha256`` matches ``corpus_manifest.json`` / ``MANIFEST.json``.
-3. Probes for live inference services (Qdrant :6333, embedding endpoint).
+3. Probes for live inference services: Qdrant :6333 (TCP), the embedding
+   endpoint (TCP), and — crucially — a *functional* rerank probe that POSTs a
+   minimal ``rerank.v1`` request and requires a contract-valid response. TCP
+   reachability alone is not enough for the reranker.
 4. Runs only the arms that can actually run:
      * ``lexical`` — a real, reproducible BM25-lite ranker over the frozen
        corpus file *paths + names* (NOT file contents). This never sends source
        text off-host, so it trivially satisfies the zero-egress bound.
-     * ``dense`` / ``hybrid`` / ``hybrid_rerank`` — recorded ``not_run`` with a
-       reason when a live embedding provider is unreachable. No numbers are
-       invented.
+     * ``dense`` / ``hybrid`` — recorded ``not_run`` with a reason when the live
+       embedding provider or Qdrant is unreachable.
+     * ``hybrid_rerank`` — additionally gated on the functional rerank probe: if
+       the rerank endpoint is down (or not speaking ``rerank.v1``) it is recorded
+       ``not_run`` rather than run as an arm-with-errors, so the gate's decisive
+       arm is never scored against a dead reranker. When it *does* run, the
+       reranker candidate text is the retrieved **document content** (loaded from
+       the pinned corpus commit), not just file paths. No numbers are invented.
 5. Computes the verdict IN CODE from the frozen ``decision_algorithm`` in
    ``gate_thresholds.json`` — the verdict is derived, not authored.
 
@@ -36,6 +44,7 @@ import re
 import socket
 import subprocess
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Mapping
 
@@ -92,6 +101,26 @@ def reconstruct_corpus(manifest: Mapping[str, Any]) -> List[str]:
 
 def corpus_path_digest(paths: List[str]) -> str:
     return hashlib.sha256("\n".join(paths).encode()).hexdigest()
+
+
+@lru_cache(maxsize=None)
+def load_doc_content(commit: str, path: str, max_chars: int = 4000) -> str:
+    """Read a corpus document's *content* from the pinned corpus commit.
+
+    Used as reranker candidate text so ``hybrid_rerank`` reranks on real document
+    bodies, not file paths. Content is read from ``git show <commit>:<path>`` so
+    it comes from the exact frozen corpus revision (not the working tree), and is
+    truncated to bound the request size. Memoized so repeated candidates across
+    queries do not re-shell out.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "show", f"{commit}:{path}"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except subprocess.CalledProcessError:
+        return ""
+    return out[:max_chars]
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +203,48 @@ def probe(host: str, port: int, timeout: float = 3.0) -> bool:
         return False
 
 
+def rerank_probe(rerank_url: str, timeout: float = 5.0) -> bool:
+    """Functional probe of the RERANK endpoint (not a bare TCP connect).
+
+    POSTs a minimal, well-formed ``rerank.v1`` request (one candidate) and
+    requires a *contract-valid* response that echoes the candidate id. A rerank
+    endpoint that is TCP-reachable but does not actually speak ``rerank.v1``
+    (wrong shape, error status, dropped candidate) fails this probe, so
+    ``hybrid_rerank`` is never scored against a reranker that cannot serve the
+    contract. All imports are lazy so the offline down-path stays dependency-free.
+    """
+    import json as _json
+    import urllib.request as _urlreq
+
+    from mcp_server.interfaces.rerank_contracts import (
+        RerankCandidate,
+        RerankRequest,
+        RerankResponse,
+        validate_rerank_response,
+    )
+
+    request = RerankRequest(
+        request_id="probe-rerank",
+        query="rerank endpoint health probe",
+        candidates=[
+            RerankCandidate(candidate_id="cand-0", text="rerank endpoint health probe candidate")
+        ],
+        top_k=1,
+    )
+    try:
+        body = _json.dumps(request.to_dict()).encode()
+        req = _urlreq.Request(
+            rerank_url, data=body, headers={"Content-Type": "application/json"}
+        )
+        with _urlreq.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - operator endpoint
+            raw = _json.loads(resp.read().decode())
+        response = RerankResponse.from_dict(raw)
+        validate_rerank_response(request, response)
+        return True
+    except Exception:  # noqa: BLE001 - any failure means "not functionally up"
+        return False
+
+
 def not_run_reason(embed_up: bool, qdrant_up: bool, host: str, port: int) -> str:
     """Truthful, probe-derived reason string for the arms that could not run.
 
@@ -195,6 +266,22 @@ def not_run_reason(embed_up: bool, qdrant_up: bool, host: str, port: int) -> str
     )
 
 
+def rerank_not_run_reason(rerank_url: str) -> str:
+    """Reason for ``hybrid_rerank`` when embeddings+Qdrant are up but the rerank
+    endpoint fails its functional probe.
+
+    Recorded as ``not_run`` (not a ran-arm-with-errors) so the gate's decisive
+    arm is never scored against a reranker that cannot serve ``rerank.v1``.
+    """
+    return (
+        "embedding endpoint and Qdrant are reachable, but the rerank endpoint "
+        f"{rerank_url} did not pass the functional rerank.v1 probe (endpoint down "
+        "or not speaking the rerank wire contract). hybrid_rerank is the arm the "
+        "gate decision hinges on, so it is recorded not_run rather than run with "
+        "errors — no invented rerank scores."
+    )
+
+
 def build_provider_arms(
     corpus: List[str],
     ranker: "BM25PathRanker",
@@ -207,7 +294,9 @@ def build_provider_arms(
     qdrant_port: int,
     collection: str,
     rerank_url: str,
+    corpus_commit: str,
     top_k: int,
+    include_rerank: bool = True,
 ) -> Dict[str, ArmSpec]:
     """Construct the LIVE ``dense`` / ``hybrid`` / ``hybrid_rerank`` arms.
 
@@ -221,9 +310,12 @@ def build_provider_arms(
       vector search; map hits back to corpus-relative doc ids.
     * ``hybrid`` — reciprocal-rank fusion of the lexical and dense rankings.
     * ``hybrid_rerank`` — the hybrid candidates reranked via ``EndpointReranker``
-      over the ``rerank.v1`` wire contract.
+      over the ``rerank.v1`` wire contract, using each candidate's **document
+      content** (from the pinned corpus commit) as the reranker text — not the
+      file path. Only constructed when ``include_rerank`` is True (i.e. the
+      functional rerank probe passed).
 
-    All three are private-endpoint (non-commercial) egress: ``egress=False``.
+    All arms are private-endpoint (non-commercial) egress: ``egress=False``.
     """
     import json as _json
     import urllib.request as _urlreq
@@ -275,40 +367,49 @@ def build_provider_arms(
         dense = [doc for doc, _ in _dense_hits(query["query"], top_k)]
         return _rrf([lex, dense])
 
-    def _transport(request: Dict[str, Any]) -> Dict[str, Any]:
-        body = _json.dumps(request).encode()
-        req = _urlreq.Request(
-            rerank_url, data=body, headers={"Content-Type": "application/json"}
-        )
-        with _urlreq.urlopen(req, timeout=30) as resp:  # noqa: S310 - operator endpoint
-            return _json.loads(resp.read().decode())
-
-    reranker = EndpointReranker(_transport, provider="endpoint")
-
-    def hybrid_rerank_arm(query: Mapping[str, Any]) -> List[str]:
-        fused = hybrid_arm(query)[:top_k]
-        results = [
-            SearchResult(
-                file_path=doc,
-                start_line=1,
-                end_line=1,
-                column=0,
-                snippet=doc,
-                match_type="semantic",
-                score=0.0,
-                context=None,
-            )
-            for doc in fused
-        ]
-        outcome = run_coroutine_sync(reranker.rerank(query["query"], results, top_k=top_k))
-        rr = getattr(outcome, "data", outcome)
-        return [item.original_result.file_path for item in rr.results]
-
-    return {
+    arms: Dict[str, ArmSpec] = {
         "dense": ArmSpec(fn=dense_arm, inference_cost=0.0, egress=False),
         "hybrid": ArmSpec(fn=hybrid_arm, inference_cost=0.0, egress=False),
-        "hybrid_rerank": ArmSpec(fn=hybrid_rerank_arm, inference_cost=0.0, egress=False),
     }
+
+    if include_rerank:
+        def _transport(request: Dict[str, Any]) -> Dict[str, Any]:
+            body = _json.dumps(request).encode()
+            req = _urlreq.Request(
+                rerank_url, data=body, headers={"Content-Type": "application/json"}
+            )
+            with _urlreq.urlopen(req, timeout=30) as resp:  # noqa: S310 - operator endpoint
+                return _json.loads(resp.read().decode())
+
+        reranker = EndpointReranker(_transport, provider="endpoint")
+
+        def hybrid_rerank_arm(query: Mapping[str, Any]) -> List[str]:
+            fused = hybrid_arm(query)[:top_k]
+            results = []
+            for doc in fused:
+                # Reranker candidate text is the retrieved DOCUMENT CONTENT (read
+                # from the pinned corpus commit), not the file path. file_path is
+                # kept for mapping the reranked order back to corpus doc ids.
+                content = load_doc_content(corpus_commit, doc)
+                results.append(
+                    SearchResult(
+                        file_path=doc,
+                        start_line=1,
+                        end_line=1,
+                        column=0,
+                        snippet=content or doc,
+                        match_type="semantic",
+                        score=0.0,
+                        context=None,
+                    )
+                )
+            outcome = run_coroutine_sync(reranker.rerank(query["query"], results, top_k=top_k))
+            rr = getattr(outcome, "data", outcome)
+            return [item.original_result.file_path for item in rr.results]
+
+        arms["hybrid_rerank"] = ArmSpec(fn=hybrid_rerank_arm, inference_cost=0.0, egress=False)
+
+    return arms
 
 
 # ---------------------------------------------------------------------------
@@ -404,6 +505,12 @@ def main() -> None:
     embed_host = os.environ.get("SEMANTIC_EMBEDDING_HOST", "ai")
     embed_port = int(os.environ.get("SEMANTIC_EMBEDDING_PORT", "8001"))
     embed_up = probe(embed_host, embed_port)
+    rerank_url = os.environ.get(
+        "RERANK_ENDPOINT_URL", f"http://{embed_host}:{embed_port}/rerank"
+    )
+    # Functional (not TCP-only) rerank probe: the reranker must actually serve
+    # the rerank.v1 wire contract for hybrid_rerank to be eligible to run.
+    rerank_up = rerank_probe(rerank_url)
 
     # --- lexical arm (runnable offline) ---
     ranker = BM25PathRanker(corpus)
@@ -411,11 +518,13 @@ def main() -> None:
         "lexical": ArmSpec(fn=lambda q: ranker.rank(q["query"]), inference_cost=0.0, egress=False)
     }
 
-    # --- provider arms: RUN them iff the embedding endpoint AND Qdrant are both
-    # reachable; otherwise record a truthful, probe-derived not_run reason. The
-    # arms are never unconditionally marked not_run.
+    # --- provider arms: dense/hybrid RUN iff the embedding endpoint AND Qdrant
+    # are both reachable; hybrid_rerank ADDITIONALLY requires the functional
+    # rerank probe to pass. Any arm that cannot run gets a truthful, probe-derived
+    # not_run reason. Arms are never unconditionally marked not_run.
     not_run: Dict[str, str] = {}
-    provider_ready = embed_up and qdrant_up
+    provider_ready = embed_up and qdrant_up           # dense + hybrid
+    rerank_ready = provider_ready and rerank_up        # hybrid_rerank
     if provider_ready:
         base_url = os.environ.get("SEMANTIC_EMBEDDING_BASE_URL") or os.environ.get(
             "OPENAI_API_BASE", f"http://{embed_host}:{embed_port}/v1"
@@ -432,10 +541,10 @@ def main() -> None:
                     qdrant_host="localhost",
                     qdrant_port=6333,
                     collection=os.environ.get("SEMANTIC_COLLECTION_NAME", "code-embeddings"),
-                    rerank_url=os.environ.get(
-                        "RERANK_ENDPOINT_URL", f"http://{embed_host}:{embed_port}/rerank"
-                    ),
+                    rerank_url=rerank_url,
+                    corpus_commit=frozen.corpus_manifest["commit"],
                     top_k=100,
+                    include_rerank=rerank_ready,
                 )
             )
         except Exception as exc:  # noqa: BLE001 - honest failure record, not invented metrics
@@ -445,6 +554,11 @@ def main() -> None:
             )
             for a in PROVIDER_ARMS:
                 not_run[a] = reason
+        else:
+            # dense/hybrid ran; hybrid_rerank only if the functional rerank probe
+            # passed. Otherwise record it not_run (dead reranker != ran-with-errors).
+            if not rerank_ready:
+                not_run["hybrid_rerank"] = rerank_not_run_reason(rerank_url)
     else:
         reason = not_run_reason(embed_up, qdrant_up, embed_host, embed_port)
         for a in PROVIDER_ARMS:
@@ -466,8 +580,10 @@ def main() -> None:
         ),
         "hybrid": "Reciprocal-rank fusion of the lexical and dense rankings.",
         "hybrid_rerank": (
-            "Hybrid candidates reranked via EndpointReranker (rerank.v1). "
-            "Private-endpoint (non-commercial) egress."
+            "Hybrid candidates reranked via EndpointReranker (rerank.v1), using "
+            "retrieved DOCUMENT CONTENT (from the pinned corpus commit) as the "
+            "reranker candidate text, not file paths. Gated on a functional "
+            "rerank.v1 endpoint probe. Private-endpoint (non-commercial) egress."
         ),
     }
     arms_ran = {
@@ -501,6 +617,7 @@ def main() -> None:
         "live_services": {
             "qdrant_localhost_6333": qdrant_up,
             f"embedding_endpoint_{embed_host}_{embed_port}": embed_up,
+            "rerank_endpoint_functional": rerank_up,
         },
         "split_evaluated": "main",
         "holdout_used_for_tuning": False,

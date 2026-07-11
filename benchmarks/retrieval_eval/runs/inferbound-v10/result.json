@@ -2,7 +2,7 @@
   "schema": "inference_rollout_run.v1",
   "phase": "INFERGATE",
   "interface": "IF-0-INFERGATE-1",
-  "code_commit": "b299005ffd457b5921e14476c97bde28cde206db",
+  "code_commit": "6cb4d7163141a3601323a72482044b3fe47ae935",
   "corpus_commit": "f7c060b4f145516a4629338e078d3b8b9c0c406a",
   "bound_checksums": {
     "dataset_sha256": "62263e2d2ddcedea2e464cc56d913d3ed64117232d093e31b6f8e9a7e378100d",
@@ -13,7 +13,8 @@
   "corpus_doc_count": 872,
   "live_services": {
     "qdrant_localhost_6333": true,
-    "embedding_endpoint_ai_8001": false
+    "embedding_endpoint_ai_8001": false,
+    "rerank_endpoint_functional": false
   },
   "split_evaluated": "main",
   "holdout_used_for_tuning": false,
@@ -37,8 +38,8 @@
         "inference_cost": 0.0,
         "error_rate": 0.0,
         "zero_result_rate": 0.0,
-        "latency_p50_ms": 0.605190172791481,
-        "latency_p95_ms": 0.8595162071287632,
+        "latency_p50_ms": 0.5496162921190262,
+        "latency_p95_ms": 0.8949721232056617,
         "depths": {
           "20": {
             "ndcg@10": 0.36989955722691653,
@@ -129,7 +130,7 @@
           },
           {
             "predicate": "p95_latency_ms",
-            "value": 0.86,
+            "value": 0.895,
             "ceiling": 150,
             "pass": true
           },

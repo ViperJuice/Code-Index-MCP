@@ -196,3 +196,136 @@ def test_failure_redacts_exception_and_leaks_no_query_or_candidate_text(caplog):
     # No query or candidate document/snippet text reaches the logs.
     assert "secretqueryzz" not in caplog.text
     assert "alpha" not in caplog.text
+
+
+# ==========================================================================
+# CR2: the synchronous reranker trio (Voyage / FlashRank / CrossEncoder) must
+# never log a raw provider exception. A credential embedded in the exception
+# message must not reach caplog OR ``last_error``.
+# ==========================================================================
+import sys
+
+from mcp_server.indexer.reranker import (
+    CrossEncoderReranker,
+    FlashRankReranker,
+    VoyageReranker,
+)
+
+_SYNC_SECRET = "sk-SECRET123"
+_SYNC_EXC_MSG = f"auth failed Bearer {_SYNC_SECRET}"
+
+
+def _sync_candidates():
+    return [
+        {"file": "a.py", "snippet": "alpha", "_rerank_doc": "alpha doc"},
+        {"file": "b.py", "snippet": "beta", "_rerank_doc": "beta doc"},
+    ]
+
+
+def test_voyage_sync_rerank_failure_redacts_exception(caplog):
+    class _FakeVoyageClient:
+        def rerank(self, **kwargs):
+            raise RuntimeError(_SYNC_EXC_MSG)
+
+    v = VoyageReranker.__new__(VoyageReranker)
+    v._client = _FakeVoyageClient()
+    v._model = "rerank-2"
+    v.last_error = None
+
+    with caplog.at_level(logging.DEBUG):
+        out = v.rerank("secretqueryzz", _sync_candidates(), top_k=2)
+
+    # Falls back to original order; credential never leaks.
+    assert [c["file"] for c in out] == ["a.py", "b.py"]
+    assert _SYNC_SECRET not in caplog.text
+    assert _SYNC_SECRET not in (v.last_error or "")
+    assert "[REDACTED]" in (v.last_error or "")
+
+
+def test_flashrank_sync_rerank_failure_redacts_exception(caplog, monkeypatch):
+    class _FakeRerankRequest:
+        def __init__(self, **kwargs):
+            pass
+
+    class _FakeRanker:
+        def rerank(self, request):
+            raise RuntimeError(_SYNC_EXC_MSG)
+
+    fake_flashrank = type(sys)("flashrank")
+    fake_flashrank.RerankRequest = _FakeRerankRequest
+    monkeypatch.setitem(sys.modules, "flashrank", fake_flashrank)
+
+    fr = FlashRankReranker.__new__(FlashRankReranker)
+    fr._model_name = "ms-marco"
+    fr._ranker = _FakeRanker()  # already "loaded" -> _load() is a no-op
+    fr.last_error = None
+
+    with caplog.at_level(logging.DEBUG):
+        out = fr.rerank("secretqueryzz", _sync_candidates(), top_k=2)
+
+    assert [c["file"] for c in out] == ["a.py", "b.py"]
+    assert _SYNC_SECRET not in caplog.text
+    assert _SYNC_SECRET not in (fr.last_error or "")
+    assert "[REDACTED]" in (fr.last_error or "")
+
+
+def test_crossencoder_sync_rerank_failure_redacts_exception(caplog):
+    class _FakeModel:
+        def predict(self, pairs):
+            raise RuntimeError(_SYNC_EXC_MSG)
+
+    ce = CrossEncoderReranker.__new__(CrossEncoderReranker)
+    ce._model_name = "cross-encoder"
+    ce._model = _FakeModel()  # already "loaded" -> _load() is a no-op
+    ce.last_error = None
+
+    with caplog.at_level(logging.DEBUG):
+        out = ce.rerank("secretqueryzz", _sync_candidates(), top_k=2)
+
+    assert [c["file"] for c in out] == ["a.py", "b.py"]
+    assert _SYNC_SECRET not in caplog.text
+    assert _SYNC_SECRET not in (ce.last_error or "")
+    assert "[REDACTED]" in (ce.last_error or "")
+
+
+# ==========================================================================
+# CR2: the dispatcher search() paths log query metadata only (query_chars),
+# never the raw query body.
+# ==========================================================================
+def test_dispatcher_search_logs_no_raw_query_body(caplog):
+    from pathlib import Path
+    from unittest.mock import MagicMock
+
+    from mcp_server.core.repo_context import RepoContext
+    from mcp_server.plugins.plugin_set_registry import PluginSetRegistry
+    from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+    query_sentinel = "zzz_raw_query_body_sentinel_zzz"
+
+    sqlite_store = MagicMock()
+    sqlite_store.search_symbols_fuzzy.return_value = []
+    sqlite_store.search_files_fuzzy.return_value = []
+
+    registry_entry = MagicMock(spec=RepositoryInfo)
+    registry_entry.tracked_branch = "main"
+    registry_entry.path = Path("/tmp/test-repo")
+
+    ctx = RepoContext(
+        repo_id="test-repo-cr2",
+        sqlite_store=sqlite_store,
+        workspace_root=Path("/tmp/test-repo"),
+        tracked_branch="main",
+        registry_entry=registry_entry,
+    )
+
+    psr = PluginSetRegistry()
+    psr._cache[ctx.repo_id] = []
+    dispatcher = EnhancedDispatcher([], plugin_set_registry=psr)
+
+    with caplog.at_level(logging.DEBUG):
+        list(dispatcher.search(ctx, query_sentinel, fuzzy=True, limit=5))
+
+    # The fuzzy-path log fired (proves we reached an instrumented log line)...
+    assert "Using fuzzy trigram search" in caplog.text
+    # ...but the raw query body never appears in any dispatcher log.
+    assert query_sentinel not in caplog.text

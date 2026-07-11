@@ -518,9 +518,9 @@ class HybridSearch:
 
     async def _rerank_results(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
         """Rerank search results using the configured reranker."""
-        from .reranker import RerankDiagnostics, RerankOutcome
+        from .reranker import RerankDiagnostics, RerankOutcome, _redact_text
 
-        if not self.reranker:
+        if self.reranker is None:
             # NOT_CONFIGURED is reserved for the absent-reranker case only.
             self.last_rerank_diagnostics = RerankDiagnostics(
                 outcome=RerankOutcome.NOT_CONFIGURED,
@@ -548,10 +548,13 @@ class HybridSearch:
                 if hasattr(self.reranker, "initialize"):
                     init_result = await self.reranker.initialize({})
                     if not init_result.is_success:
-                        logger.error(f"Failed to initialize reranker: {init_result.error}")
+                        logger.error(
+                            "Failed to initialize reranker: %s",
+                            _redact_text(str(init_result.error)),
+                        )
                         self.last_rerank_diagnostics = RerankDiagnostics(
                             outcome=RerankOutcome.FAILED,
-                            error=str(init_result.error),
+                            error=_redact_text(str(init_result.error)),
                             candidate_count=len(results),
                             returned_count=len(results),
                         )
@@ -584,10 +587,10 @@ class HybridSearch:
             rerank_result = await self.reranker.rerank(query, reranker_results, top_k=top_k)
 
             if not rerank_result.is_success:
-                logger.warning(f"Reranking failed: {rerank_result.error}")
+                logger.warning("Reranking failed: %s", _redact_text(str(rerank_result.error)))
                 self.last_rerank_diagnostics = RerankDiagnostics(
                     outcome=RerankOutcome.FAILED,
-                    error=str(rerank_result.error),
+                    error=_redact_text(str(rerank_result.error)),
                     candidate_count=len(results),
                     returned_count=len(results),
                 )
@@ -677,10 +680,10 @@ class HybridSearch:
             return reranked_results
 
         except Exception as e:
-            logger.error(f"Error during reranking: {e}", exc_info=True)
+            logger.error("Error during reranking: %s", _redact_text(str(e)))
             self.last_rerank_diagnostics = RerankDiagnostics(
                 outcome=RerankOutcome.FAILED,
-                error=str(e),
+                error=_redact_text(str(e)),
                 candidate_count=len(results),
                 returned_count=len(results),
             )

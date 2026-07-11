@@ -1884,7 +1884,7 @@ class EnhancedDispatcher:
 
             # Fuzzy (trigram) path for misspelled queries
             if fuzzy and sqlite_store:
-                logger.info(f"Using fuzzy trigram search for query: {query}")
+                logger.info("Using fuzzy trigram search (query_chars=%d)", len(query or ""))
                 try:
                     sym_results = sqlite_store.search_symbols_fuzzy(query, limit)
                     file_results = sqlite_store.search_files_fuzzy(query, limit)
@@ -1932,15 +1932,17 @@ class EnhancedDispatcher:
                     sym_results = self._symbol_route(sqlite_store, sym_name, kind_hint, limit)
                     if sym_results:
                         logger.info(
-                            f"Symbol route hit for '{query}' → '{sym_name}' "
-                            f"({len(sym_results)} result(s))"
+                            "Symbol route hit (query_chars=%d, symbol=%r, results=%d)",
+                            len(query or ""),
+                            sym_name,
+                            len(sym_results),
                         )
                         yield from sym_results
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
                         return
 
-                logger.info(f"Using direct lexical search for query: {query}")
+                logger.info("Using direct lexical search (query_chars=%d)", len(query or ""))
                 try:
                     tables_to_try = ["bm25_content", "fts_code"]
 
@@ -2208,7 +2210,11 @@ class EnhancedDispatcher:
             queries = [query]
             if is_doc_query:
                 queries = self._expand_document_query(query)
-                logger.info(f"Expanded document query '{query}' to {len(queries)} variations")
+                logger.info(
+                    "Expanded document query (query_chars=%d) to %d variations",
+                    len(query or ""),
+                    len(queries),
+                )
                 # Force semantic search for natural language queries
                 semantic = True
 
@@ -2432,7 +2438,11 @@ class EnhancedDispatcher:
         except SemanticSearchFailure:
             raise
         except Exception as e:
-            logger.error(f"Error in search for {query}: {e}", exc_info=True)
+            logger.error(
+                "Error in search (query_chars=%d): %s",
+                len(query or ""),
+                _redact_secrets(str(e)),
+            )
         finally:
             try:
                 from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter

@@ -39,13 +39,52 @@ evidence), which is distinct from `rejected` (arm ran and missed a threshold).
 | `lexical` | **ran** | BM25-lite over the frozen corpus file **paths + names** (not file contents). Real, reproducible, offline. Zero source-text egress by construction. |
 | `dense` | **not_run** | No live embedding provider reachable — see reason below. |
 | `hybrid` | **not_run** | No live embedding provider reachable. |
-| `hybrid_rerank` | **not_run** | No live embedding provider reachable; this is the arm the gate decision hinges on. |
+| `hybrid_rerank` | **not_run** | No live embedding provider reachable; and, independently, the rerank endpoint failed its functional probe. This is the arm the gate decision hinges on. |
 
 **not_run reason (dense / hybrid / hybrid_rerank):** no live embedding provider
 reachable — the embedding endpoint `http://ai:8001/v1` was unreachable at run
 time. (Qdrant `localhost:6333` was reachable, but that alone cannot produce
 query/corpus embeddings.) Dense and fused arms require embeddings, so they are
 recorded `not_run` rather than assigned invented metrics.
+
+### Provider-run validity (how the arms are gated when services ARE up)
+
+The driver does not treat TCP reachability as sufficient evidence a provider run
+is valid. Two hardening rules apply when services come up:
+
+- **Functional rerank probe.** `hybrid_rerank` (the decisive arm) is gated on a
+  *functional* `rerank.v1` probe — the driver POSTs a minimal request and
+  requires a contract-valid response, not merely an open socket. If the rerank
+  endpoint is down or does not speak the wire contract, `hybrid_rerank` is
+  recorded **`not_run`** (insufficient evidence) rather than run as an
+  arm-with-errors against a dead reranker. `dense`/`hybrid` remain gated on the
+  embedding endpoint + Qdrant. The run records three service states:
+  `qdrant_localhost_6333`, `embedding_endpoint_<host>_<port>`, and
+  `rerank_endpoint_functional`.
+- **Reranker candidate text = document content.** When `hybrid_rerank` runs, the
+  reranker scores each candidate on the retrieved **document content** (read from
+  the pinned corpus commit via `git show <commit>:<path>`, truncated to bound
+  request size), not on file paths. Paths are retained only to map the reranked
+  order back to corpus doc ids.
+
+In **this** environment the embedding endpoint is down and the functional rerank
+probe fails, so all three provider arms stay `not_run` and the verdict stays
+`dark_opt_in`. That is the expected offline outcome.
+
+### Precondition for a LIVE provider run to count
+
+A live provider run cannot be validated in this offline environment, and its
+numbers do **not** count toward the gate until an additional precondition is
+met: **the live Qdrant collection must be verified against the frozen corpus
+before scoring.** Specifically, a live run must confirm the collection's indexed
+**commit**, **corpus checksum** (`corpus_sha256`), **profile fingerprint**, and
+**provider revision** match the frozen corpus this gate binds (`corpus_commit`
+`f7c060b…`, `corpus_sha256` above). A collection indexed against a different
+commit, corpus, embedding profile, or provider revision would make dense/hybrid/
+hybrid_rerank metrics unattributable to the frozen eval set, so such a run is
+**invalid** and its verdict must not be recorded as gate evidence. This is a
+stated gate precondition, not an implementation detail: numbers from an
+unverified live collection are out of contract.
 
 ## Metrics produced (lexical arm only)
 
@@ -98,9 +137,18 @@ The frozen corpus path list was independently **reconstructed from the pinned
 corpus commit and its digest matched `corpus_sha256`** (872 docs), confirming
 the lexical arm ran against the real frozen corpus.
 
-- code commit (this run): `b299005ffd457b5921e14476c97bde28cde206db`
+- code commit (this run): `6cb4d7163141a3601323a72482044b3fe47ae935`
 - corpus commit (pinned, distinct from code commit): `f7c060b4f145516a4629338e078d3b8b9c0c406a`
 - provider revision: none — no live embedding/rerank provider was exercised.
+
+The code commit above is stamped by the driver at generation time
+(`git rev-parse HEAD`), so `result.json` records the exact revision that produced
+the numbers. Note a deliberate **one-commit lag**: committing this report/driver
+change itself advances `HEAD`, so the recorded run commit trails live `HEAD` by
+(at most) the single commit that carries this update. The contract test therefore
+asserts the report records *a* valid 40-hex code commit, **not** equality with
+live `HEAD` (which moves the moment this fix lands). Re-running the driver after
+this commit re-stamps the recorded commit to the then-current `HEAD`.
 
 ## Holdout
 

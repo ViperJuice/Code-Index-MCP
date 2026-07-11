@@ -23,6 +23,9 @@ from mcp_server.config.settings import (
     DeploymentProfileContract,
     RerankerPath,
     apply_degradation_policy,
+    commercial_egress_allowed,
+    deployment_profile_is_explicitly_set,
+    learned_models_allowed,
     resolve_active_deployment_profile,
     resolve_deployment_profile,
 )
@@ -355,3 +358,115 @@ def test_degradation_diagnostic_serializes():
     assert payload["degraded"] is True
     assert payload["collection_mutated"] is False
     assert isinstance(diag, DegradationDiagnostic)
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatible enforcement helpers (GF1: unset -> legacy allow)
+# ---------------------------------------------------------------------------
+
+
+def test_profile_explicitly_set_discriminates_unset_from_lexical_only():
+    # The discriminator that keeps enforcement backward-compatible: an ABSENT env
+    # var (legacy operator) is NOT the same as an explicitly-chosen lexical_only.
+    assert deployment_profile_is_explicitly_set(env={}) is False
+    assert (
+        deployment_profile_is_explicitly_set(env={"MCP_DEPLOYMENT_PROFILE": "lexical_only"})
+        is True
+    )
+
+
+def test_commercial_egress_allowed_unset_is_legacy_allow():
+    # Operator never opted into the profile system -> preserve prior behavior.
+    assert commercial_egress_allowed(env={}) is True
+
+
+def test_commercial_egress_allowed_explicit_noncommercial_forbids():
+    assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "lexical_only"}) is False
+    assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "fleet_local"}) is False
+    assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "standalone_local"}) is False
+
+
+def test_commercial_egress_allowed_commercial_requires_explicit_optin():
+    assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "commercial"}) is False
+    assert (
+        commercial_egress_allowed(
+            env={"MCP_DEPLOYMENT_PROFILE": "commercial", "MCP_ALLOW_COMMERCIAL_EGRESS": "0"}
+        )
+        is False
+    )
+    assert (
+        commercial_egress_allowed(
+            env={"MCP_DEPLOYMENT_PROFILE": "commercial", "MCP_ALLOW_COMMERCIAL_EGRESS": "1"}
+        )
+        is True
+    )
+
+
+def test_commercial_egress_allowed_unknown_profile_fails_closed():
+    assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "bogus_profile"}) is False
+
+
+def test_learned_models_allowed_only_forbidden_under_explicit_lexical_only():
+    assert learned_models_allowed(env={}) is True  # legacy
+    assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "fleet_local"}) is True
+    assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "standalone_local"}) is True
+    assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "commercial"}) is True
+    assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "lexical_only"}) is False
+
+
+# ---------------------------------------------------------------------------
+# Provider-construction enforcement (SemanticIndexer._enforce_commercial_egress_policy)
+# ---------------------------------------------------------------------------
+
+
+def _bare_policy_indexer():
+    """A SemanticIndexer with NO heavy __init__ — only the policy method is exercised.
+
+    ``_enforce_commercial_egress_policy`` reads ``os.environ`` and the class-level
+    provider set; it constructs no provider or qdrant client, keeping this test
+    network-free.
+    """
+    pytest.importorskip("mcp_server.utils.semantic_indexer")
+    from mcp_server.utils.semantic_indexer import SemanticIndexer
+
+    return SemanticIndexer.__new__(SemanticIndexer)
+
+
+def test_enforcement_unset_profile_allows_voyage_legacy(monkeypatch):
+    monkeypatch.delenv("MCP_DEPLOYMENT_PROFILE", raising=False)
+    # Legacy path: a commercial provider builds without restriction (this is the
+    # exact regression the GF1 fix restores).
+    _bare_policy_indexer()._enforce_commercial_egress_policy("voyage")
+
+
+def test_enforcement_explicit_lexical_only_forbids_any_learned_provider(monkeypatch):
+    monkeypatch.setenv("MCP_DEPLOYMENT_PROFILE", "lexical_only")
+    ix = _bare_policy_indexer()
+    with pytest.raises(RuntimeError, match="lexical"):
+        ix._enforce_commercial_egress_policy("openai_compatible")
+    with pytest.raises(RuntimeError, match="lexical"):
+        ix._enforce_commercial_egress_policy("voyage")
+
+
+def test_enforcement_explicit_commercial_without_optin_raises(monkeypatch):
+    monkeypatch.setenv("MCP_DEPLOYMENT_PROFILE", "commercial")
+    monkeypatch.delenv("MCP_ALLOW_COMMERCIAL_EGRESS", raising=False)
+    with pytest.raises(RuntimeError, match="egress"):
+        _bare_policy_indexer()._enforce_commercial_egress_policy("voyage")
+
+
+def test_enforcement_explicit_commercial_with_optin_allows(monkeypatch):
+    monkeypatch.setenv("MCP_DEPLOYMENT_PROFILE", "commercial")
+    monkeypatch.setenv("MCP_ALLOW_COMMERCIAL_EGRESS", "1")
+    ix = _bare_policy_indexer()
+    ix._enforce_commercial_egress_policy("voyage")  # opted in: no raise
+    ix._enforce_commercial_egress_policy("openai_compatible")  # learned allowed too
+
+
+def test_enforcement_explicit_fleet_local_allows_local_forbids_commercial(monkeypatch):
+    monkeypatch.setenv("MCP_DEPLOYMENT_PROFILE", "fleet_local")
+    monkeypatch.delenv("MCP_ALLOW_COMMERCIAL_EGRESS", raising=False)
+    ix = _bare_policy_indexer()
+    ix._enforce_commercial_egress_policy("openai_compatible")  # local learned: allowed
+    with pytest.raises(RuntimeError, match="egress"):
+        ix._enforce_commercial_egress_policy("voyage")  # commercial egress refused

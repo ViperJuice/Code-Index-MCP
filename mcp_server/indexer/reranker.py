@@ -230,7 +230,7 @@ class BaseReranker(IReranker, ABC):
             import time
 
             if time.time() - cached_data["timestamp"] < self.cache_ttl:
-                logger.debug(f"Cache hit for reranking query: {query}")
+                logger.debug("Cache hit for reranking query (chars=%d)", len(query))
                 return cached_data["results"]
             else:
                 # Cache expired
@@ -760,7 +760,18 @@ def _redact_error(exc: BaseException) -> str:
 
     Strips bearer/api-key-like substrings; carries no candidate/query text.
     """
-    msg = f"{type(exc).__name__}: {exc}"
+    return _redact_text(f"{type(exc).__name__}: {exc}")
+
+
+def _redact_text(text: Optional[str]) -> Optional[str]:
+    """Scrub bearer/api-key-like substrings from an arbitrary string.
+
+    Safe for error strings surfaced from provider ``Result.error`` fields or
+    exception messages before they reach logs or diagnostics.
+    """
+    if text is None:
+        return None
+    msg = str(text)
     for pat in _SECRET_PATTERNS:
         msg = pat.sub("[REDACTED]", msg)
     return msg
@@ -803,7 +814,7 @@ class VoyageReranker:
             return [candidates[r.index] for r in result.results]
         except Exception as e:
             self.last_error = _redact_error(e)
-            logger.warning(f"VoyageReranker.rerank() failed, using original order: {e}")
+            logger.warning("VoyageReranker.rerank() failed, using original order: %s", _redact_error(e))
             return candidates[:top_k]
 
 
@@ -854,7 +865,7 @@ class FlashRankReranker:
             return [candidates[r["id"]] for r in results[:top_k]]
         except Exception as e:
             self.last_error = _redact_error(e)
-            logger.warning(f"FlashRankReranker.rerank() failed, using original order: {e}")
+            logger.warning("FlashRankReranker.rerank() failed, using original order: %s", _redact_error(e))
             return candidates[:top_k]
 
 
@@ -901,7 +912,7 @@ class CrossEncoderReranker:
             return [candidates[i] for i, _ in indexed[:top_k]]
         except Exception as e:
             self.last_error = _redact_error(e)
-            logger.warning(f"CrossEncoderReranker.rerank() failed, using original order: {e}")
+            logger.warning("CrossEncoderReranker.rerank() failed, using original order: %s", _redact_error(e))
             return candidates[:top_k]
 
 
@@ -1057,9 +1068,18 @@ class EndpointReranker(IReranker):
         transport: Callable[[Dict[str, Any]], Dict[str, Any]],
         *,
         provider: str = "endpoint",
+        timeout: Optional[float] = None,
     ):
         self._transport = transport
         self.provider = provider
+        # Intrinsic per-call timeout so DIRECT async consumers (hybrid /
+        # cross_repo) are bounded even without the dispatcher's wait_for wrapper.
+        if timeout is None:
+            try:
+                timeout = float(os.getenv("MCP_RERANK_TIMEOUT_S", "30.0"))
+            except (TypeError, ValueError):
+                timeout = 30.0
+        self._timeout = timeout
         self.last_outcome: Optional[RerankOutcome] = None
         self.last_diagnostics: Optional[RerankDiagnostics] = None
         self.last_fallback: Optional[RerankFallbackSignal] = None
@@ -1117,7 +1137,10 @@ class EndpointReranker(IReranker):
         started = time.perf_counter()
         # Run the synchronous transport off the event loop so blocking network
         # I/O never stalls the running loop (IF-0-RERANKEND-1).
-        raw_response = await asyncio.to_thread(self._transport, request.to_dict())
+        raw_response = await asyncio.wait_for(
+            asyncio.to_thread(self._transport, request.to_dict()),
+            timeout=self._timeout,
+        )
         response = RerankResponse.from_dict(raw_response)
         duration_ms = (time.perf_counter() - started) * 1000.0
 

@@ -389,42 +389,59 @@ class SemanticIndexer:
     # that opts into commercial egress.
     _COMMERCIAL_EMBEDDING_PROVIDERS = frozenset({"voyage", "voyageai"})
 
-    def _resolve_active_deployment_contract(self) -> Optional[Any]:
-        """Resolve the active deployment-profile contract, guarded defensively.
-
-        The ``resolve_active_deployment_profile`` symbol is owned by the settings
-        lane and may not have landed yet. If it cannot be imported we return
-        ``None`` (an intentional TRANSITIONAL fail-open until that lane lands — the
-        default profile is lexical_only/non-commercial and commercial providers are
-        never configured implicitly). A resolver that EXISTS but raises (e.g.
-        ``CommercialEgressNotOptedIn`` for a commercial profile without opt-in) is
-        propagated so the egress policy stays fail-closed once the lane is present.
-        """
-        try:
-            from mcp_server.config.settings import resolve_active_deployment_profile
-        except ImportError:
-            return None
-        return resolve_active_deployment_profile()
-
     def _enforce_commercial_egress_policy(self, provider_name: str) -> None:
-        """Refuse to build a commercial provider unless the active profile allows it."""
-        normalized = (provider_name or "").strip().lower()
-        if normalized not in self._COMMERCIAL_EMBEDDING_PROVIDERS:
-            return  # Local / private-endpoint provider: always permitted.
+        """Gate embedding-provider construction on the active deployment profile.
 
-        contract = self._resolve_active_deployment_contract()
-        if contract is None:
+        Backward-compatible enforcement (fixes the aggressive-guard regression):
+
+        * Profile **unset** (operator never opted into the profile system) ->
+          allow everything, exactly as before the profile system existed. A
+          ``voyage``-backed indexer under the DEFAULT posture builds unchanged.
+        * Profile explicitly **lexical_only** -> forbid constructing ANY learned
+          embedding provider (openai-compatible included), naming the profile.
+        * A **commercial** provider (voyage/cohere) under an explicitly-set,
+          non-commercial or un-opted-in profile -> refuse the source-code egress.
+
+        The settings helpers are owned by the settings lane and may not have
+        landed yet; if they cannot be imported we fail open (TRANSITIONAL — the
+        default posture is non-commercial and commercial providers are never
+        configured implicitly).
+        """
+        normalized = (provider_name or "").strip().lower()
+        try:
+            from mcp_server.config.settings import (
+                ACTIVE_PROFILE_ENV,
+                commercial_egress_allowed,
+                deployment_profile_is_explicitly_set,
+                learned_models_allowed,
+            )
+        except ImportError:
             return  # Settings lane not present yet: transitional guard.
 
-        if not getattr(contract, "commercial_egress", False):
-            profile = getattr(contract, "profile", None)
-            profile_label = getattr(profile, "value", profile)
+        # LEGACY: no explicit profile -> preserve pre-existing behavior (allow).
+        if not deployment_profile_is_explicitly_set():
+            return
+
+        profile_label = os.environ.get(ACTIVE_PROFILE_ENV)
+
+        # Explicit lexical_only forbids ALL learned embedding providers.
+        if not learned_models_allowed():
+            raise RuntimeError(
+                f"Embedding provider '{provider_name}' is a learned model, but the "
+                f"active deployment profile '{profile_label}' is lexical-only and "
+                "forbids constructing any learned embedding provider (BM25 / symbol "
+                "search only). Select a learned-model profile to build embeddings."
+            )
+
+        # Commercial (source-code egress) providers require an explicit opt-in.
+        if normalized in self._COMMERCIAL_EMBEDDING_PROVIDERS and not commercial_egress_allowed():
             raise RuntimeError(
                 f"Embedding provider '{provider_name}' performs source-code egress to a "
                 f"third-party commercial API, but the active deployment profile "
                 f"'{profile_label}' does not permit commercial egress. Select the "
                 "commercial profile with an explicit opt-in (e.g. "
-                "MCP_DEPLOYMENT_PROFILE=commercial) to authorize it."
+                "MCP_DEPLOYMENT_PROFILE=commercial MCP_ALLOW_COMMERCIAL_EGRESS=1) to "
+                "authorize it."
             )
 
     # ------------------------------------------------------------------
@@ -1406,14 +1423,28 @@ class SemanticIndexer:
                 )
             )
 
-        # 2. Persist the attested profile atomically (raises on write failure,
+        # 2. Validate the LIVE collection shape (read-only) BEFORE persisting
+        #    attested metadata. Persisting first would stamp attested=True at the
+        #    active dimension while an existing (e.g. profile-migrated v9)
+        #    collection still holds vectors at the old dimension, then
+        #    _ensure_collection() would raise a raw blocked error with the
+        #    metadata already corrupted. Fail closed here, before any write.
+        if self._existing_collection_shape_blocked():
+            raise RuntimeError(
+                f"Qdrant collection '{self.collection}' is blocked: its shape/config "
+                "does not match the active semantic profile. Refusing to persist "
+                "attested metadata over a stale collection. Run an operator-authorized "
+                "reindex to rebuild the collection with the correct shape."
+            )
+
+        # 3. Persist the attested profile atomically (raises on write failure,
         #    BEFORE the collection is created/validated — so a metadata-write
         #    failure never leaves a collection created under an unpersisted
         #    profile).
         self._atomic_write_metadata(self._attested_metadata(attestation))
         self._attestation = attestation
 
-        # 3. Only now create/validate the collection and permit point writes.
+        # 4. Only now create/validate the collection and permit point writes.
         self._ensure_collection()
         self._writes_prepared = True
 
@@ -1551,6 +1582,41 @@ class SemanticIndexer:
         )
 
     # ------------------------------------------------------------------
+    def _existing_collection_shape_blocked(self) -> bool:
+        """Read-only: does a live collection EXIST whose shape a write would block?
+
+        Returns ``True`` only when the collection already exists but its vector
+        shape/config does NOT match the active semantic profile (or cannot be
+        read). A missing collection is NOT blocked — a fresh create will match the
+        active shape. This never mutates Qdrant; it is the pre-persist guard that
+        keeps ``_atomic_write_metadata`` from stamping ``attested=True`` at the
+        active dimension over vectors still stored at a stale (e.g. profile-
+        migrated v9) dimension.
+        """
+        if not self._qdrant_available:
+            return False
+        try:
+            collections = self.qdrant.get_collections()
+            exists = any(c.name == self.collection for c in collections.collections)
+            if not exists:
+                return False
+            info = self.qdrant.get_collection(self.collection)
+            vectors_config = info.config.params.vectors
+            actual_dimension = getattr(vectors_config, "size", None)
+            actual_distance = getattr(vectors_config, "distance", None)
+            if actual_dimension is None or actual_distance is None:
+                return True  # Unreadable config: never treat as compatible reuse.
+            expected_distance = self.resolve_qdrant_distance(self.distance_metric)
+            return (
+                actual_dimension != self.embedding_dimension
+                or actual_distance != expected_distance
+            )
+        except Exception:
+            # An unknown/unreadable live shape must fail closed (block), never be
+            # silently treated as a compatible reuse.
+            return True
+
+    # ------------------------------------------------------------------
     def reconcile_existing_collection(
         self, *, probe_texts: Optional[List[str]] = None, allow_reindex: bool = False
     ) -> Dict[str, Any]:
@@ -1622,7 +1688,42 @@ class SemanticIndexer:
                 result["attestation"] = reattest.to_dict()
             return result
 
-        # Compatible: revalidate + re-persist as attested.
+        # The probe attested compatible, but the EXISTING collection shape may
+        # still be stale — the profile-migrated scenario where the active profile
+        # moved to a new dimension while the on-disk collection is the old (e.g.
+        # v9) one. Validate the live shape (read-only) BEFORE persisting attested
+        # metadata, so we never stamp attested=True at the new dimension over
+        # vectors still stored at the old one.
+        if self._existing_collection_shape_blocked():
+            if allow_reindex:
+                # Operator authorized a destructive rebuild for the profile-
+                # migrated collection: recreate to the active shape FIRST, then
+                # persist under the already-verified attestation and open the gate.
+                self._recreate_collection_for_reindex()
+                self._atomic_write_metadata(self._attested_metadata(attestation))
+                self._attestation = attestation
+                self._writes_prepared = True
+                return {
+                    "status": "reindexed",
+                    "collection": self.collection,
+                    "attestation": attestation.to_dict(),
+                }
+            # No operator authorization: name the remediation, mutate nothing
+            # (crucially, do NOT persist attested metadata over the stale shape).
+            return {
+                "status": "reindex_required",
+                "collection": self.collection,
+                "message": (
+                    f"Existing collection '{self.collection}' shape does not match the "
+                    "active semantic profile (profile-migrated dimension/metric change). "
+                    + REINDEX_REMEDIATION
+                ),
+                "remediation": REINDEX_REMEDIATION,
+                "attestation": attestation.to_dict(),
+            }
+
+        # Compatible attestation AND compatible live shape: revalidate + re-persist
+        # as attested.
         self._atomic_write_metadata(self._attested_metadata(attestation))
         self._attestation = attestation
         self._ensure_collection()
@@ -3360,8 +3461,11 @@ class SemanticIndexer:
 
             # Batch update payloads
             if updated_points:
-                # Qdrant doesn't support payload-only updates directly,
-                # so we need to re-fetch vectors and update
+                # PAYLOAD-ONLY update on EXISTING points: re-fetches the existing
+                # vectors and re-attaches them unchanged (no re-embed / no source
+                # egress), only the relative_path/file payload changes. This is
+                # metadata maintenance, not a new attested write, so it correctly
+                # does NOT go through the _prepare_for_writes attestation gate.
                 point_ids = [p.id for p in updated_points]
 
                 # Fetch full points with vectors
@@ -3477,6 +3581,10 @@ class SemanticIndexer:
                 point.payload["is_deleted"] = True
                 point_ids.append(point.id)
 
+            # PAYLOAD-ONLY update on EXISTING points: re-fetches the existing
+            # vectors and re-attaches them unchanged (no re-embed / no source
+            # egress), only the is_deleted flag changes. Metadata maintenance, not
+            # a new attested write, so it correctly bypasses _prepare_for_writes.
             # Re-fetch and update (same process as move_file)
             full_points = self.qdrant.retrieve(
                 collection_name=self.collection,
