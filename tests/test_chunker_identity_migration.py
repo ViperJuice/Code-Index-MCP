@@ -190,21 +190,28 @@ def test_mismatch_refuses_plugin_path(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 # 3. Unmarked non-empty index: legacy-compatible (B1) vs new-scheme fail-closed
 # --------------------------------------------------------------------------- #
-def test_unmarked_v1_index_is_compatible_and_autostamps(tmp_path):
+def test_unmarked_v1_index_is_compatible_and_autostamps(tmp_path, monkeypatch):
     """B1: an existing (v3-built) index has no marker, but the chunk-id algorithm
     was stable across chunker majors 1-3, so under a v1 runtime it genuinely IS
     v1.  Treat it as compatible, allow read+write, and auto-stamp the marker -
-    never brick every legacy index by refusing it as a scheme mismatch."""
+    never brick every legacy index by refusing it as a scheme mismatch.
+
+    Forces the v1 runtime scheme so the behavior is asserted regardless of the
+    installed chunker major (under a real v4 runtime this path correctly does not
+    fire - see test_unmarked_index_under_new_scheme_fails_closed)."""
+    _force_scheme(monkeypatch, "treesitter_chunk_id_v1")  # legacy v1 runtime
     store = _make_store(tmp_path)
     file_id = _make_file(store)
     _store_code_chunk(store, file_id, "c1")
-    _clear_marker(store)  # legacy/unmarked fixture; runtime scheme is v1
+    _clear_marker(store)  # legacy/unmarked fixture
 
     with store._get_connection() as conn:
         status, marker, target = evaluate_chunk_scheme(conn)
     assert status == "compatible_legacy"
     assert marker is None
-    assert target == current_chunk_id_scheme() == "treesitter_chunk_id_v1"
+    # target reflects the forced v1 runtime (the directly-imported
+    # current_chunk_id_scheme() bypasses the module-attr patch under a real v4 env).
+    assert target == "treesitter_chunk_id_v1"
 
     # Read is allowed (a genuinely-compatible legacy index must not fail closed).
     with sqlite3.connect(store.db_path) as raw:
