@@ -50,6 +50,8 @@ def test_readiness_state_values_are_exact():
         "corrupt_sqlite",
         "missing_schema",
         "missing_provenance",
+        "scheme_mismatch",
+        "index_rebuilding",
     }
 
 

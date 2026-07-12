@@ -12,7 +12,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..core.errors import TransientArtifactError
 from ..core.path_resolver import PathResolver
@@ -134,6 +134,166 @@ def classify_sqlite_storage_failure(error: BaseException) -> Optional[Dict[str, 
             "readonly": True,
         }
     return None
+
+
+# ---------------------------------------------------------------------------
+# Chunk identity-scheme guard (CHUNKERSAFE Lane A)
+#
+# ``code_chunks`` rows (and the ``chunk_summaries`` / ``semantic_points`` /
+# remote Qdrant vectors keyed off their ids) are only coherent within a single
+# chunk-identity scheme.  Upstream ``treesitter-chunker`` may change the id
+# algorithm across a major (issue #76 / v4), which silently corrupts a mixed
+# index if un-reindexed rows from an older scheme survive.  These helpers persist
+# a per-DB scheme marker in ``index_config`` and provide the single fail-closed
+# check that every writer, deleter, and scheme-dependent reader routes through.
+# ---------------------------------------------------------------------------
+
+#: Legacy stable-id algorithm name, kept coherent with the hardcoded
+#: ``chunk_identity_algorithm`` in ``manifest_v2`` / ``artifact_upload`` and with
+#: the semantic-profile ``chunker_version`` contract.  The chunk-id algorithm was
+#: stable across chunker package majors 1-3, so pre-v4 chunkers map to this.
+LEGACY_CHUNK_ID_SCHEME = "treesitter_chunk_id_v1"
+
+#: ``index_config`` keys for the persisted scheme markers.
+CHUNK_SCHEME_MARKER_KEY = "chunk_identity_scheme"
+CHUNK_IDENTITY_ALGORITHM_KEY = "chunk_identity_algorithm"
+CHUNK_SCHEME_REBUILD_KEY = "chunk_scheme_rebuild_target"
+
+#: ``code_chunks.chunk_type`` value used for synthetic history/document rows that
+#: are NOT produced by the tree-sitter chunker and must survive a rebuild.
+PRESERVED_CHUNK_TYPE = "document"
+
+_SCHEME_READ_BLOCKING = frozenset({"mismatch", "missing_marker", "rebuilding"})
+_SCHEME_WRITE_BLOCKING = frozenset({"mismatch", "missing_marker"})
+
+
+class ChunkSchemeMismatchError(RuntimeError):
+    """Raised when a ``code_chunks`` operation would cross an id-scheme boundary.
+
+    A typed, actionable error: refusing the operation is the fail-closed behavior
+    that prevents a mixed-scheme (silently corrupt) index.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        expected: Optional[str] = None,
+        found: Optional[str] = None,
+        state: Optional[str] = None,
+        remediation: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.expected = expected
+        self.found = found
+        self.state = state
+        self.remediation = remediation or (
+            "Run an atomic chunk-scheme rebuild (reindex) before reading or writing "
+            "code chunks for this repository."
+        )
+
+
+def _chunker_major_version(chunker_module: Any) -> Optional[int]:
+    version = getattr(chunker_module, "__version__", None)
+    if not version:
+        try:
+            import importlib.metadata as _md
+
+            version = _md.version("treesitter-chunker")
+        except Exception:
+            version = None
+    if not version:
+        return None
+    match = re.match(r"\s*v?(\d+)", str(version))
+    return int(match.group(1)) if match else None
+
+
+def current_chunk_id_scheme() -> str:
+    """Return the id-scheme of the installed chunker.
+
+    Reuses the upstream identity contract: an explicit ``CHUNK_ID_SCHEME``
+    attribute wins; otherwise derive from the package major, staying coherent
+    with the legacy ``treesitter_chunk_id_v1`` algorithm for pre-v4 chunkers and
+    only diverging to ``treesitter_chunk_id_v{major}`` once a new major (>=4)
+    ships without advertising the attribute.  When the chunker cannot be imported
+    at all, default to the legacy scheme.
+    """
+    try:
+        import chunker
+    except Exception:
+        return LEGACY_CHUNK_ID_SCHEME
+    scheme = getattr(chunker, "CHUNK_ID_SCHEME", None)
+    if isinstance(scheme, str) and scheme.strip():
+        return scheme.strip()
+    major = _chunker_major_version(chunker)
+    if major is None or major < 4:
+        return LEGACY_CHUNK_ID_SCHEME
+    return f"treesitter_chunk_id_v{major}"
+
+
+def _scheme_read_config_value(conn: sqlite3.Connection, key: str) -> Optional[str]:
+    try:
+        row = conn.execute(
+            "SELECT config_value FROM index_config WHERE config_key = ?", (key,)
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if row is None:
+        return None
+    return row[0]
+
+
+def _has_chunker_rows(conn: sqlite3.Connection) -> bool:
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM code_chunks WHERE chunk_type != ? LIMIT 1",
+            (PRESERVED_CHUNK_TYPE,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    return row is not None
+
+
+def evaluate_chunk_scheme(
+    conn: sqlite3.Connection, target_scheme: Optional[str] = None
+) -> Tuple[str, Optional[str], str]:
+    """Classify the chunk-scheme compatibility of ``conn`` against ``target_scheme``.
+
+    Returns ``(status, marker, target)`` where ``status`` is one of:
+
+    - ``"compatible"`` - marker present and equal to target.
+    - ``"empty"``       - no marker and no chunker rows; safe to stamp on first build.
+    - ``"missing_marker"`` - no marker but chunker rows present (a legacy/unmarked
+      index of unknown scheme): treated as incompatible, fail closed.
+    - ``"mismatch"``    - marker present but different from target.
+    - ``"rebuilding"``  - an atomic rebuild is in progress and unfinalized.
+    """
+    target = target_scheme or current_chunk_id_scheme()
+    rebuild_target = _scheme_read_config_value(conn, CHUNK_SCHEME_REBUILD_KEY)
+    if rebuild_target is not None:
+        return ("rebuilding", rebuild_target, target)
+    marker = _scheme_read_config_value(conn, CHUNK_SCHEME_MARKER_KEY)
+    if marker is not None:
+        return ("compatible" if marker == target else "mismatch", marker, target)
+    if _has_chunker_rows(conn):
+        return ("missing_marker", None, target)
+    return ("empty", None, target)
+
+
+def assert_chunk_scheme_readable(
+    conn: sqlite3.Connection, target_scheme: Optional[str] = None
+) -> None:
+    """Fail closed on scheme-dependent reads over an incompatible/rebuilding index."""
+    status, marker, target = evaluate_chunk_scheme(conn, target_scheme)
+    if status in _SCHEME_READ_BLOCKING:
+        raise ChunkSchemeMismatchError(
+            f"code_chunks scheme is {status!r} (index marker={marker!r}, current "
+            f"scheme={target!r}); refusing scheme-dependent read until an atomic "
+            "rebuild completes.",
+            expected=target,
+            found=marker,
+            state=status,
+        )
 
 
 class SQLiteStore:
@@ -1077,6 +1237,281 @@ class SQLiteStore:
             return cursor.fetchone()[0]
 
     # Code Chunk operations
+    # ------------------------------------------------------------------
+    # Chunk identity-scheme marker + central guard (CHUNKERSAFE Lane A)
+    # ------------------------------------------------------------------
+    def _current_scheme(self) -> str:
+        return current_chunk_id_scheme()
+
+    def _set_config(
+        self,
+        conn: sqlite3.Connection,
+        key: str,
+        value: str,
+        description: Optional[str] = None,
+    ) -> None:
+        conn.execute(
+            "INSERT INTO index_config (config_key, config_value, description) "
+            "VALUES (?, ?, ?) "
+            "ON CONFLICT(config_key) DO UPDATE SET "
+            "config_value=excluded.config_value, "
+            "description=COALESCE(excluded.description, index_config.description), "
+            "updated_at=CURRENT_TIMESTAMP",
+            (key, value, description),
+        )
+
+    def _delete_config(self, conn: sqlite3.Connection, key: str) -> None:
+        conn.execute("DELETE FROM index_config WHERE config_key = ?", (key,))
+
+    def get_chunk_scheme_marker(self) -> Optional[str]:
+        """Return the persisted chunk-identity-scheme marker, or None if unmarked."""
+        with self._get_connection() as conn:
+            return _scheme_read_config_value(conn, CHUNK_SCHEME_MARKER_KEY)
+
+    def get_chunk_scheme_status(self) -> Tuple[str, Optional[str], str]:
+        """Return ``(status, marker, target)`` for the current scheme (see
+        :func:`evaluate_chunk_scheme`)."""
+        with self._get_connection() as conn:
+            return evaluate_chunk_scheme(conn, self._current_scheme())
+
+    def _stamp_scheme(self, conn: sqlite3.Connection, target: str) -> None:
+        """Persist the scheme marker, keeping it coherent with the manifest
+        ``chunk_identity_algorithm`` fingerprint."""
+        self._set_config(
+            conn,
+            CHUNK_SCHEME_MARKER_KEY,
+            target,
+            "Chunk identity scheme stamped on first build (CHUNKERSAFE)",
+        )
+        self._set_config(
+            conn,
+            CHUNK_IDENTITY_ALGORITHM_KEY,
+            target,
+            "Chunk identity algorithm reconciled with manifest_v2 contract",
+        )
+
+    def _assert_chunk_scheme_writable(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        chunk_type: str = "code",
+        target: Optional[str] = None,
+    ) -> None:
+        """Central write choke point: refuse chunker writes across a scheme
+        boundary; stamp the scheme on the first write into an empty index.
+
+        Synthetic ``document`` rows (history docs) are not chunker-derived and
+        bypass the guard entirely.
+        """
+        if chunk_type == PRESERVED_CHUNK_TYPE:
+            return
+        self._require_writable()
+        target = target or self._current_scheme()
+        status, marker, target = evaluate_chunk_scheme(conn, target)
+        if status in _SCHEME_WRITE_BLOCKING:
+            raise ChunkSchemeMismatchError(
+                f"code_chunks scheme is {status!r} (index marker={marker!r}, "
+                f"current scheme={target!r}); refusing chunker write until an "
+                "atomic rebuild completes.",
+                expected=target,
+                found=marker,
+                state=status,
+            )
+        if status == "empty":
+            self._stamp_scheme(conn, target)
+
+    def _assert_chunk_scheme_deletable(
+        self, conn: sqlite3.Connection, *, target: Optional[str] = None
+    ) -> None:
+        """Refuse scheme-dependent deletes over an incompatible index (a delete of
+        old-scheme rows before a mismatched store would destroy the coherent
+        index)."""
+        target = target or self._current_scheme()
+        status, marker, target = evaluate_chunk_scheme(conn, target)
+        if status in _SCHEME_WRITE_BLOCKING:
+            raise ChunkSchemeMismatchError(
+                f"code_chunks scheme is {status!r} (index marker={marker!r}, "
+                f"current scheme={target!r}); refusing chunk delete until an "
+                "atomic rebuild completes.",
+                expected=target,
+                found=marker,
+                state=status,
+            )
+
+    def _collect_stale_chunk_artifacts(
+        self, conn: sqlite3.Connection, profile_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """Gather chunker-derived ids (preserving synthetic history/document rows)
+        across code_chunks, chunk_summaries, and semantic_points, so the rebuild
+        can delete locally and hand stale remote-vector ids to a semantic indexer.
+        """
+        preserved = [
+            row[0]
+            for row in conn.execute(
+                "SELECT chunk_id FROM code_chunks WHERE chunk_type = ?",
+                (PRESERVED_CHUNK_TYPE,),
+            ).fetchall()
+        ]
+
+        def _is_preserved(identifier: Optional[str]) -> bool:
+            if identifier is None:
+                return False
+            if identifier.startswith("history:"):
+                return True
+            for base in preserved:
+                if identifier == base or identifier.startswith(f"{base}:"):
+                    return True
+            return False
+
+        stale_chunk_ids = [
+            row[0]
+            for row in conn.execute(
+                "SELECT chunk_id FROM code_chunks WHERE chunk_type != ?",
+                (PRESERVED_CHUNK_TYPE,),
+            ).fetchall()
+        ]
+
+        stale_summary_hashes = [
+            row[0]
+            for row in conn.execute("SELECT chunk_hash FROM chunk_summaries").fetchall()
+            if not _is_preserved(row[0])
+        ]
+
+        if profile_id is None:
+            point_rows = conn.execute(
+                "SELECT profile_id, chunk_id, point_id, collection FROM semantic_points"
+            ).fetchall()
+        else:
+            point_rows = conn.execute(
+                "SELECT profile_id, chunk_id, point_id, collection FROM semantic_points "
+                "WHERE profile_id = ?",
+                (profile_id,),
+            ).fetchall()
+        stale_points = [
+            {
+                "profile_id": row[0],
+                "chunk_id": row[1],
+                "point_id": row[2],
+                "collection": row[3],
+            }
+            for row in point_rows
+            if not _is_preserved(row[1])
+        ]
+        return {
+            "chunk_ids": stale_chunk_ids,
+            "summary_hashes": stale_summary_hashes,
+            "points": stale_points,
+        }
+
+    def begin_chunk_scheme_rebuild(
+        self, target_scheme: Optional[str] = None, *, profile_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Phase 1 of an atomic/resumable rebuild.
+
+        In a single transaction: collect the stale remote-vector ids, delete the
+        chunker-derived rows from ``code_chunks`` / ``chunk_summaries`` /
+        ``semantic_points`` (PRESERVING synthetic history/document rows), and mark
+        the DB ``rebuilding`` (which trips the guard/readiness).  The scheme marker
+        is NOT flipped here, so a crash after this commit leaves a blocked,
+        resumable state - never a half-populated "ready" index.
+
+        Returns the stale ids so a caller holding a semantic indexer can delete the
+        matching remote Qdrant vectors.
+        """
+        self._require_writable()
+        target = target_scheme or self._current_scheme()
+        with self._get_connection() as conn:
+            stale = self._collect_stale_chunk_artifacts(conn, profile_id)
+            self._set_config(
+                conn,
+                CHUNK_SCHEME_REBUILD_KEY,
+                target,
+                "Chunk-scheme rebuild in progress (CHUNKERSAFE)",
+            )
+            self._delete_chunker_rows(conn, stale)
+        return {"target_scheme": target, "profile_id": profile_id, **stale}
+
+    def finalize_chunk_scheme_rebuild(
+        self, target_scheme: Optional[str] = None
+    ) -> None:
+        """Phase 2: flip the scheme marker to ``target`` and clear the rebuilding
+        flag, in one transaction, only after repopulation is complete."""
+        self._require_writable()
+        target = target_scheme or self._current_scheme()
+        with self._get_connection() as conn:
+            self._stamp_scheme(conn, target)
+            self._delete_config(conn, CHUNK_SCHEME_REBUILD_KEY)
+
+    def _delete_chunker_rows(
+        self, conn: sqlite3.Connection, stale: Dict[str, Any]
+    ) -> None:
+        conn.execute(
+            "DELETE FROM code_chunks WHERE chunk_type != ?", (PRESERVED_CHUNK_TYPE,)
+        )
+        summary_hashes = stale.get("summary_hashes") or []
+        for start in range(0, len(summary_hashes), 500):
+            batch = summary_hashes[start : start + 500]
+            placeholders = ",".join("?" * len(batch))
+            conn.execute(
+                f"DELETE FROM chunk_summaries WHERE chunk_hash IN ({placeholders})",
+                batch,
+            )
+        points = stale.get("points") or []
+        for start in range(0, len(points), 500):
+            batch = points[start : start + 500]
+            placeholders = ",".join("?" * len(batch))
+            params: List[Any] = []
+            for point in batch:
+                params.extend([point["profile_id"], point["chunk_id"]])
+            clause = " OR ".join(["(profile_id = ? AND chunk_id = ?)"] * len(batch))
+            conn.execute(f"DELETE FROM semantic_points WHERE {clause}", params)
+
+    def rebuild_chunk_scheme(
+        self,
+        target_scheme: Optional[str] = None,
+        *,
+        profile_id: Optional[str] = None,
+        repopulate: Optional[Callable[[sqlite3.Connection], None]] = None,
+    ) -> Dict[str, Any]:
+        """Atomic chunk-scheme rebuild (public operator entry point).
+
+        Invalidates every chunker-derived row across ``code_chunks``,
+        ``chunk_summaries`` and ``semantic_points`` (PRESERVING synthetic
+        history/document rows) and returns the stale remote-vector ids for Qdrant
+        cleanup.
+
+        Atomicity:
+
+        - With ``repopulate`` supplied, invalidation, repopulation, and the scheme
+          marker flip all run in ONE transaction.  If ``repopulate`` raises, the
+          transaction rolls back and the old, coherent index survives untouched -
+          never a half-populated "ready" DB.
+        - Without ``repopulate``, this commits a blocked ``rebuilding`` state
+          (readiness reports non-``ready``, reads/writes fail closed) whose scheme
+          marker is only flipped by a later
+          :meth:`finalize_chunk_scheme_rebuild` - a crash in between is resumable.
+        """
+        self._require_writable()
+        target = target_scheme or self._current_scheme()
+        if repopulate is None:
+            return self.begin_chunk_scheme_rebuild(target, profile_id=profile_id)
+
+        with self._get_connection() as conn:
+            stale = self._collect_stale_chunk_artifacts(conn, profile_id)
+            self._set_config(
+                conn,
+                CHUNK_SCHEME_REBUILD_KEY,
+                target,
+                "Chunk-scheme rebuild in progress (CHUNKERSAFE)",
+            )
+            self._delete_chunker_rows(conn, stale)
+            # Repopulation runs inside the same transaction; a failure here rolls
+            # the whole rebuild back to the prior coherent index.
+            repopulate(conn)
+            self._stamp_scheme(conn, target)
+            self._delete_config(conn, CHUNK_SCHEME_REBUILD_KEY)
+        return {"target_scheme": target, "profile_id": profile_id, **stale}
+
     def store_chunk(
         self,
         file_id: int,
@@ -1104,6 +1539,7 @@ class SQLiteStore:
         """Store a code chunk with stable IDs and token counting."""
         serialized_metadata = _merge_chunk_source_metadata(metadata, content, line_start)
         with self._get_connection() as conn:
+            self._assert_chunk_scheme_writable(conn, chunk_type=chunk_type)
             cursor = conn.execute(
                 """INSERT INTO code_chunks
                    (file_id, symbol_id, content, content_start, content_end,
@@ -1213,21 +1649,39 @@ class SQLiteStore:
             return [dict(row) for row in cursor.fetchall()]
 
     def update_chunk_token_count(
-        self, chunk_id: str, token_count: int, token_model: str = "cl100k_base"
+        self,
+        chunk_id: str,
+        token_count: int,
+        token_model: str = "cl100k_base",
+        *,
+        file_id: Optional[int] = None,
     ) -> bool:
-        """Update token count for a chunk."""
+        """Update token count for a chunk.
+
+        ``chunk_id`` is only unique per ``(file_id, chunk_id)``; pass ``file_id``
+        to scope the update so a chunk id shared across files cannot collide.
+        """
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                """UPDATE code_chunks
-                   SET token_count = ?, token_model = ?, updated_at = CURRENT_TIMESTAMP
-                   WHERE chunk_id = ?""",
-                (token_count, token_model, chunk_id),
-            )
+            if file_id is not None:
+                cursor = conn.execute(
+                    """UPDATE code_chunks
+                       SET token_count = ?, token_model = ?, updated_at = CURRENT_TIMESTAMP
+                       WHERE chunk_id = ? AND file_id = ?""",
+                    (token_count, token_model, chunk_id, file_id),
+                )
+            else:
+                cursor = conn.execute(
+                    """UPDATE code_chunks
+                       SET token_count = ?, token_model = ?, updated_at = CURRENT_TIMESTAMP
+                       WHERE chunk_id = ?""",
+                    (token_count, token_model, chunk_id),
+                )
             return cursor.rowcount > 0
 
     def delete_chunks_for_file(self, file_id: int) -> int:
         """Delete all chunks for a file. Returns number of chunks deleted."""
         with self._get_connection() as conn:
+            self._assert_chunk_scheme_deletable(conn)
             cursor = conn.execute("DELETE FROM code_chunks WHERE file_id = ?", (file_id,))
             return cursor.rowcount
 
@@ -1315,6 +1769,12 @@ class SQLiteStore:
             return 0
 
         with self._get_connection() as conn:
+            # Central guard: any non-document (chunker-derived) row in the batch
+            # must satisfy the scheme check before any write; stamps an empty index.
+            if any(
+                chunk.get("chunk_type", "code") != PRESERVED_CHUNK_TYPE for chunk in chunks
+            ):
+                self._assert_chunk_scheme_writable(conn, chunk_type="code")
             count = 0
             for chunk in chunks:
                 try:

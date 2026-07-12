@@ -1437,6 +1437,7 @@ async def handle_summarize_sample(
     import sqlite3 as _sqlite3
 
     from mcp_server.indexing.summarization import FileBatchSummarizer
+    from mcp_server.storage.sqlite_store import assert_chunk_scheme_readable
 
     repository = (arguments or {}).get("repository")
     paths_arg = (arguments or {}).get("paths")
@@ -1585,6 +1586,9 @@ async def handle_summarize_sample(
             continue
 
         with _sqlite3.connect(db_path) as _conn:
+            # Fail closed on scheme-dependent reads (CHUNKERSAFE Lane A): refuse to
+            # read code_chunks rows across an incompatible/rebuilding scheme.
+            assert_chunk_scheme_readable(_conn)
             chunk_rows = _conn.execute(
                 """SELECT c.chunk_id, c.line_start, c.line_end,
                           c.content, c.node_type, c.parent_chunk_id,

@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 import mcp.types as types
 
 from ..setup.semantic_preflight import EnrichmentModelResolution, resolve_enrichment_model
-from ..storage.sqlite_store import SQLiteStore
+from ..storage.sqlite_store import SQLiteStore, assert_chunk_scheme_readable
 
 logger = logging.getLogger(__name__)
 
@@ -1077,6 +1077,8 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             Path(path).resolve(strict=False).as_posix() for path in (target_paths or []) if path
         }
         with sqlite3.connect(self.db_path) as conn:
+            # Fail closed on scheme-dependent reads (CHUNKERSAFE Lane A).
+            assert_chunk_scheme_readable(conn)
             where_clauses = ["cs.chunk_hash IS NULL"]
             params: list[Any] = []
             if normalized_paths:
@@ -1106,6 +1108,8 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             Path(path).resolve(strict=False).as_posix() for path in (target_paths or []) if path
         }
         with sqlite3.connect(self.db_path) as conn:
+            # Fail closed on scheme-dependent reads (CHUNKERSAFE Lane A).
+            assert_chunk_scheme_readable(conn)
             where_clauses = ["cs.chunk_hash IS NULL"]
             params: list[Any] = []
             if normalized_paths:
