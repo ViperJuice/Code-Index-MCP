@@ -1,7 +1,7 @@
 """Thin wrapper for parsing files with Tree-sitter.
 
 This wrapper only exposes a minimal interface required by the tests.  It
-loads the prebuilt Python grammar distributed with ``tree_sitter_languages``
+loads the prebuilt Python grammar distributed with ``tree_sitter_language_pack``
 and provides a helper to parse a file and return the root node of the parsed
 tree as an S-expression string.
 """
