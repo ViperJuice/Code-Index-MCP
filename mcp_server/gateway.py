@@ -370,6 +370,10 @@ _RECOVERABLE_REINDEX_STATES = frozenset(
         RepositoryReadinessState.CORRUPT_SQLITE,
         RepositoryReadinessState.MISSING_SCHEMA,
         RepositoryReadinessState.MISSING_PROVENANCE,
+        # CHUNKERSAFE Lane A: scheme-mismatched / mid-rebuild indexes must be
+        # reindexable so a tripped guard is not a permanent dead-end.
+        RepositoryReadinessState.SCHEME_MISMATCH,
+        RepositoryReadinessState.INDEX_REBUILDING,
     }
 )
 

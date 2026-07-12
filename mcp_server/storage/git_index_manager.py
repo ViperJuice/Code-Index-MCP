@@ -57,6 +57,12 @@ _RECOVERABLE_REBUILD_STATES = frozenset(
         RepositoryReadinessState.CORRUPT_SQLITE,
         RepositoryReadinessState.MISSING_SCHEMA,
         RepositoryReadinessState.MISSING_PROVENANCE,
+        # CHUNKERSAFE Lane A: the staged full rebuild builds a fresh stage DB
+        # (empty -> current scheme stamped on first write -> os.replace), which
+        # naturally yields a clean single-scheme index. Allow it to run for a
+        # scheme-mismatched or interrupted-rebuild index so recovery is possible.
+        RepositoryReadinessState.SCHEME_MISMATCH,
+        RepositoryReadinessState.INDEX_REBUILDING,
     }
 )
 _QUARANTINE_REBUILD_STATES = frozenset(
@@ -64,6 +70,10 @@ _QUARANTINE_REBUILD_STATES = frozenset(
         RepositoryReadinessState.CORRUPT_SQLITE,
         RepositoryReadinessState.MISSING_SCHEMA,
         RepositoryReadinessState.MISSING_PROVENANCE,
+        # Preserve the pre-rebuild bytes of a scheme-mismatched / half-rebuilt
+        # index for forensics before the atomic os.replace overwrites it.
+        RepositoryReadinessState.SCHEME_MISMATCH,
+        RepositoryReadinessState.INDEX_REBUILDING,
     }
 )
 

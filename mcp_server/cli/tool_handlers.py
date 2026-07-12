@@ -45,6 +45,11 @@ _RECOVERABLE_REINDEX_STATES = frozenset(
         RepositoryReadinessState.CORRUPT_SQLITE,
         RepositoryReadinessState.MISSING_SCHEMA,
         RepositoryReadinessState.MISSING_PROVENANCE,
+        # CHUNKERSAFE Lane A: a scheme-mismatched or mid-rebuild index is a
+        # recoverable dead-end -- readiness tells the operator to reindex, so
+        # reindex must actually run the staged full rebuild for these states.
+        RepositoryReadinessState.SCHEME_MISMATCH,
+        RepositoryReadinessState.INDEX_REBUILDING,
     }
 )
 
@@ -667,13 +672,23 @@ async def handle_search_code(
 
         # Lazy summarization enqueue
         if lazy_summarizer and lazy_summarizer.can_summarize() and sqlite_store:
-            for item in result.results[:5]:
-                raw_file = item.file
-                raw_line = item.line or 1
-                if raw_file and raw_line:
-                    chunk_info = sqlite_store.find_chunk_at_line(raw_file, int(raw_line))
-                    if chunk_info:
-                        lazy_summarizer.enqueue(chunk_info)
+            # CHUNKERSAFE Lane A: find_chunk_at_line is a scheme-dependent
+            # code_chunks read; fail closed and skip summarization over an
+            # incompatible/rebuilding index rather than enqueue stale-scheme rows.
+            scheme_readable = True
+            try:
+                scheme_status, _sc_marker, _sc_target = sqlite_store.get_chunk_scheme_status()
+                scheme_readable = scheme_status in ("compatible", "empty")
+            except Exception:
+                scheme_readable = False
+            if scheme_readable:
+                for item in result.results[:5]:
+                    raw_file = item.file
+                    raw_line = item.line or 1
+                    if raw_file and raw_line:
+                        chunk_info = sqlite_store.find_chunk_at_line(raw_file, int(raw_line))
+                        if chunk_info:
+                            lazy_summarizer.enqueue(chunk_info)
 
         filtered_or_enriched = bool(
             source_type
@@ -1437,6 +1452,7 @@ async def handle_summarize_sample(
     import sqlite3 as _sqlite3
 
     from mcp_server.indexing.summarization import FileBatchSummarizer
+    from mcp_server.storage.sqlite_store import assert_chunk_scheme_readable
 
     repository = (arguments or {}).get("repository")
     paths_arg = (arguments or {}).get("paths")
@@ -1585,6 +1601,9 @@ async def handle_summarize_sample(
             continue
 
         with _sqlite3.connect(db_path) as _conn:
+            # Fail closed on scheme-dependent reads (CHUNKERSAFE Lane A): refuse to
+            # read code_chunks rows across an incompatible/rebuilding scheme.
+            assert_chunk_scheme_readable(_conn)
             chunk_rows = _conn.execute(
                 """SELECT c.chunk_id, c.line_start, c.line_end,
                           c.content, c.node_type, c.parent_chunk_id,

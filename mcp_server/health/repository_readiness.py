@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp_server.storage.repo_identity import compute_repo_id
+from mcp_server.storage.sqlite_store import evaluate_chunk_scheme
 from mcp_server.utils.subprocess_env import get_full_env
 
 
@@ -30,6 +31,8 @@ class RepositoryReadinessState(str, Enum):
     CORRUPT_SQLITE = "corrupt_sqlite"
     MISSING_SCHEMA = "missing_schema"
     MISSING_PROVENANCE = "missing_provenance"
+    SCHEME_MISMATCH = "scheme_mismatch"
+    INDEX_REBUILDING = "index_rebuilding"
 
 
 class SemanticReadinessState(str, Enum):
@@ -169,6 +172,14 @@ def _inspect_index_uncached(index_path: Path) -> Optional[RepositoryReadinessSta
             ).fetchone()
             if not count or int(count[0]) == 0:
                 return RepositoryReadinessState.INDEX_EMPTY
+            # CHUNKERSAFE Lane A: a half-rebuilt or mixed-scheme code_chunks table
+            # passes the table-presence check but is not query-safe. Report a
+            # non-ready state so the guard trip is visible at the readiness surface.
+            scheme_status, _marker, _target = evaluate_chunk_scheme(conn)
+            if scheme_status == "rebuilding":
+                return RepositoryReadinessState.INDEX_REBUILDING
+            if scheme_status in ("mismatch", "missing_marker"):
+                return RepositoryReadinessState.SCHEME_MISMATCH
     except sqlite3.DatabaseError:
         return RepositoryReadinessState.CORRUPT_SQLITE
     return None
@@ -264,6 +275,18 @@ class ReadinessClassifier:
             elif db_state == RepositoryReadinessState.MISSING_SCHEMA:
                 state = RepositoryReadinessState.MISSING_SCHEMA
                 remediation = "Run reindex to quarantine the incomplete schema and rebuild it."
+            elif db_state == RepositoryReadinessState.INDEX_REBUILDING:
+                state = RepositoryReadinessState.INDEX_REBUILDING
+                remediation = (
+                    "A chunk-scheme rebuild is in progress; wait for it to finalize "
+                    "or resume reindex before querying code chunks."
+                )
+            elif db_state == RepositoryReadinessState.SCHEME_MISMATCH:
+                state = RepositoryReadinessState.SCHEME_MISMATCH
+                remediation = (
+                    "The chunk-identity scheme is incompatible with the installed "
+                    "chunker; run reindex to rebuild the index under the current scheme."
+                )
             elif staleness_reason in {"index_publication_pending", "partial_index_failure"}:
                 state = RepositoryReadinessState.MISSING_PROVENANCE
                 remediation = "Run reindex to quarantine the interrupted generation and rebuild it."
