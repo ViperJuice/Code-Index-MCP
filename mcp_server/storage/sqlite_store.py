@@ -5,6 +5,7 @@ This module provides a local storage implementation using SQLite with FTS5
 for efficient full-text search capabilities.
 """
 
+import functools
 import json
 import logging
 import re
@@ -167,6 +168,19 @@ _SCHEME_READ_BLOCKING = frozenset({"mismatch", "missing_marker", "rebuilding"})
 _SCHEME_WRITE_BLOCKING = frozenset({"mismatch", "missing_marker"})
 
 
+def _escape_like(text: str) -> str:
+    """Escape SQL LIKE metacharacters so a literal id matches only itself.
+
+    Canonical home for the helper (this module is imported by the indexing layer,
+    not vice-versa).  Backslash is the ``ESCAPE`` char (see ``LIKE ? ESCAPE '\\'``),
+    so it must be escaped first; then the ``%``/``_`` wildcards are neutralised.
+    Under collision-free (v4) ids a ``chunk_id`` may legitimately contain ``%``/``_``,
+    which would otherwise make a ``chunk_id LIKE '<id>:part:%'`` query mis-match
+    unrelated rows.
+    """
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class ChunkSchemeMismatchError(RuntimeError):
     """Raised when a ``code_chunks`` operation would cross an id-scheme boundary.
 
@@ -208,6 +222,7 @@ def _chunker_major_version(chunker_module: Any) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
+@functools.lru_cache(maxsize=1)
 def current_chunk_id_scheme() -> str:
     """Return the id-scheme of the installed chunker.
 
@@ -217,6 +232,10 @@ def current_chunk_id_scheme() -> str:
     only diverging to ``treesitter_chunk_id_v{major}`` once a new major (>=4)
     ships without advertising the attribute.  When the chunker cannot be imported
     at all, default to the legacy scheme.
+
+    Result is cached for the process (``lru_cache``): the installed chunker
+    version cannot change without a restart, so this keeps the per-write hot path
+    off the ``importlib.metadata`` dist-info scan (I6).
     """
     try:
         import chunker
@@ -231,13 +250,29 @@ def current_chunk_id_scheme() -> str:
     return f"treesitter_chunk_id_v{major}"
 
 
+def _is_missing_schema_error(error: sqlite3.OperationalError) -> bool:
+    """True only for a structural "schema not present" error - a missing table or
+    column (a not-yet-created / older-schema index).
+
+    Every OTHER ``OperationalError`` - notably "database is locked"/"is busy"
+    under write contention - must NOT be swallowed: misreading a locked, *marked*
+    DB as absent would let the caller reclassify it as ``empty`` and silently
+    re-stamp the marker with the new scheme (I1, silent mixed-scheme corruption).
+    Those propagate so the caller fails loud instead of corrupting the marker.
+    """
+    message = str(error).lower()
+    return "no such table" in message or "no such column" in message
+
+
 def _scheme_read_config_value(conn: sqlite3.Connection, key: str) -> Optional[str]:
     try:
         row = conn.execute(
             "SELECT config_value FROM index_config WHERE config_key = ?", (key,)
         ).fetchone()
-    except sqlite3.OperationalError:
-        return None
+    except sqlite3.OperationalError as error:
+        if _is_missing_schema_error(error):
+            return None
+        raise
     if row is None:
         return None
     return row[0]
@@ -249,8 +284,10 @@ def _has_chunker_rows(conn: sqlite3.Connection) -> bool:
             "SELECT 1 FROM code_chunks WHERE chunk_type != ? LIMIT 1",
             (PRESERVED_CHUNK_TYPE,),
         ).fetchone()
-    except sqlite3.OperationalError:
-        return False
+    except sqlite3.OperationalError as error:
+        if _is_missing_schema_error(error):
+            return False
+        raise
     return row is not None
 
 
@@ -262,9 +299,15 @@ def evaluate_chunk_scheme(
     Returns ``(status, marker, target)`` where ``status`` is one of:
 
     - ``"compatible"`` - marker present and equal to target.
+    - ``"compatible_legacy"`` - no marker but chunker rows present AND the current
+      target is the legacy ``treesitter_chunk_id_v1`` scheme.  The chunk-id
+      algorithm was stable across chunker majors 1-3, so an existing unmarked
+      (v3-built) index genuinely IS v1: treat it as compatible and auto-stamp v1
+      on the next write, rather than bricking every legacy index (B1).
     - ``"empty"``       - no marker and no chunker rows; safe to stamp on first build.
-    - ``"missing_marker"`` - no marker but chunker rows present (a legacy/unmarked
-      index of unknown scheme): treated as incompatible, fail closed.
+    - ``"missing_marker"`` - no marker but chunker rows present AND the current
+      target is a *different* (>=v4) scheme: a real scheme change over an unmarked
+      index, treated as incompatible - fail closed.
     - ``"mismatch"``    - marker present but different from target.
     - ``"rebuilding"``  - an atomic rebuild is in progress and unfinalized.
     """
@@ -276,6 +319,8 @@ def evaluate_chunk_scheme(
     if marker is not None:
         return ("compatible" if marker == target else "mismatch", marker, target)
     if _has_chunker_rows(conn):
+        if target == LEGACY_CHUNK_ID_SCHEME:
+            return ("compatible_legacy", None, target)
         return ("missing_marker", None, target)
     return ("empty", None, target)
 
@@ -323,6 +368,7 @@ class SQLiteStore:
         self._init_database()
         self._run_migrations()
         self._ensure_semantic_points_table()
+        self._ensure_pending_vector_deletions_table()
         self._ensure_chunk_summary_audit_columns()
 
     def _require_writable(self) -> None:
@@ -373,6 +419,95 @@ class SQLiteStore:
                 CREATE INDEX IF NOT EXISTS idx_semantic_points_collection
                     ON semantic_points(collection);
                 """)
+
+    def _ensure_pending_vector_deletions_table(self) -> None:
+        """Durable crash-ledger of remote (Qdrant) vector ids awaiting deletion.
+
+        A scheme rebuild deletes local ``semantic_points`` rows in-transaction but
+        the matching *remote* vectors are cleaned up by the caller AFTER the
+        commit returns.  A crash in that window would orphan the remote vectors
+        forever, because the only record of them was the in-memory return value.
+        Persisting the stale ids here (in the same transaction as the local
+        delete) means the ledger survives a crash and a recovery pass can finish
+        the remote cleanup (I4).
+        """
+        with self._get_connection() as conn:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS pending_vector_deletions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    profile_id TEXT NOT NULL,
+                    chunk_id TEXT NOT NULL,
+                    point_id INTEGER,
+                    collection TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_pending_vector_deletions_profile
+                    ON pending_vector_deletions(profile_id);
+                """)
+
+    def _record_pending_vector_deletions(
+        self, conn: sqlite3.Connection, points: List[Dict[str, Any]]
+    ) -> None:
+        """Persist stale remote-vector ids to the crash-ledger inside ``conn``'s
+        transaction, so they survive a crash before the caller's remote cleanup."""
+        if not points:
+            return
+        conn.executemany(
+            "INSERT INTO pending_vector_deletions "
+            "(profile_id, chunk_id, point_id, collection) VALUES (?, ?, ?, ?)",
+            [
+                (
+                    point.get("profile_id"),
+                    point.get("chunk_id"),
+                    point.get("point_id"),
+                    point.get("collection"),
+                )
+                for point in points
+            ],
+        )
+
+    def get_pending_vector_deletions(self) -> List[Dict[str, Any]]:
+        """Return the durable crash-ledger of remote-vector ids awaiting cleanup."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT id, profile_id, chunk_id, point_id, collection "
+                "FROM pending_vector_deletions ORDER BY id"
+            ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "profile_id": row[1],
+                "chunk_id": row[2],
+                "point_id": row[3],
+                "collection": row[4],
+            }
+            for row in rows
+        ]
+
+    def clear_pending_vector_deletions(
+        self, ledger_ids: Optional[List[int]] = None
+    ) -> int:
+        """Clear ledger rows once their remote vectors are deleted.
+
+        With ``ledger_ids`` clears exactly those rows (the ids from
+        :meth:`get_pending_vector_deletions`); with ``None`` clears the whole
+        ledger.  Returns the number of rows removed.
+        """
+        with self._get_connection() as conn:
+            if ledger_ids is None:
+                cursor = conn.execute("DELETE FROM pending_vector_deletions")
+                return cursor.rowcount
+            removed = 0
+            for start in range(0, len(ledger_ids), 500):
+                batch = ledger_ids[start : start + 500]
+                placeholders = ",".join("?" * len(batch))
+                cursor = conn.execute(
+                    f"DELETE FROM pending_vector_deletions WHERE id IN ({placeholders})",
+                    batch,
+                )
+                removed += cursor.rowcount
+            return removed
 
     def _ensure_chunk_summary_audit_columns(self) -> None:
         """Ensure additive chunk summary audit columns exist."""
@@ -1308,6 +1443,24 @@ class SQLiteStore:
         self._require_writable()
         target = target or self._current_scheme()
         status, marker, target = evaluate_chunk_scheme(conn, target)
+        if status == "rebuilding":
+            # A rebuild is in-flight: ``marker`` is the persisted rebuild target.
+            # ONLY the explicitly-scoped rebuild writer (whose target equals that
+            # rebuild target) may commit rows during the begin->finalize window.
+            # An ordinary writer (target == current runtime scheme) that does not
+            # match would otherwise commit old-scheme rows that finalize then
+            # stamps as the new scheme - the exact mixed-scheme corruption the
+            # guard exists to prevent.
+            if target != marker:
+                raise ChunkSchemeMismatchError(
+                    f"code_chunks is rebuilding to {marker!r}; refusing a write "
+                    f"scoped to {target!r}. Only the rebuild writer (scheme_target="
+                    f"{marker!r}) may write until the rebuild is finalized.",
+                    expected=marker,
+                    found=target,
+                    state=status,
+                )
+            return
         if status in _SCHEME_WRITE_BLOCKING:
             raise ChunkSchemeMismatchError(
                 f"code_chunks scheme is {status!r} (index marker={marker!r}, "
@@ -1317,7 +1470,10 @@ class SQLiteStore:
                 found=marker,
                 state=status,
             )
-        if status == "empty":
+        if status in ("empty", "compatible_legacy"):
+            # First write into an empty index, or the first write into a legacy
+            # unmarked (v3-built == v1) index: durably stamp the scheme so the
+            # marker becomes authoritative (B1 auto-stamp).
             self._stamp_scheme(conn, target)
 
     def _assert_chunk_scheme_deletable(
@@ -1377,16 +1533,16 @@ class SQLiteStore:
             if not _is_preserved(row[0])
         ]
 
-        if profile_id is None:
-            point_rows = conn.execute(
-                "SELECT profile_id, chunk_id, point_id, collection FROM semantic_points"
-            ).fetchall()
-        else:
-            point_rows = conn.execute(
-                "SELECT profile_id, chunk_id, point_id, collection FROM semantic_points "
-                "WHERE profile_id = ?",
-                (profile_id,),
-            ).fetchall()
+        # The scheme marker is DB-wide, so a rebuild must invalidate EVERY
+        # profile's stale semantic-point mappings - not just ``profile_id``.
+        # Restricting to one profile would leave other profiles' old-scheme
+        # mappings (and their orphaned remote vectors) behind.  ``profile_id`` is
+        # retained only as documentation of the caller's primary profile; the
+        # per-point ``profile_id``/``collection`` is returned so remote cleanup can
+        # target the right collection for each.
+        point_rows = conn.execute(
+            "SELECT profile_id, chunk_id, point_id, collection FROM semantic_points"
+        ).fetchall()
         stale_points = [
             {
                 "profile_id": row[0],
@@ -1434,11 +1590,46 @@ class SQLiteStore:
     def finalize_chunk_scheme_rebuild(
         self, target_scheme: Optional[str] = None
     ) -> None:
-        """Phase 2: flip the scheme marker to ``target`` and clear the rebuilding
-        flag, in one transaction, only after repopulation is complete."""
+        """Phase 2: flip the scheme marker to the recorded rebuild target and clear
+        the rebuilding flag, in one transaction - but ONLY after validating that:
+
+        1. a rebuild is actually in progress (a recorded rebuild target exists);
+        2. the caller's ``target_scheme`` (if supplied) matches that recorded
+           target - never let a caller stamp a scheme the rebuild did not build;
+        3. repopulation actually happened (chunker rows are present) - refusing to
+           stamp an empty index as "ready", which would advertise a coherent index
+           over zero rows.
+
+        Without these checks, finalize is a no-op rubber stamp that can flip the
+        marker over an unpopulated (or wrong-scheme) DB.
+        """
         self._require_writable()
-        target = target_scheme or self._current_scheme()
         with self._get_connection() as conn:
+            recorded = _scheme_read_config_value(conn, CHUNK_SCHEME_REBUILD_KEY)
+            if recorded is None:
+                raise ChunkSchemeMismatchError(
+                    "finalize_chunk_scheme_rebuild called with no rebuild in "
+                    "progress (no recorded rebuild target).",
+                    state="not_rebuilding",
+                )
+            target = target_scheme or recorded
+            if target != recorded:
+                raise ChunkSchemeMismatchError(
+                    f"finalize target {target!r} does not match the recorded "
+                    f"rebuild target {recorded!r}; refusing to stamp a scheme the "
+                    "rebuild did not build.",
+                    expected=recorded,
+                    found=target,
+                    state="rebuild_target_mismatch",
+                )
+            if not _has_chunker_rows(conn):
+                raise ChunkSchemeMismatchError(
+                    f"refusing to finalize rebuild to {recorded!r}: no chunker rows "
+                    "were repopulated, so the index is empty. Repopulate before "
+                    "finalizing (or the old, coherent index is lost for nothing).",
+                    expected=recorded,
+                    state="rebuild_not_repopulated",
+                )
             self._stamp_scheme(conn, target)
             self._delete_config(conn, CHUNK_SCHEME_REBUILD_KEY)
 
@@ -1457,9 +1648,13 @@ class SQLiteStore:
                 batch,
             )
         points = stale.get("points") or []
+        # Persist the stale remote-vector ids to the durable crash-ledger BEFORE
+        # deleting their local mappings, in this same transaction: if the process
+        # dies before the caller cleans up remote Qdrant vectors, the ledger still
+        # names every orphan so recovery can finish the job (I4).
+        self._record_pending_vector_deletions(conn, points)
         for start in range(0, len(points), 500):
             batch = points[start : start + 500]
-            placeholders = ",".join("?" * len(batch))
             params: List[Any] = []
             for point in batch:
                 params.extend([point["profile_id"], point["chunk_id"]])
@@ -1535,11 +1730,22 @@ class SQLiteStore:
         depth: int = 0,
         chunk_index: int = 0,
         metadata: Optional[Dict] = None,
+        scheme_target: Optional[str] = None,
     ) -> int:
-        """Store a code chunk with stable IDs and token counting."""
+        """Store a code chunk with stable IDs and token counting.
+
+        ``scheme_target`` is the explicitly-scoped rebuild-writer escape hatch:
+        during a ``rebuilding`` window the guard only admits writes whose target
+        equals the persisted rebuild target, so a repopulation into a *different*
+        target scheme (e.g. a v4 rebuild running under a v1 runtime) must pass
+        ``scheme_target`` to identify itself as the rebuild writer.  Ordinary
+        callers leave it ``None`` (defaults to the current runtime scheme).
+        """
         serialized_metadata = _merge_chunk_source_metadata(metadata, content, line_start)
         with self._get_connection() as conn:
-            self._assert_chunk_scheme_writable(conn, chunk_type=chunk_type)
+            self._assert_chunk_scheme_writable(
+                conn, chunk_type=chunk_type, target=scheme_target
+            )
             cursor = conn.execute(
                 """INSERT INTO code_chunks
                    (file_id, symbol_id, content, content_start, content_end,
@@ -1606,6 +1812,7 @@ class SQLiteStore:
     def get_chunk_by_chunk_id(self, chunk_id: str, file_id: Optional[int] = None) -> Optional[Dict]:
         """Get chunk by chunk_id, optionally filtered by file_id."""
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             if file_id is not None:
                 cursor = conn.execute(
                     "SELECT * FROM code_chunks WHERE chunk_id = ? AND file_id = ?",
@@ -1619,6 +1826,7 @@ class SQLiteStore:
     def get_chunk_by_node_id(self, node_id: str, file_id: Optional[int] = None) -> Optional[Dict]:
         """Get chunk by node_id, optionally filtered by file_id."""
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             if file_id is not None:
                 cursor = conn.execute(
                     "SELECT * FROM code_chunks WHERE node_id = ? AND file_id = ?",
@@ -1632,6 +1840,7 @@ class SQLiteStore:
     def get_chunk_by_definition_id(self, definition_id: str) -> List[Dict]:
         """Get chunks by definition_id (may return multiple chunks)."""
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 "SELECT * FROM code_chunks WHERE definition_id = ?", (definition_id,)
             )
@@ -1640,6 +1849,7 @@ class SQLiteStore:
     def get_chunks_for_file(self, file_id: int) -> List[Dict]:
         """Get all chunks for a file, ordered by chunk_index."""
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 """SELECT * FROM code_chunks
                    WHERE file_id = ?
@@ -1662,6 +1872,10 @@ class SQLiteStore:
         to scope the update so a chunk id shared across files cannot collide.
         """
         with self._get_connection() as conn:
+            # Guard the chunker-derived write path: refuse a token-count update
+            # across a scheme boundary (cheap central check; also stamps a legacy
+            # unmarked index on first touch).
+            self._assert_chunk_scheme_writable(conn, chunk_type="code")
             if file_id is not None:
                 cursor = conn.execute(
                     """UPDATE code_chunks
@@ -1858,6 +2072,7 @@ class SQLiteStore:
     ) -> List[Dict[str, Any]]:
         """Return chunks whose stored source metadata matches the requested filters."""
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 """SELECT c.content, c.line_start, c.line_end, c.metadata,
                           COALESCE(f.path, f.relative_path, CAST(c.file_id AS TEXT)) AS file_path
@@ -2228,6 +2443,7 @@ class SQLiteStore:
             Dict with symbol, line_start, line_end, node_type or None
         """
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 """
                 SELECT cc.line_start, cc.line_end, cc.node_type, cc.content,
@@ -3118,11 +3334,15 @@ class SQLiteStore:
             if profile_id:
                 if source_chunk_ids:
                     like_clauses = " OR ".join(
-                        ["chunk_id = ? OR chunk_id LIKE ?"] * len(source_chunk_ids)
+                        ["chunk_id = ? OR chunk_id LIKE ? ESCAPE '\\'"]
+                        * len(source_chunk_ids)
                     )
                     params: List[Any] = [profile_id]
                     for chunk_id in source_chunk_ids:
-                        params.extend([chunk_id, f"{chunk_id}:part:%"])
+                        # Escape LIKE metacharacters: a collision-free (v4) chunk_id
+                        # may legitimately contain %/_ which would otherwise make the
+                        # ':part:%' sub-chunk match hit unrelated rows (I2).
+                        params.extend([chunk_id, f"{_escape_like(chunk_id)}:part:%"])
                     params.append(result["file_summary_chunk_id"])
                     vector_rows = conn.execute(
                         f"""SELECT chunk_id
@@ -3178,6 +3398,7 @@ class SQLiteStore:
     def get_missing_summaries(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Find chunks that don't have summaries yet."""
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 """SELECT c.chunk_id, c.file_id, c.content_start, c.content_end, c.line_start, c.line_end, c.content, s.name as symbol
                    FROM code_chunks c
@@ -3281,6 +3502,7 @@ class SQLiteStore:
         ``symbol``, ``content``.
         """
         with self._get_connection() as conn:
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 """SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
                           c.content, s.name AS symbol, c.metadata

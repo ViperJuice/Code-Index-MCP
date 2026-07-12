@@ -42,6 +42,7 @@ from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import (
     SQLiteStore,
     _merge_chunk_source_metadata,
+    assert_chunk_scheme_readable,
     classify_sqlite_storage_failure,
 )
 from ..storage.two_phase import TwoPhaseCommitError, two_phase_commit
@@ -3268,6 +3269,9 @@ class EnhancedDispatcher:
         normalized_paths = sorted(Path(path).resolve(strict=False).as_posix() for path in paths)
         placeholders = ", ".join("?" for _ in normalized_paths)
         with sqlite3.connect(active_store.db_path) as conn:
+            # CHUNKERSAFE Lane A: fail closed before a scheme-dependent code_chunks
+            # read over an incompatible/rebuilding index.
+            assert_chunk_scheme_readable(conn)
             row = conn.execute(
                 f"""SELECT COUNT(*)
                     FROM code_chunks c

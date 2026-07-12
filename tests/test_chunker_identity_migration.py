@@ -188,40 +188,103 @@ def test_mismatch_refuses_plugin_path(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 3. Missing marker over non-empty index fails closed on read AND write
+# 3. Unmarked non-empty index: legacy-compatible (B1) vs new-scheme fail-closed
 # --------------------------------------------------------------------------- #
-def test_missing_marker_over_nonempty_index_fails_closed(tmp_path):
+def test_unmarked_v1_index_is_compatible_and_autostamps(tmp_path):
+    """B1: an existing (v3-built) index has no marker, but the chunk-id algorithm
+    was stable across chunker majors 1-3, so under a v1 runtime it genuinely IS
+    v1.  Treat it as compatible, allow read+write, and auto-stamp the marker -
+    never brick every legacy index by refusing it as a scheme mismatch."""
     store = _make_store(tmp_path)
     file_id = _make_file(store)
     _store_code_chunk(store, file_id, "c1")
-    _clear_marker(store)  # v3-unmarked legacy fixture
+    _clear_marker(store)  # legacy/unmarked fixture; runtime scheme is v1
 
+    with store._get_connection() as conn:
+        status, marker, target = evaluate_chunk_scheme(conn)
+    assert status == "compatible_legacy"
+    assert marker is None
+    assert target == current_chunk_id_scheme() == "treesitter_chunk_id_v1"
+
+    # Read is allowed (a genuinely-compatible legacy index must not fail closed).
+    with sqlite3.connect(store.db_path) as raw:
+        assert_chunk_scheme_readable(raw)  # does not raise
+    assert store.get_chunks_for_file(file_id)  # store-level read allowed
+
+    # Write is allowed AND durably auto-stamps the marker as v1.
+    _store_code_chunk(store, file_id, "c2")
+    assert store.get_chunk_scheme_marker() == "treesitter_chunk_id_v1"
+    status, marker, _ = store.get_chunk_scheme_status()
+    assert status == "compatible"
+
+
+def test_unmarked_index_under_new_scheme_fails_closed(tmp_path, monkeypatch):
+    """A real scheme change (>=v4) over an unmarked index IS a genuine mismatch:
+    ``missing_marker`` - fail closed on read, write, and delete."""
+    store = _make_store(tmp_path)
+    file_id = _make_file(store)
+    _store_code_chunk(store, file_id, "c1")  # stamps v1
+    _clear_marker(store)
+
+    _force_scheme(monkeypatch, "treesitter_chunk_id_v4")
     with store._get_connection() as conn:
         status, marker, _ = evaluate_chunk_scheme(conn)
     assert status == "missing_marker"
     assert marker is None
 
     before = _count_chunks(store)
-
-    # Write fails closed.
     with pytest.raises(ChunkSchemeMismatchError):
         _store_code_chunk(store, file_id, "c2")
-    # Delete fails closed.
     with pytest.raises(ChunkSchemeMismatchError):
         store.delete_chunks_for_file(file_id)
-    # Read fails closed.
     with sqlite3.connect(store.db_path) as raw:
         with pytest.raises(ChunkSchemeMismatchError):
             assert_chunk_scheme_readable(raw)
-
     assert _count_chunks(store) == before  # no read/delete/upsert mutated the index
+
+
+def test_store_level_read_fails_closed_under_mismatch(tmp_path):
+    """Fix #2: store-level readers route through the central read guard, so a
+    direct get_chunk over a scheme-mismatched DB fails closed - not only at the
+    tool-layer perimeter."""
+    store = _make_store(tmp_path)
+    file_id = _make_file(store)
+    _store_code_chunk(store, file_id, "c1")
+    _insert_summary(store, "c1", file_id)
+    # Simulate a foreign-scheme (v4-built) index read by this (v1) runtime.
+    with store._get_connection() as conn:
+        conn.execute(
+            "UPDATE index_config SET config_value = ? WHERE config_key = ?",
+            (FOREIGN_SCHEME, CHUNK_SCHEME_MARKER_KEY),
+        )
+    with store._get_connection() as conn:
+        status, _marker, _ = evaluate_chunk_scheme(conn)
+    assert status == "mismatch"
+
+    for reader in (
+        lambda: store.get_chunk_by_chunk_id("c1", file_id=file_id),
+        lambda: store.get_chunk_by_node_id("node-c1"),
+        lambda: store.get_chunk_by_definition_id("def-1"),
+        lambda: store.get_chunks_for_file(file_id),
+        lambda: store.get_missing_summaries(),
+        lambda: store.find_best_chunk_for_file(file_id, ["f"]),
+        lambda: store.find_chunk_at_line("/repo/a.py", 1),
+    ):
+        with pytest.raises(ChunkSchemeMismatchError):
+            reader()
 
 
 def test_readiness_reports_scheme_mismatch_not_ready(tmp_path):
     store = _make_store(tmp_path)
     file_id = _make_file(store)
     _store_code_chunk(store, file_id, "c1")
-    _clear_marker(store)
+    # A foreign-scheme marker (v4-built index under a v1 runtime) is a genuine
+    # mismatch that readiness must surface as non-ready.
+    with store._get_connection() as conn:
+        conn.execute(
+            "UPDATE index_config SET config_value = ? WHERE config_key = ?",
+            (FOREIGN_SCHEME, CHUNK_SCHEME_MARKER_KEY),
+        )
 
     state = repository_readiness._inspect_index_uncached(
         __import__("pathlib").Path(store.db_path)
@@ -292,24 +355,139 @@ def test_rebuild_invalidates_dependent_stores_and_preserves_synthetic(tmp_path):
     assert store.get_chunk_scheme_marker() == current_chunk_id_scheme()
 
 
+def _rebuild_write(store: SQLiteStore, file_id: int, chunk_id: str, target: str) -> int:
+    """The explicitly-scoped rebuild writer: writes rows tagged with the rebuild's
+    target scheme so they are admitted during the ``rebuilding`` window."""
+    return store.store_chunk(
+        file_id=file_id,
+        content="x\n",
+        content_start=0,
+        content_end=1,
+        line_start=1,
+        line_end=1,
+        chunk_id=chunk_id,
+        node_id=f"node-{chunk_id}",
+        treesitter_file_id="t",
+        scheme_target=target,
+    )
+
+
 def test_rebuild_flips_marker_only_after_repopulation(tmp_path):
     store = _make_store(tmp_path)
-    _seed_for_rebuild(store)
+    code_file, _hist = _seed_for_rebuild(store)
     marker_before = store.get_chunk_scheme_marker()
 
-    # Phase 1 only: invalidate + enter rebuilding, marker NOT yet flipped.
+    # Phase 1: invalidate + enter rebuilding to a NEW scheme; marker NOT flipped.
     store.begin_chunk_scheme_rebuild(FOREIGN_SCHEME, profile_id="profile-a")
     with store._get_connection() as conn:
         status, _marker, _target = evaluate_chunk_scheme(conn, FOREIGN_SCHEME)
     assert status == "rebuilding"
     assert store.get_chunk_scheme_marker() == marker_before  # unchanged
 
-    # Phase 2: finalize flips the marker and clears the rebuilding flag.
+    # An ordinary (old-scheme) writer must NOT commit rows during the rebuild
+    # window - only the explicitly-scoped rebuild writer may (fix #3).
+    with pytest.raises(ChunkSchemeMismatchError):
+        _store_code_chunk(store, code_file, "wrong-scheme")  # target = v1 runtime
+
+    # Repopulate with the rebuild writer (scheme_target == the rebuild target).
+    _rebuild_write(store, code_file, "rebuilt-1", FOREIGN_SCHEME)
+
+    # Phase 2: finalize now flips the marker and clears the rebuilding flag.
     store.finalize_chunk_scheme_rebuild(FOREIGN_SCHEME)
     assert store.get_chunk_scheme_marker() == FOREIGN_SCHEME
     with store._get_connection() as conn:
         status, marker, _ = evaluate_chunk_scheme(conn, FOREIGN_SCHEME)
     assert status == "compatible"
+
+
+def test_finalize_refuses_empty_or_mismatched_target(tmp_path):
+    """Fix #3: finalize is not a rubber stamp - it refuses to flip the marker when
+    no repopulation happened or the caller's target != the recorded rebuild
+    target."""
+    store = _make_store(tmp_path)
+    _seed_for_rebuild(store)
+    store.begin_chunk_scheme_rebuild(FOREIGN_SCHEME, profile_id="profile-a")
+
+    # No repopulation yet -> finalize must refuse (would stamp an empty index).
+    with pytest.raises(ChunkSchemeMismatchError) as empty_exc:
+        store.finalize_chunk_scheme_rebuild(FOREIGN_SCHEME)
+    assert empty_exc.value.state == "rebuild_not_repopulated"
+    assert store.get_chunk_scheme_marker() != FOREIGN_SCHEME  # still not flipped
+
+    # Repopulate, then a finalize whose target != recorded rebuild target refuses.
+    resumed = _make_file(store, "resumed.py")
+    _rebuild_write(store, resumed, "rebuilt-1", FOREIGN_SCHEME)
+    with pytest.raises(ChunkSchemeMismatchError) as mismatch_exc:
+        store.finalize_chunk_scheme_rebuild("treesitter_chunk_id_v9_other")
+    assert mismatch_exc.value.state == "rebuild_target_mismatch"
+
+    # Correct target with repopulation present -> finalizes.
+    store.finalize_chunk_scheme_rebuild(FOREIGN_SCHEME)
+    assert store.get_chunk_scheme_marker() == FOREIGN_SCHEME
+
+    # A second finalize (no rebuild in progress) refuses.
+    with pytest.raises(ChunkSchemeMismatchError) as done_exc:
+        store.finalize_chunk_scheme_rebuild(FOREIGN_SCHEME)
+    assert done_exc.value.state == "not_rebuilding"
+
+
+def test_rebuild_invalidates_all_profiles_semantic_mappings(tmp_path):
+    """Fix #4: the scheme marker is DB-wide, so a rebuild must invalidate EVERY
+    profile's stale semantic-point mappings, not just the caller's profile."""
+    store = _make_store(tmp_path)
+    _seed_for_rebuild(store)  # profile-a mappings (101, 102) + document (900)
+    # A second profile with its own chunker + preserved-document mappings.
+    store.upsert_semantic_point("profile-b", "code-chunk-1", 201, "col-b")
+    store.upsert_semantic_point("profile-b", "history:issue", 901, "col-b")
+
+    result = store.rebuild_chunk_scheme(profile_id="profile-a")  # begin (no repopulate)
+
+    with store._get_connection() as conn:
+        remaining = {
+            (r[0], r[1])
+            for r in conn.execute("SELECT profile_id, chunk_id FROM semantic_points")
+        }
+    # Both profiles' chunker mappings gone; both profiles' document mapping kept.
+    assert ("profile-a", "code-chunk-1") not in remaining
+    assert ("profile-b", "code-chunk-1") not in remaining
+    assert ("profile-a", "history:issue") in remaining
+    assert ("profile-b", "history:issue") in remaining
+
+    # Returned stale points span BOTH profiles (with their collections) so remote
+    # cleanup can target the right collection for each.
+    returned = {(p["profile_id"], p["point_id"], p["collection"]) for p in result["points"]}
+    assert ("profile-a", 101, "col-a") in returned
+    assert ("profile-a", 102, "col-a") in returned
+    assert ("profile-b", 201, "col-b") in returned
+
+
+def test_rebuild_persists_pending_vector_deletions_ledger(tmp_path):
+    """Fix #7 (I4): stale remote-vector ids are persisted to a durable crash-ledger
+    inside the invalidation transaction, so a crash before the caller's remote
+    cleanup cannot orphan them."""
+    store = _make_store(tmp_path)
+    _seed_for_rebuild(store)
+    store.upsert_semantic_point("profile-b", "code-chunk-2", 202, "col-b")
+
+    assert store.get_pending_vector_deletions() == []
+
+    store.begin_chunk_scheme_rebuild(profile_id="profile-a")
+
+    ledger = store.get_pending_vector_deletions()
+    point_ids = {row["point_id"] for row in ledger}
+    # Every chunker point (all profiles) recorded; preserved document point kept.
+    assert {101, 102, 202}.issubset(point_ids)
+    assert 900 not in point_ids
+
+    # Ledger survives the local semantic_points delete (rows gone, ledger stays).
+    with store._get_connection() as conn:
+        remaining = {r[0] for r in conn.execute("SELECT point_id FROM semantic_points")}
+    assert remaining == {900}
+
+    # Clearing after remote cleanup drains the ledger.
+    cleared = store.clear_pending_vector_deletions()
+    assert cleared == len(ledger)
+    assert store.get_pending_vector_deletions() == []
 
 
 # --------------------------------------------------------------------------- #
@@ -381,3 +559,36 @@ def test_update_chunk_token_count_scoped_by_file_id(tmp_path):
     chunk_b = store.get_chunk_by_chunk_id(shared_chunk_id, file_id=file_b)
     assert chunk_a["token_count"] == 42
     assert chunk_b["token_count"] is None  # sibling file untouched
+
+
+# --------------------------------------------------------------------------- #
+# 7. Lock-contention must fail loud, not be misread as an empty index (I1)
+# --------------------------------------------------------------------------- #
+def test_scheme_probe_reraises_non_schema_operational_error():
+    """Fix #5 (I1): a lock/contention ``OperationalError`` must propagate, not be
+    swallowed as 'absent' - swallowing it would let a marked, locked DB be
+    reclassified ``empty`` and silently re-stamped with a new scheme.  Only a
+    genuine missing-table/column (schema-not-present) is treated as absent."""
+
+    class _LockedConn:
+        def execute(self, *_args, **_kwargs):
+            raise sqlite3.OperationalError("database is locked")
+
+    with pytest.raises(sqlite3.OperationalError):
+        sqlite_store_module._has_chunker_rows(_LockedConn())
+    with pytest.raises(sqlite3.OperationalError):
+        sqlite_store_module._scheme_read_config_value(_LockedConn(), "k")
+
+    class _NoTableConn:
+        def execute(self, *_args, **_kwargs):
+            raise sqlite3.OperationalError("no such table: code_chunks")
+
+    # A genuinely-absent schema is still treated as absent (no raise).
+    assert sqlite_store_module._has_chunker_rows(_NoTableConn()) is False
+
+    class _NoColumnConn:
+        def execute(self, *_args, **_kwargs):
+            raise sqlite3.OperationalError("no such column: chunk_type")
+
+    # An older/minimal schema (table present, column absent) is absent, not corrupt.
+    assert sqlite_store_module._has_chunker_rows(_NoColumnConn()) is False

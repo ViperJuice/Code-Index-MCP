@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from ..core.path_resolver import PathResolver
 from ..core.repo_context import RepoContext
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from ..storage.sqlite_store import SQLiteStore
+from ..storage.sqlite_store import SQLiteStore, assert_chunk_scheme_readable
 from ..storage.two_phase import two_phase_commit
 from ..utils.subprocess_env import get_full_env
 from .change_detector import FileChange
@@ -95,6 +95,9 @@ class IncrementalIndexer:
         repo_id = self._get_repository_id()
 
         with self.store._get_connection() as conn:
+            # CHUNKERSAFE Lane A: refuse to hand back chunk ids read across an
+            # incompatible/rebuilding code_chunks scheme (fail closed).
+            assert_chunk_scheme_readable(conn)
             cursor = conn.execute(
                 "SELECT id FROM files WHERE relative_path = ? AND repository_id = ?",
                 (relative_path, repo_id),
