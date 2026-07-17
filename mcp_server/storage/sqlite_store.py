@@ -509,6 +509,79 @@ class SQLiteStore:
                 removed += cursor.rowcount
             return removed
 
+    def drain_pending_vector_deletions(
+        self,
+        delete_remote: Callable[[Optional[str], List[Any]], None],
+    ) -> Dict[str, int]:
+        """Best-effort recovery drain of the remote-vector crash-ledger (I4).
+
+        When a chunk-scheme rebuild deletes the local ``semantic_points`` rows but
+        crashes before the caller finishes the matching *remote* (Qdrant) delete,
+        the orphaned remote point ids survive only in the durable
+        ``pending_vector_deletions`` ledger.  Nothing else will ever clean them up
+        because the local mapping is already gone.  This drains that ledger: it
+        reads the pending rows, groups them by ``(profile_id, collection)`` so each
+        remote delete targets the right collection, and asks
+        ``delete_remote(collection, point_ids)`` to remove those remote points.
+
+        Guarantees:
+
+        * **fail-safe** - a group's ledger rows are cleared ONLY when its
+          ``delete_remote`` returns without raising; a raise leaves that group's
+          rows in the ledger for the next attempt (an un-drained row is never
+          cleared), while OTHER healthy groups still drain.  A remote-delete error
+          is logged and swallowed, so this method itself never raises and can never
+          crash the reindex/startup it is hooked into.
+        * **idempotent** - an empty ledger (including a re-run after a successful
+          drain) is a no-op.
+
+        Returns a small counts dict (``rows_drained``, ``rows_remaining``,
+        ``groups_failed``) for observability and tests.
+        """
+        pending = self.get_pending_vector_deletions()
+        if not pending:
+            return {"rows_drained": 0, "rows_remaining": 0, "groups_failed": 0}
+
+        groups: Dict[Tuple[Optional[str], Optional[str]], Dict[str, List[Any]]] = {}
+        for row in pending:
+            key = (row.get("profile_id"), row.get("collection"))
+            group = groups.setdefault(key, {"ledger_ids": [], "point_ids": []})
+            group["ledger_ids"].append(row["id"])
+            point_id = row.get("point_id")
+            if point_id is not None:
+                group["point_ids"].append(point_id)
+
+        drainable_ids: List[int] = []
+        groups_failed = 0
+        for (profile_id, collection), group in groups.items():
+            point_ids = list(dict.fromkeys(group["point_ids"]))
+            try:
+                # A group with no remote point ids carries no remote debt; its
+                # rows are ledger noise we can clear without a remote call.
+                if point_ids:
+                    delete_remote(collection, point_ids)
+            except Exception as exc:  # best-effort recovery: keep this group's rows
+                groups_failed += 1
+                logger.warning(
+                    "Deferred pending-vector-deletion drain for profile %r / "
+                    "collection %r (%d point ids): %s",
+                    profile_id,
+                    collection,
+                    len(point_ids),
+                    exc,
+                )
+                continue
+            drainable_ids.extend(group["ledger_ids"])
+
+        rows_drained = (
+            self.clear_pending_vector_deletions(drainable_ids) if drainable_ids else 0
+        )
+        return {
+            "rows_drained": rows_drained,
+            "rows_remaining": len(pending) - rows_drained,
+            "groups_failed": groups_failed,
+        }
+
     def _ensure_chunk_summary_audit_columns(self) -> None:
         """Ensure additive chunk summary audit columns exist."""
         with self._get_connection() as conn:
