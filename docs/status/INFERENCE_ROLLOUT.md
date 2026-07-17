@@ -94,34 +94,52 @@ collection-provenance.v1 = {
 ```
 
 The gate's verifier (`verify_collection_provenance`, in
-`mcp_server/benchmarks/retrieval_eval_harness.py`) requires, before counting
-`dense` / `hybrid` / `hybrid_rerank`:
+`mcp_server/benchmarks/retrieval_eval_harness.py`) enforces, before counting
+`dense` / `hybrid` / `hybrid_rerank`, **exactly** this — no more:
 
-- `corpus_sha256` **matches** the frozen dataset's corpus
+- `provenance_version` is the accepted `collection-provenance.v1` schema, every
+  required key is present, and `indexed_commit` / `profile_fingerprint` /
+  `provider_revision` are **recorded** (non-empty);
+- `indexed_commit` **matches** the frozen corpus commit (`f7c060b…`);
+- `corpus_sha256` is **recorded** (a null/absent corpus digest is *unbound*, not
+  a mismatch) **and matches** the frozen dataset's corpus
   (`corpus_sha256` `93c894e…` above);
-- `indexed_commit` **matches** the frozen corpus commit (`f7c060b…`) and is
-  present;
-- `profile_fingerprint` and `provider_revision` are **recorded**; and
+- the recorded `collection` **matches** the run's target collection (the driver
+  always supplies it — this rejects a sentinel copied from another collection);
+- `profile_fingerprint`, `provider_id`, and `provider_revision` are **value-matched
+  only when the run supplies the corresponding expectation** (env
+  `EXPECTED_PROFILE_FINGERPRINT`, `SEMANTIC_EMBEDDING_MODEL` → expected
+  `provider_id`, `EXPECTED_PROVIDER_REVISION`). Without an expectation they are
+  only required to be recorded — the offline gate does not over-tighten; and
 - when the run declares an expected `point_set_id`, the collection's
   `point_set_id` **matches** it (so a run never scores a mixed index build).
 
+Identity fields for which no expectation is passed are recorded but **not**
+matched — so a collection indexed at the frozen commit/corpus but under a
+different embedding model verifies only when the run omits the model expectation;
+passing `SEMANTIC_EMBEDDING_MODEL` (the query-side model) rejects it.
+
 Any binding that fails records the affected arm **`not_run`** with a distinct,
-per-case `provenance_mismatch` reason code — never invented metrics:
+per-case reason code — never invented metrics:
 
 | Case | Meaning | `reason_code` |
 | --- | --- | --- |
-| **missing** | no resident binding was written into the collection | `provenance_missing` |
-| **stale** | `indexed_commit` or `corpus_sha256` does not match the frozen corpus | `provenance_stale` |
+| **missing** | no resident binding was written into the collection (untagged / unreadable sentinel) | `provenance_missing` |
+| **tampered** | wrong/absent `provenance_version`, a missing required key, or an empty `indexed_commit` / `profile_fingerprint` / `provider_revision` | `provenance_tampered` |
+| **stale** | `indexed_commit`, or a *recorded* `corpus_sha256`, does not match the frozen corpus | `provenance_stale` |
+| **corpus-unbound** | `corpus_sha256` is null/absent — the producer wrote a binding but never bound a corpus digest | `provenance_corpus_unbound` |
+| **collection-mismatch** | recorded `collection` differs from the run's target collection | `provenance_collection_mismatch` |
+| **profile-mismatch** | recorded `profile_fingerprint` differs from the run's expected profile (only when supplied) | `provenance_profile_mismatch` |
+| **provider-mismatch** | recorded `provider_id` / `provider_revision` differs from the run's expectation (only when supplied) | `provenance_provider_mismatch` |
 | **mixed-run** | `point_set_id` differs from the run's expectation (a mixed index build) | `provenance_mixed_run` |
-| **tampered** | wrong/absent `provenance_version`, a missing required key, or an empty identity field | `provenance_tampered` |
 
 The provider arms are gated on **both** the live probes (embedding endpoint +
 Qdrant, plus the functional `rerank.v1` probe for `hybrid_rerank`) **and**
-collection-resident provenance verification. A collection indexed against a
-different commit, corpus, embedding profile, provider revision, or index build
-makes dense/hybrid/hybrid_rerank metrics unattributable to the frozen eval set,
-so such a run is **invalid** and its verdict must not be recorded as gate
-evidence. Numbers from an unverified live collection are out of contract.
+collection-resident provenance verification. A collection whose binding is
+missing, unbound, or mismatched on any enforced field makes
+dense/hybrid/hybrid_rerank metrics unattributable to the frozen eval set, so such
+a run is **invalid** and its verdict must not be recorded as gate evidence.
+Numbers from an unverified live collection are out of contract.
 
 In **this** offline environment the embedding endpoint is down, so the provider
 arms never reach provenance verification; the run records
@@ -145,7 +163,15 @@ gate-counting numbers. Steps:
    - `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_VECTOR_DIMENSION`, `OPENAI_API_KEY`;
    - `RERANK_ENDPOINT_URL`;
    - `EXPECTED_POINT_SET_ID` — the build id this run intends to score (enables the
-     mixed-run check).
+     mixed-run check);
+   - optional identity expectations that tighten the gate when supplied:
+     `SEMANTIC_EMBEDDING_MODEL` is matched against the recorded `provider_id`
+     (rejects a collection embedded under a different model), and
+     `EXPECTED_PROFILE_FINGERPRINT` / `EXPECTED_PROVIDER_ID` /
+     `EXPECTED_PROVIDER_REVISION` match the corresponding recorded fields. The
+     run's target `SEMANTIC_COLLECTION_NAME` is always matched against the
+     recorded `collection`. Expectations that are not supplied are only required
+     to be recorded, not matched.
 3. **Run the gate driver:**
    ```
    uv run --no-sync python benchmarks/retrieval_eval/runs/inferbound-v10/run_inference_gate.py

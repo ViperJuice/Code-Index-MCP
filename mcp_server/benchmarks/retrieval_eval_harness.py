@@ -283,9 +283,16 @@ PROVENANCE_RECORDED_FIELDS: Tuple[str, ...] = (
 #: not_run reason codes, one per distinct failure mode. Each maps a live
 #: collection's binding to a truthful, non-overlapping cause.
 PROVENANCE_MISSING = "provenance_missing"      # no binding written into the collection
-PROVENANCE_STALE = "provenance_stale"          # commit or corpus checksum mismatch
+PROVENANCE_STALE = "provenance_stale"          # commit or corpus checksum MISMATCH
+PROVENANCE_CORPUS_UNBOUND = "provenance_corpus_unbound"  # corpus_sha256 null/absent
 PROVENANCE_MIXED_RUN = "provenance_mixed_run"  # point_set_id != the run's expectation
 PROVENANCE_TAMPERED = "provenance_tampered"    # schema/version wrong or fields absent
+#: Identity-expectation mismatches: the binding is internally well-formed and
+#: frozen-corpus-consistent, but a query-side expectation the run supplied does
+#: not match the recorded value. Only fired when an expected value is provided.
+PROVENANCE_PROFILE_MISMATCH = "provenance_profile_mismatch"    # embedding profile fingerprint
+PROVENANCE_PROVIDER_MISMATCH = "provenance_provider_mismatch"  # provider id/revision
+PROVENANCE_COLLECTION_MISMATCH = "provenance_collection_mismatch"  # collection name
 
 
 @dataclass
@@ -298,10 +305,12 @@ class ProvenanceVerification:
     and, when the run declares an expected ``point_set_id``, the same build id.
 
     When ``verified`` is False, ``reason_code`` is exactly one of
-    :data:`PROVENANCE_MISSING`, :data:`PROVENANCE_STALE`,
-    :data:`PROVENANCE_MIXED_RUN`, :data:`PROVENANCE_TAMPERED` — the distinct
-    per-case cause — and :attr:`not_run_reason` is the operator-facing string the
-    gate records for the arm.
+    :data:`PROVENANCE_MISSING`, :data:`PROVENANCE_TAMPERED`,
+    :data:`PROVENANCE_STALE`, :data:`PROVENANCE_CORPUS_UNBOUND`,
+    :data:`PROVENANCE_COLLECTION_MISMATCH`, :data:`PROVENANCE_PROFILE_MISMATCH`,
+    :data:`PROVENANCE_PROVIDER_MISMATCH`, :data:`PROVENANCE_MIXED_RUN` — the
+    distinct per-case cause — and :attr:`not_run_reason` is the operator-facing
+    string the gate records for the arm.
     """
 
     verified: bool
@@ -327,6 +336,10 @@ def verify_collection_provenance(
     frozen: "FrozenEval",
     *,
     expected_point_set_id: Optional[str] = None,
+    expected_profile_fingerprint: Optional[str] = None,
+    expected_provider_id: Optional[str] = None,
+    expected_provider_revision: Optional[str] = None,
+    expected_collection: Optional[str] = None,
 ) -> ProvenanceVerification:
     """Verify a live collection's resident provenance against the frozen corpus.
 
@@ -336,15 +349,39 @@ def verify_collection_provenance(
     the loaded :class:`FrozenEval`, so the gate's counting logic is testable with
     a fabricated manifest and no live services.
 
-    Verification (in precedence order, so each failure has ONE cause):
+    What is enforced (in precedence order, so each failure has ONE cause):
 
     1. **missing** — no resident manifest at all -> :data:`PROVENANCE_MISSING`.
     2. **tampered** — wrong/absent ``provenance_version``, a missing required key,
-       or an empty identity field -> :data:`PROVENANCE_TAMPERED`.
-    3. **stale** — ``indexed_commit`` != the frozen corpus commit, or
-       ``corpus_sha256`` != the frozen ``corpus_sha256`` -> :data:`PROVENANCE_STALE`.
-    4. **mixed-run** — a run that declares ``expected_point_set_id`` sees a
+       or an empty ``indexed_commit`` / ``profile_fingerprint`` /
+       ``provider_revision`` -> :data:`PROVENANCE_TAMPERED`.
+    3. **stale** — ``indexed_commit`` != the frozen corpus commit, or a *recorded*
+       ``corpus_sha256`` that differs from the frozen ``corpus_sha256``
+       -> :data:`PROVENANCE_STALE`.
+    4. **corpus-unbound** — ``corpus_sha256`` is null/absent, i.e. the producer
+       never bound a corpus to the collection (not a mismatch, an unbound
+       binding) -> :data:`PROVENANCE_CORPUS_UNBOUND`.
+    5. **collection mismatch** — ``expected_collection`` was supplied and the
+       recorded ``collection`` differs -> :data:`PROVENANCE_COLLECTION_MISMATCH`.
+    6. **profile mismatch** — ``expected_profile_fingerprint`` was supplied and
+       the recorded ``profile_fingerprint`` differs
+       -> :data:`PROVENANCE_PROFILE_MISMATCH`.
+    7. **provider mismatch** — ``expected_provider_id`` and/or
+       ``expected_provider_revision`` was supplied and the recorded
+       ``provider_id`` / ``provider_revision`` differs
+       -> :data:`PROVENANCE_PROVIDER_MISMATCH`.
+    8. **mixed-run** — a run that declares ``expected_point_set_id`` sees a
        collection whose ``point_set_id`` differs -> :data:`PROVENANCE_MIXED_RUN`.
+
+    The identity fields ``collection`` / ``profile_fingerprint`` / ``provider_id``
+    / ``provider_revision`` are **value-matched only when the caller supplies the
+    corresponding ``expected_*``**. When an expectation is not provided, the field
+    is merely required to be recorded (non-empty, per the tampered check) and is
+    NOT matched — so an offline gate that lacks the query-side expectations does
+    not over-tighten. A collection indexed at the frozen commit/corpus but with a
+    DIFFERENT embedding model, or a sentinel copied from another collection,
+    verifies OK only when no matching expectation is passed; supply the run's
+    expectations to reject those.
 
     Otherwise the binding is **verified**.
     """
@@ -415,6 +452,20 @@ def verify_collection_provenance(
         )
 
     corpus_sha = snapshot.get("corpus_sha256")
+    if not corpus_sha:
+        # The producer did not bind a corpus to the collection at all. This is an
+        # UNBOUND binding, not a mismatch — classify it honestly so it is never
+        # conflated with a real stale (commit/corpus) mismatch.
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_CORPUS_UNBOUND,
+            detail=(
+                f"collection corpus_sha256 is {corpus_sha!r} (null/absent); the "
+                "producer wrote a provenance binding but never recorded a corpus "
+                "digest, so the queried points cannot be bound to the frozen corpus"
+            ),
+            manifest=snapshot,
+        )
     if corpus_sha != frozen.corpus_sha256:
         return ProvenanceVerification(
             verified=False,
@@ -423,6 +474,65 @@ def verify_collection_provenance(
                 f"collection corpus_sha256 {corpus_sha!r} != frozen corpus_sha256 "
                 f"{frozen.corpus_sha256!r}; the indexed corpus does not match the "
                 "frozen dataset this gate binds"
+            ),
+            manifest=snapshot,
+        )
+
+    if expected_collection is not None and snapshot.get("collection") != expected_collection:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_COLLECTION_MISMATCH,
+            detail=(
+                f"collection {snapshot.get('collection')!r} != this run's expected "
+                f"collection {expected_collection!r}; the resident binding belongs "
+                "to a different collection than the one this run scored"
+            ),
+            manifest=snapshot,
+        )
+
+    if (
+        expected_profile_fingerprint is not None
+        and snapshot.get("profile_fingerprint") != expected_profile_fingerprint
+    ):
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_PROFILE_MISMATCH,
+            detail=(
+                f"collection profile_fingerprint {snapshot.get('profile_fingerprint')!r} "
+                f"!= this run's expected profile_fingerprint {expected_profile_fingerprint!r}; "
+                "the points were embedded under a different embedding profile than "
+                "the run's query side"
+            ),
+            manifest=snapshot,
+        )
+
+    if (
+        expected_provider_id is not None
+        and snapshot.get("provider_id") != expected_provider_id
+    ):
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_PROVIDER_MISMATCH,
+            detail=(
+                f"collection provider_id {snapshot.get('provider_id')!r} != this "
+                f"run's expected provider_id {expected_provider_id!r}; the points "
+                "were embedded by a different provider than the run's query side"
+            ),
+            manifest=snapshot,
+        )
+
+    if (
+        expected_provider_revision is not None
+        and snapshot.get("provider_revision") != expected_provider_revision
+    ):
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_PROVIDER_MISMATCH,
+            detail=(
+                f"collection provider_revision {snapshot.get('provider_revision')!r} "
+                f"!= this run's expected provider_revision {expected_provider_revision!r}; "
+                "the points were embedded by a different provider revision than the "
+                "run's query side"
             ),
             manifest=snapshot,
         )

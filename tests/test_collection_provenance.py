@@ -16,9 +16,12 @@ contract that a live-collection benchmark (Lane B) depends on:
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 from types import SimpleNamespace
 
 from mcp_server.artifacts.semantic_profiles import SemanticProfile
+from mcp_server.utils import semantic_indexer as semantic_indexer_module
 from mcp_server.utils.semantic_indexer import (
     SemanticIndexer,
     read_collection_provenance,
@@ -30,8 +33,21 @@ from mcp_server.utils.semantic_indexer import (
 # ---------------------------------------------------------------------------
 
 
+def _payload_matches(filter_obj, payload) -> bool:
+    """Evaluate a qdrant ``Filter`` (must[FieldCondition(MatchValue)]) offline."""
+    if filter_obj is None:
+        return True
+    for cond in getattr(filter_obj, "must", None) or []:
+        key = getattr(cond, "key", None)
+        match = getattr(cond, "match", None)
+        want = getattr(match, "value", None)
+        if payload.get(key) != want:
+            return False
+    return True
+
+
 class FakeQdrant:
-    """Minimal in-memory qdrant double supporting upsert/retrieve/search."""
+    """Minimal in-memory qdrant double supporting upsert/retrieve/search/delete."""
 
     def __init__(self) -> None:
         # id -> SimpleNamespace(id, vector, payload)
@@ -47,21 +63,48 @@ class FakeQdrant:
                 payload=dict(point.payload or {}),
             )
 
-    def retrieve(self, *, collection_name, ids, with_payload=True):
+    def retrieve(self, *, collection_name, ids, with_payload=True, with_vectors=False):
         out = []
         for pid in ids:
             stored = self.points.get(pid)
             if stored is not None:
-                out.append(SimpleNamespace(id=stored.id, payload=dict(stored.payload)))
+                out.append(
+                    SimpleNamespace(
+                        id=stored.id,
+                        vector=list(stored.vector),
+                        payload=dict(stored.payload),
+                    )
+                )
         return out
 
-    def search(self, *, collection_name, query_vector, limit):
+    def search(
+        self,
+        *,
+        collection_name,
+        query_vector,
+        limit=10,
+        filter=None,
+        query_filter=None,
+        with_payload=True,
+        with_vectors=False,
+        **kwargs,
+    ):
+        flt = filter if filter is not None else query_filter
         results = []
         for stored in self.points.values():
+            if not _payload_matches(flt, stored.payload):
+                continue
             results.append(
                 SimpleNamespace(id=stored.id, score=1.0, payload=dict(stored.payload))
             )
         return results[:limit]
+
+    def delete(self, *, collection_name, points_selector):
+        ids = getattr(points_selector, "points", None)
+        if ids is None:
+            ids = points_selector
+        for pid in ids:
+            self.points.pop(pid, None)
 
 
 class _RaisingUpsertQdrant(FakeQdrant):
@@ -309,3 +352,187 @@ def test_best_effort_write_swallows_failure():
     ix = _make_indexer(_RaisingUpsertQdrant())
     # The best-effort wrapper must NOT propagate the upsert failure.
     assert ix._write_collection_provenance_best_effort(point_ids=[1, 2]) is None
+
+
+# ===========================================================================
+# 6. Automatic build path emits a NON-null corpus_sha256 (recipe-matching)
+# ===========================================================================
+
+
+def _corpus_sha256(relative_paths):
+    """Reference implementation of the frozen benchmark corpus recipe."""
+    normalized = sorted(set(relative_paths))
+    return hashlib.sha256("\n".join(normalized).encode("utf-8")).hexdigest()
+
+
+def test_compute_corpus_sha256_matches_frozen_recipe():
+    ix = _make_indexer(FakeQdrant())
+    # Order-independent + deduplicated; joined by '\n' with no trailing newline.
+    digest = ix._compute_corpus_sha256(["pkg/b.py", "pkg/a.py", "pkg/a.py"])
+    assert digest == hashlib.sha256(b"pkg/a.py\npkg/b.py").hexdigest()
+    assert digest == _corpus_sha256(["pkg/a.py", "pkg/b.py"])
+
+
+def test_index_files_batch_writes_non_null_corpus_sha256():
+    """The only automatic provenance write (index_files_batch Phase 5) must stamp a
+    NON-null corpus_sha256 derived from the indexed relative-path SET, so a
+    produced manifest can actually verify against the frozen corpus."""
+    qdrant = FakeQdrant()
+    ix = _make_indexer(qdrant, attestation=_attestation())
+
+    preps = {
+        "a.py": {
+            "embedding_inputs": ["chunk-a"],
+            "relative_path": "pkg/a.py",
+            "missing_summary_chunk_ids": [],
+        },
+        "b.py": {
+            "embedding_inputs": ["chunk-b"],
+            "relative_path": "pkg/b.py",
+            "missing_summary_chunk_ids": [],
+        },
+    }
+
+    ix._preflight_blocker_details = lambda *a, **k: None  # type: ignore[assignment]
+    ix._prepare_for_writes = lambda *a, **k: None  # type: ignore[assignment]
+    ix._prepare_file_for_indexing = lambda p: preps[str(p)]  # type: ignore[assignment]
+    ix._embed_texts = lambda texts, input_type=None: [[0.0] * 8 for _ in texts]  # type: ignore[assignment]
+
+    stored_point_ids = {"pkg/a.py": 111, "pkg/b.py": 222}
+
+    def _fake_store(path, prep, embeds):
+        return {"point_ids": [stored_point_ids[prep["relative_path"]]]}
+
+    ix._store_file_embeddings = _fake_store  # type: ignore[assignment]
+
+    result = ix.index_files_batch([Path("a.py"), Path("b.py")])
+    assert result["files_indexed"] == 2
+
+    manifest = ix.read_collection_provenance()
+    assert manifest is not None
+    assert manifest["corpus_sha256"] is not None
+    assert manifest["corpus_sha256"] == _corpus_sha256(["pkg/a.py", "pkg/b.py"])
+
+
+# ===========================================================================
+# 7. Incremental mutation invalidates the sentinel -> provenance_missing
+# ===========================================================================
+
+
+def _relative_path_resolver():
+    return SimpleNamespace(
+        normalize_path=lambda p: str(p).replace("\\", "/")
+    )
+
+
+def test_remove_file_invalidates_sentinel():
+    qdrant = FakeQdrant()
+    ix = _make_indexer(qdrant, attestation=_attestation())
+    ix.path_resolver = _relative_path_resolver()
+
+    # A real point for the file plus a clean full-build provenance sentinel.
+    qdrant.points[555] = SimpleNamespace(
+        id=555, vector=[0.1] * 8, payload={"relative_path": "pkg/a.py"}
+    )
+    ix.write_collection_provenance(point_ids=[555])
+    assert ix.read_collection_provenance() is not None
+
+    removed = ix.remove_file("pkg/a.py")
+    assert removed == 1
+
+    # The incremental mutation dropped the sentinel: reads now fail closed.
+    assert ix.read_collection_provenance() is None
+    assert SemanticIndexer.PROVENANCE_POINT_ID not in qdrant.points
+
+
+def test_index_file_invalidates_sentinel():
+    qdrant = FakeQdrant()
+    ix = _make_indexer(qdrant, attestation=_attestation())
+    ix.path_resolver = _relative_path_resolver()
+    ix._prepare_for_writes = lambda *a, **k: None  # type: ignore[assignment]
+    ix._embed_texts = lambda texts, input_type=None: [[0.0] * 8 for _ in texts]  # type: ignore[assignment]
+    ix._preflight_blocker_details = lambda *a, **k: None  # type: ignore[assignment]
+    ix._prepare_file_for_indexing = lambda p: {  # type: ignore[assignment]
+        "embedding_inputs": ["chunk"],
+        "relative_path": "pkg/a.py",
+        "missing_summary_chunk_ids": [],
+    }
+    ix._store_file_embeddings = lambda path, prep, embeds: {"point_ids": [42]}  # type: ignore[assignment]
+
+    # A clean full build wrote provenance.
+    ix.write_collection_provenance(point_ids=[42])
+    assert ix.read_collection_provenance() is not None
+
+    # A single-file incremental index invalidates it.
+    ix.index_file(Path("a.py"))
+    assert ix.read_collection_provenance() is None
+
+
+# ===========================================================================
+# 8. Caller metadata cannot poison a real point via the reserved tag
+# ===========================================================================
+
+
+def test_index_symbol_strips_caller_provenance_key():
+    qdrant = FakeQdrant()
+    ix = _make_indexer(qdrant, provider=_LegacyProvider(dim=8))
+    ix.path_resolver = _relative_path_resolver()
+    ix._prepare_for_writes = lambda *a, **k: None  # type: ignore[assignment]
+    ix._embed_texts = lambda texts, input_type=None: [[0.1] * 8 for _ in texts]  # type: ignore[assignment]
+
+    ix.index_symbol(
+        file="pkg/a.py",
+        name="foo",
+        kind="function",
+        signature="def foo()",
+        line=10,
+        span=(10, 20),
+        content="body",
+        metadata={"__provenance__": True, "extra": "ok"},
+    )
+
+    real_points = [
+        p for pid, p in qdrant.points.items() if pid != SemanticIndexer.PROVENANCE_POINT_ID
+    ]
+    assert real_points, "expected the indexed symbol point to be stored"
+    payload = real_points[0].payload
+    # The poisoning tag was stripped; benign metadata survived.
+    assert payload.get("__provenance__") is not True
+    assert payload.get("extra") == "ok"
+
+    # And the real point remains visible to ordinary search (not hidden).
+    results = list(ix.query("where is foo implemented", limit=10))
+    assert any(r.get("symbol") == "foo" for r in results)
+
+
+# ===========================================================================
+# 9. A real id colliding with the reserved sentinel id is relocated
+# ===========================================================================
+
+
+def test_reserve_safe_id_relocates_reserved_id():
+    ix = _make_indexer(FakeQdrant())
+    relocated = ix._reserve_safe_id(SemanticIndexer.PROVENANCE_POINT_ID)
+    assert relocated != SemanticIndexer.PROVENANCE_POINT_ID
+    # Non-reserved ids pass through untouched.
+    assert ix._reserve_safe_id(42) == 42
+
+
+def test_derived_ids_never_occupy_reserved_id(monkeypatch):
+    """Force the truncated hash to collide with the reserved id and confirm both
+    id-derivations relocate it off the sentinel."""
+    ix = _make_indexer(FakeQdrant())
+    ix.path_resolver = _relative_path_resolver()
+
+    class _ZeroDigest:
+        def digest(self):
+            return b"\x00" * 8
+
+    monkeypatch.setattr(
+        semantic_indexer_module.hashlib, "sha1", lambda *a, **k: _ZeroDigest()
+    )
+
+    sid = ix._symbol_id("pkg/a.py", "foo", 1, None)
+    did = ix._document_section_id("pkg/a.py", "Intro", 1)
+    assert sid != SemanticIndexer.PROVENANCE_POINT_ID
+    assert did != SemanticIndexer.PROVENANCE_POINT_ID

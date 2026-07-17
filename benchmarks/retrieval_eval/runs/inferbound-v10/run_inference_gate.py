@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping
 
 from mcp_server.benchmarks.retrieval_eval_harness import (
+    PROVENANCE_VERSION,
     ArmSpec,
     ProvenanceVerification,
     RetrievalBenchmarkHarness,
@@ -297,40 +298,48 @@ def rerank_not_run_reason(rerank_url: str) -> str:
 # Collection-resident provenance read (INFERLIVEGATE, IF-0-INFERLIVEGATE-1)
 # ---------------------------------------------------------------------------
 
-# Fallback sentinel conventions, matching the Lane A producer
-# (``mcp_server/utils/semantic_indexer.py``): the producer upserts ONE reserved
-# point (id ``PROVENANCE_POINT_ID``) whose payload is the ``collection-provenance.v1``
-# manifest merged with a ``PROVENANCE_TAG`` marker. These defaults are used only
-# if the producer module cannot be imported to read its published constants.
-_DEFAULT_PROVENANCE_POINT_ID = 0
-_DEFAULT_PROVENANCE_TAG = "__provenance__"
-
-
 def read_live_collection_provenance(client: Any, collection: str) -> Dict[str, Any] | None:
     """Read the collection-resident provenance manifest from the live collection.
 
-    Per the shared contract, the semantic-index producer (Lane A) writes a
-    reserved sentinel point into the collection whose payload is the
-    ``collection-provenance.v1`` manifest. This reader parses that sentinel point
-    directly, using the producer's OWN published constants
-    (``SemanticIndexer.PROVENANCE_POINT_ID`` / ``PROVENANCE_TAG``) so it stays in
-    lock-step with the producer without instantiating a full indexer (which would
-    require live embedding-provider config). The producer's ``__provenance__``
-    marker key is stripped so the returned dict is the bare manifest.
+    The single source of truth for the sentinel id/tag/schema is the producer's
+    CANONICAL reader ``mcp_server.utils.semantic_indexer.read_collection_provenance``
+    (a module-level function that needs a raw Qdrant ``client`` + collection name
+    and does NOT instantiate a full indexer). This gate delegates to it verbatim
+    so the reader can never drift from the producer's semantics — in particular,
+    a point that is untagged (no ``__provenance__`` marker) or carries the wrong
+    ``provenance_version`` is treated as **missing**, exactly as the producer does.
 
-    Any failure (producer not importable, no sentinel point, unreadable payload)
-    returns ``None`` so :func:`verify_collection_provenance` records a truthful
-    ``provenance_missing`` rather than guessing — this reader never fabricates a
-    binding.
+    Only if that canonical reader cannot be imported does this fall back to an
+    inline read that enforces the SAME semantics (require the producer's tag on
+    the sentinel point and the ``collection-provenance.v1`` schema version). Any
+    failure (producer not importable AND unreadable, no sentinel point, wrong
+    version) returns ``None`` so :func:`verify_collection_provenance` records a
+    truthful ``provenance_missing`` rather than guessing — this reader never
+    fabricates a binding.
     """
-    point_id: Any = _DEFAULT_PROVENANCE_POINT_ID
-    tag = _DEFAULT_PROVENANCE_TAG
+    try:
+        from mcp_server.utils.semantic_indexer import (  # noqa: WPS433 - lazy
+            read_collection_provenance,
+        )
+    except Exception:  # noqa: BLE001 - producer module unavailable; use inline fallback
+        return _read_provenance_fallback(client, collection)
+
+    return read_collection_provenance(client, collection)
+
+
+def _read_provenance_fallback(client: Any, collection: str) -> Dict[str, Any] | None:
+    """Inline sentinel read used only when the canonical producer reader is
+    unimportable. Enforces the producer's contract: the reserved point must carry
+    the ``__provenance__`` tag and the ``collection-provenance.v1`` schema version,
+    otherwise the binding is treated as **missing** (returns ``None``)."""
+    point_id: Any = 0
+    tag = "__provenance__"
     try:
         from mcp_server.utils.semantic_indexer import SemanticIndexer  # noqa: WPS433 - lazy
 
         point_id = getattr(SemanticIndexer, "PROVENANCE_POINT_ID", point_id)
         tag = getattr(SemanticIndexer, "PROVENANCE_TAG", tag)
-    except Exception:  # noqa: BLE001 - use the default sentinel conventions
+    except Exception:  # noqa: BLE001 - use the documented sentinel conventions
         pass
 
     try:
@@ -343,12 +352,14 @@ def read_live_collection_provenance(client: Any, collection: str) -> Dict[str, A
         return None
     for point in points or []:
         payload = dict(getattr(point, "payload", None) or {})
-        if not payload:
+        if not payload.get(tag):
+            # Untagged point -> not the provenance sentinel -> missing.
             continue
-        # Strip the producer's reserved marker; the remainder is the manifest.
-        payload.pop(tag, None)
-        if payload:
-            return payload
+        manifest = {key: value for key, value in payload.items() if key != tag}
+        if manifest.get("provenance_version") != PROVENANCE_VERSION:
+            # Wrong/absent schema version -> missing (matches producer semantics).
+            return None
+        return manifest
     return None
 
 
@@ -599,6 +610,22 @@ def main() -> None:
     # gets a truthful reason; arms are never unconditionally marked not_run.
     collection = os.environ.get("SEMANTIC_COLLECTION_NAME", "code-embeddings")
     expected_point_set_id = os.environ.get("EXPECTED_POINT_SET_ID") or None
+    # Query-side identity expectations. The target collection is always known, so
+    # the recorded ``collection`` MUST equal it (rejects a sentinel copied from
+    # another collection). The embedding profile / provider expectations are only
+    # enforced when the operator supplies them (else the verifier keeps the
+    # recorded-non-empty check and does not over-tighten). ``SEMANTIC_EMBEDDING_MODEL``
+    # is the model the query side embeds with, and the producer records that as
+    # ``provider_id`` (it defaults to the declared embedding model), so it is the
+    # natural default expected provider id — this rejects a collection indexed at
+    # the frozen commit/corpus but with a DIFFERENT embedding model.
+    expected_profile_fingerprint = os.environ.get("EXPECTED_PROFILE_FINGERPRINT") or None
+    expected_provider_id = (
+        os.environ.get("EXPECTED_PROVIDER_ID")
+        or os.environ.get("SEMANTIC_EMBEDDING_MODEL")
+        or None
+    )
+    expected_provider_revision = os.environ.get("EXPECTED_PROVIDER_REVISION") or None
 
     not_run: Dict[str, str] = {}
     provider_ready = embed_up and qdrant_up           # dense + hybrid live probes
@@ -631,7 +658,13 @@ def main() -> None:
         prov_client = QdrantClient(host="localhost", port=6333)
         manifest = read_live_collection_provenance(prov_client, collection)
         provenance = verify_collection_provenance(
-            manifest, frozen, expected_point_set_id=expected_point_set_id
+            manifest,
+            frozen,
+            expected_point_set_id=expected_point_set_id,
+            expected_collection=collection,
+            expected_profile_fingerprint=expected_profile_fingerprint,
+            expected_provider_id=expected_provider_id,
+            expected_provider_revision=expected_provider_revision,
         )
         provenance_verified = provenance.verified
         provenance_detail = {
@@ -640,6 +673,10 @@ def main() -> None:
             "reason_code": provenance.reason_code,
             "detail": provenance.detail,
             "expected_point_set_id": expected_point_set_id,
+            "expected_collection": collection,
+            "expected_profile_fingerprint": expected_profile_fingerprint,
+            "expected_provider_id": expected_provider_id,
+            "expected_provider_revision": expected_provider_revision,
             "manifest": provenance.manifest,
         }
 

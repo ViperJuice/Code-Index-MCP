@@ -269,8 +269,11 @@ class SemanticIndexer:
     # WITHOUT reading the local ``.index_metadata.json`` file.
     PROVENANCE_VERSION = "collection-provenance.v1"
     # Reserved point id for the provenance sentinel. Ordinary points use
-    # content-hash-derived 64-bit ids (``_symbol_id``), so id 0 is never minted
-    # for a real chunk and is safe to reserve.
+    # content-hash-derived 64-bit ids (``_symbol_id`` / ``_document_section_id``).
+    # A real point hashing to this id is astronomically unlikely (~2**-64) but
+    # NOT impossible, so both id-derivations route through ``_reserve_safe_id``,
+    # which relocates any real id that lands on the reserved value — guaranteeing
+    # id 0 is never occupied by a real chunk and is safe to reserve.
     PROVENANCE_POINT_ID = 0
     # Payload key marking the reserved sentinel; excluded from all search results.
     PROVENANCE_TAG = "__provenance__"
@@ -1895,7 +1898,20 @@ class SemanticIndexer:
             id_str = f"{relative_path}:{name}:{line}"
 
         h = hashlib.sha1(id_str.encode("utf-8"), usedforsecurity=False).digest()[:8]
-        return int.from_bytes(h, "big", signed=False)
+        return self._reserve_safe_id(int.from_bytes(h, "big", signed=False))
+
+    def _reserve_safe_id(self, value: int) -> int:
+        """Keep a derived point id off the reserved provenance sentinel id.
+
+        ``_symbol_id`` / ``_document_section_id`` truncate a hash to 64 bits, so a
+        real point could (with probability ~2**-64) derive an id equal to the
+        reserved ``PROVENANCE_POINT_ID``. Fail-safe: relocate such a collision to a
+        fixed non-reserved id so a real point can never occupy — and thereby
+        clobber — the provenance sentinel.
+        """
+        if value == self.PROVENANCE_POINT_ID:
+            return 0xFFFFFFFFFFFFFFFF
+        return value
 
     def _looks_like_code_intent(self, query: str) -> bool:
         """Detect when a query is likely asking for implementation code."""
@@ -2640,7 +2656,11 @@ class SemanticIndexer:
         # Attest + persist the provenance profile BEFORE any point write.
         self._prepare_for_writes()
         embeds = self._embed_texts(prep["embedding_inputs"], input_type="document")
-        return self._store_file_embeddings(path, prep, embeds)
+        result = self._store_file_embeddings(path, prep, embeds)
+        # Incremental single-file mutation: invalidate the collection provenance
+        # sentinel so only a clean full rebuild can re-attest the collection.
+        self._invalidate_collection_provenance()
+        return result
 
     def index_files_batch(
         self,
@@ -2764,11 +2784,13 @@ class SemanticIndexer:
         indexed = 0
         failed = 0
         built_point_ids: List[int] = []
+        indexed_relative_paths: List[str] = []
         for path, prep, start, end in file_slices:
             file_embeds = all_embeds[start:end]
             try:
                 store_result = self._store_file_embeddings(path, prep, file_embeds)
                 built_point_ids.extend(store_result.get("point_ids", []))
+                indexed_relative_paths.append(prep["relative_path"])
                 indexed += 1
             except Exception as exc:
                 logger.error("Failed to store embeddings for %s: %s", path, exc)
@@ -2776,9 +2798,17 @@ class SemanticIndexer:
 
         # Phase 5: stamp collection-resident provenance for this successful build.
         # Best-effort: a provenance-write failure is logged but never fails the
-        # index build that already durably wrote its points.
+        # index build that already durably wrote its points. The corpus digest is
+        # computed from the SET of indexed relative paths using the same recipe as
+        # the frozen benchmark ``corpus_manifest.json`` (sha256 of the sorted
+        # included relative paths joined by '\n', no trailing newline) so a
+        # collection built from the frozen corpus emits a ``corpus_sha256`` that
+        # verifies against the benchmark's recorded value.
         if indexed:
-            self._write_collection_provenance_best_effort(point_ids=built_point_ids)
+            corpus_sha256 = self._compute_corpus_sha256(indexed_relative_paths)
+            self._write_collection_provenance_best_effort(
+                point_ids=built_point_ids, corpus_sha256=corpus_sha256
+            )
 
         logger.info(
             "Batch semantic indexing complete: %d indexed, %d failed, %d skipped",
@@ -2918,6 +2948,20 @@ class SemanticIndexer:
         digest = hashlib.sha256("\n".join(normalized).encode("utf-8")).hexdigest()
         return digest
 
+    @staticmethod
+    def _compute_corpus_sha256(relative_paths: Iterable[str]) -> str:
+        """Corpus digest for the indexed file SET.
+
+        Matches the frozen benchmark ``corpus_manifest.json`` recipe exactly:
+        sha256 of the UTF-8 bytes of the SORTED included relative paths joined by
+        a single newline (``\\n``), with NO trailing newline. Deduplicated and
+        order-independent so the same indexed corpus always yields the same digest.
+        A collection built from the frozen corpus therefore emits a
+        ``corpus_sha256`` that verifies against the benchmark's recorded value.
+        """
+        normalized = sorted({str(p).replace("\\", "/") for p in relative_paths})
+        return hashlib.sha256("\n".join(normalized).encode("utf-8")).hexdigest()
+
     def build_collection_provenance_manifest(
         self,
         point_ids: Optional[Iterable[Any]] = None,
@@ -2999,6 +3043,33 @@ class SemanticIndexer:
             )
             return None
 
+    def _invalidate_collection_provenance(self) -> None:
+        """Delete the reserved provenance sentinel after an incremental mutation.
+
+        Any post-build incremental mutation (``index_file``, ``index_symbol``,
+        ``remove_file``, ``move_file``, ``mark_file_deleted``) changes the live
+        point set out from under the last clean full build's recorded
+        ``point_set_id``. Rather than leave a stale-but-valid-looking sentinel, we
+        fail closed: drop the reserved point so ``read_collection_provenance``
+        returns ``None`` (``provenance_missing``) until a clean full rebuild
+        re-attests the collection. Best-effort — a delete failure must never fail
+        the mutation that triggered it.
+        """
+        if not getattr(self, "_qdrant_available", False):
+            return
+        try:
+            self.qdrant.delete(
+                collection_name=self.collection,
+                points_selector=models.PointIdsList(points=[self.PROVENANCE_POINT_ID]),
+            )
+        except Exception as exc:  # pragma: no cover - defensive best-effort guard
+            logger.debug(
+                "Failed to invalidate collection provenance for '%s': %s: %s",
+                self.collection,
+                type(exc).__name__,
+                exc,
+            )
+
     def read_collection_provenance(
         self, collection: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
@@ -3078,9 +3149,15 @@ class SemanticIndexer:
                 "is_deleted": False,
             }
 
-            # Add custom metadata if provided
+            # Add custom metadata if provided. Strip the reserved provenance tag
+            # so caller metadata can never poison a real point: a point carrying
+            # ``__provenance__`` is filtered out of every search result, so a
+            # caller-supplied key would otherwise make a real point silently
+            # invisible.
             if metadata:
-                payload.update(metadata)
+                payload.update(
+                    {k: v for k, v in metadata.items() if k != self.PROVENANCE_TAG}
+                )
 
             point = models.PointStruct(id=point_id, vector=embedding, payload=payload)
 
@@ -3107,6 +3184,10 @@ class SemanticIndexer:
                 )
                 self._qdrant_available = False
                 raise RuntimeError(f"Failed to store symbol '{name}' in Qdrant: {upsert_error}")
+
+            # Incremental mutation: the last clean full build's point-set binding
+            # is now stale, so drop the provenance sentinel (fail-closed).
+            self._invalidate_collection_provenance()
         except Exception as e:
             if "API key" in str(e) or "authentication" in str(e).lower():
                 raise RuntimeError(
@@ -3448,7 +3529,7 @@ class SemanticIndexer:
         h = hashlib.sha1(
             f"doc:{file}:{section}:{line}".encode("utf-8"), usedforsecurity=False
         ).digest()[:8]
-        return int.from_bytes(h, "big", signed=False)
+        return self._reserve_safe_id(int.from_bytes(h, "big", signed=False))
 
     def query_natural_language(
         self,
@@ -3622,6 +3703,8 @@ class SemanticIndexer:
                     points_selector=models.PointIdsList(points=point_ids),
                 )
                 logger.info(f"Removed {len(point_ids)} embeddings for file: {relative_path}")
+                # Incremental mutation: fail-closed by dropping the provenance sentinel.
+                self._invalidate_collection_provenance()
 
             return len(point_ids)
         except Exception as e:
@@ -3732,6 +3815,8 @@ class SemanticIndexer:
                 logger.info(
                     f"Updated {len(new_points)} embeddings: {old_relative} -> {new_relative}"
                 )
+                # Incremental mutation: fail-closed by dropping the provenance sentinel.
+                self._invalidate_collection_provenance()
 
             return len(updated_points)
         except Exception as e:
@@ -3845,6 +3930,8 @@ class SemanticIndexer:
             self.qdrant.upsert(collection_name=self.collection, points=updated_points)
 
             logger.info(f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}")
+            # Incremental mutation: fail-closed by dropping the provenance sentinel.
+            self._invalidate_collection_provenance()
             return len(updated_points)
         except Exception as e:
             logger.error(
