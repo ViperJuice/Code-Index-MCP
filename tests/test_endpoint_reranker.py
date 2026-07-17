@@ -567,11 +567,12 @@ def _slow_transport(latency_s: float):
 
 
 async def test_endpoint_reranker_intrinsic_default_timeout(monkeypatch):
-    # No external wait_for wrapper: the EndpointReranker's own default timeout
-    # (read from MCP_RERANK_TIMEOUT_S) must still bound a slow transport.
+    # No external wait_for wrapper: the EndpointReranker's own env-driven timeout
+    # must still bound a slow transport. A sub-1s env value is clamped up to the
+    # >=1s floor (INFERPOLISH item 4), so the intrinsic bound stays enabled.
     monkeypatch.setenv("MCP_RERANK_TIMEOUT_S", "0.05")
-    reranker = EndpointReranker(_slow_transport(1.0), provider="slow")
-    assert reranker._timeout == 0.05
+    reranker = EndpointReranker(_slow_transport(3.0), provider="slow")
+    assert reranker._timeout == 1.0
     with pytest.raises(asyncio.TimeoutError):
         await reranker.rerank("q", _results(3))
 
@@ -588,3 +589,106 @@ def test_endpoint_reranker_default_timeout_is_30s(monkeypatch):
     monkeypatch.delenv("MCP_RERANK_TIMEOUT_S", raising=False)
     reranker = EndpointReranker(_fake_transport({0: 0.1}), provider="fake")
     assert reranker._timeout == 30.0
+
+
+# --------------------------------------------------------------------------
+# INFERPOLISH item 4: EndpointReranker's own MCP_RERANK_TIMEOUT_S parsing must
+# clamp to a >=1s floor (mirroring the dispatcher clamp) so a 0/negative env
+# can never disable the intrinsic per-call timeout, and an unparseable value
+# falls back to the 30s default.
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("raw", ["0", "0.0", "-5", "0.001"])
+def test_endpoint_reranker_timeout_clamps_to_one_second_floor(monkeypatch, raw):
+    monkeypatch.setenv("MCP_RERANK_TIMEOUT_S", raw)
+    reranker = EndpointReranker(_fake_transport({0: 0.1}), provider="fake")
+    assert reranker._timeout == 1.0
+
+
+def test_endpoint_reranker_timeout_unparseable_falls_back_to_default(monkeypatch):
+    monkeypatch.setenv("MCP_RERANK_TIMEOUT_S", "not-a-number")
+    reranker = EndpointReranker(_fake_transport({0: 0.1}), provider="fake")
+    assert reranker._timeout == 30.0
+
+
+def test_endpoint_reranker_timeout_above_floor_is_preserved(monkeypatch):
+    monkeypatch.setenv("MCP_RERANK_TIMEOUT_S", "12.5")
+    reranker = EndpointReranker(_fake_transport({0: 0.1}), provider="fake")
+    assert reranker._timeout == 12.5
+
+
+# --------------------------------------------------------------------------
+# INFERPOLISH item 5: a timed-out endpoint call must not publish outcome /
+# diagnostics. Shared reranker state (last_outcome / last_diagnostics) is only
+# assigned after a successful response is fully processed in the coroutine, so
+# a late transport worker cannot mutate it after the bridge raised TimeoutError.
+# --------------------------------------------------------------------------
+def test_endpoint_reranker_timeout_does_not_publish_shared_state():
+    import time as _time
+
+    def slow_transport(request_dict):
+        # Sleeps well past the tiny per-call timeout; if it "wins" late it must
+        # still be unable to touch shared reranker state.
+        _time.sleep(0.3)
+        return {"results": []}
+
+    reranker = EndpointReranker(slow_transport, provider="fake", timeout=0.01)
+
+    with pytest.raises(asyncio.TimeoutError):
+        run_coroutine_sync(reranker.rerank("find json", _results(2), top_k=2))
+
+    assert reranker.last_outcome is None
+    assert reranker.last_diagnostics is None
+
+
+# --------------------------------------------------------------------------
+# INFERPOLISH item 6: CohereV2RerankAdapter must report model_revision honestly
+# -- pass through the provider's revision when present, else None (unknown),
+# never echoing the configured ``model`` as a revision it isn't.
+# --------------------------------------------------------------------------
+def test_cohere_adapter_model_revision_none_when_response_omits_it():
+    def send(body):
+        # Cohere native response with NO model_revision field.
+        return {
+            "results": [
+                {"index": 0, "relevance_score": 0.9},
+                {"index": 1, "relevance_score": 0.5},
+            ]
+        }
+
+    adapter = CohereV2RerankAdapter(send)
+    out = adapter(
+        {
+            "candidates": [
+                {"candidate_id": "cand-0", "text": "a"},
+                {"candidate_id": "cand-1", "text": "b"},
+            ],
+            "query": "q",
+            "request_id": "r",
+            "contract_version": "rerank.v1",
+        }
+    )
+
+    # model_id honestly reports the configured model...
+    assert out["model_id"] == COHERE_CURRENT_RERANK_MODEL
+    # ...but model_revision is None (unknown), not the model echoed as a revision.
+    assert out["model_revision"] is None
+
+
+def test_cohere_adapter_model_revision_passes_through_when_present():
+    def send(body):
+        return {
+            "results": [{"index": 0, "relevance_score": 0.9}],
+            "model_revision": "2026-06-01",
+        }
+
+    adapter = CohereV2RerankAdapter(send)
+    out = adapter(
+        {
+            "candidates": [{"candidate_id": "cand-0", "text": "a"}],
+            "query": "q",
+            "request_id": "r",
+            "contract_version": "rerank.v1",
+        }
+    )
+
+    assert out["model_revision"] == "2026-06-01"

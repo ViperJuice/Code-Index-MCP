@@ -283,7 +283,7 @@ class CohereReranker(BaseReranker):
                     "Cohere library not installed. Install with: pip install cohere"
                 )
         except Exception as e:
-            logger.error(f"Failed to initialize Cohere reranker: {e}")
+            logger.error("Failed to initialize Cohere reranker: %s", _redact_error(e))
             return Result.error(f"Initialization failed: {str(e)}")
 
     async def shutdown(self) -> Result:
@@ -365,7 +365,7 @@ class CohereReranker(BaseReranker):
             return Result.ok(rerank_result)
 
         except Exception as e:
-            logger.error(f"Cohere reranking failed: {e}")
+            logger.error("Cohere reranking failed: %s", _redact_error(e))
             return Result.error(f"Reranking failed: {str(e)}")
 
     def get_capabilities(self) -> Dict[str, Any]:
@@ -409,7 +409,7 @@ class LocalCrossEncoderReranker(BaseReranker):
                     "Install with: pip install sentence-transformers"
                 )
         except Exception as e:
-            logger.error(f"Failed to initialize cross-encoder: {e}")
+            logger.error("Failed to initialize cross-encoder: %s", _redact_error(e))
             return Result.error(f"Initialization failed: {str(e)}")
 
     async def shutdown(self) -> Result:
@@ -507,7 +507,7 @@ class LocalCrossEncoderReranker(BaseReranker):
             return Result.ok(rerank_result)
 
         except Exception as e:
-            logger.error(f"Cross-encoder reranking failed: {e}")
+            logger.error("Cross-encoder reranking failed: %s", _redact_error(e))
             return Result.error(f"Reranking failed: {str(e)}")
 
     def get_capabilities(self) -> Dict[str, Any]:
@@ -551,7 +551,7 @@ class TFIDFReranker(BaseReranker):
                 "Scikit-learn not installed. Install with: pip install scikit-learn"
             )
         except Exception as e:
-            logger.error(f"Failed to initialize TF-IDF reranker: {e}")
+            logger.error("Failed to initialize TF-IDF reranker: %s", _redact_error(e))
             return Result.error(f"Initialization failed: {str(e)}")
 
     async def shutdown(self) -> Result:
@@ -638,7 +638,7 @@ class TFIDFReranker(BaseReranker):
             return Result.ok(rerank_result)
 
         except Exception as e:
-            logger.error(f"TF-IDF reranking failed: {e}")
+            logger.error("TF-IDF reranking failed: %s", _redact_error(e))
             return Result.error(f"Reranking failed: {str(e)}")
 
     def get_capabilities(self) -> Dict[str, Any]:
@@ -1075,8 +1075,11 @@ class EndpointReranker(IReranker):
         # Intrinsic per-call timeout so DIRECT async consumers (hybrid /
         # cross_repo) are bounded even without the dispatcher's wait_for wrapper.
         if timeout is None:
+            # Mirror the dispatcher's _get_endpoint_rerank_timeout_seconds clamp:
+            # fall back to 30s on an unparseable value and floor to >=1s so a
+            # 0/negative env can never disable the intrinsic per-call timeout.
             try:
-                timeout = float(os.getenv("MCP_RERANK_TIMEOUT_S", "30.0"))
+                timeout = max(float(os.getenv("MCP_RERANK_TIMEOUT_S", "30.0")), 1.0)
             except (TypeError, ValueError):
                 timeout = 30.0
         self._timeout = timeout
@@ -1333,7 +1336,10 @@ class CohereV2RerankAdapter:
             "request_id": request_dict.get("request_id", ""),
             "provider": self.provider,
             "model_id": self.model,
-            "model_revision": cohere_response.get("model_revision", self.model),
+            # Report the provider's response revision when present; otherwise
+            # None (unknown). Never echo the configured ``model`` as a revision
+            # it isn't -- that would misreport the served model version.
+            "model_revision": cohere_response.get("model_revision"),
             "results": results,
             "candidate_count": len(candidates),
             "scored_count": scored,

@@ -1119,11 +1119,13 @@ def commercial_egress_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
 def learned_models_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
     """Return ``True`` unless the profile is EXPLICITLY ``lexical_only``.
 
-    ``lexical_only`` is the only profile that forbids ALL learned providers and
-    rerankers (BM25 / symbol search only). When the profile is unset (legacy) or
-    set to any learned-model profile, learned providers are permitted. An unknown
-    explicit profile name is not ``lexical_only`` and so is permitted here (the
-    contract resolver raises on it elsewhere).
+    ``lexical_only`` is the only *known* profile that forbids ALL learned
+    providers and rerankers (BM25 / symbol search only). When the profile is
+    unset (legacy) or set to any learned-model profile, learned providers are
+    permitted. An unknown explicit profile name is treated as forbidding learned
+    models (fail-closed), symmetric with :func:`commercial_egress_allowed`; use
+    :func:`resolve_active_deployment_profile` when a raising contract check is
+    desired.
     """
     if not deployment_profile_is_explicitly_set(env):
         return True  # LEGACY: unset -> allow.
@@ -1131,7 +1133,7 @@ def learned_models_allowed(env: Optional[Mapping[str, str]] = None) -> bool:
     try:
         profile = _coerce_profile(environ.get(ACTIVE_PROFILE_ENV, ""))
     except ValueError:
-        return True
+        return False  # Unknown explicit profile: fail closed.
     return profile is not DeploymentProfile.LEXICAL_ONLY
 
 

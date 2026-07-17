@@ -3938,7 +3938,11 @@ class EnhancedDispatcher:
         # Deduplicate queries
         queries = list(dict.fromkeys(queries))
 
-        logger.info(f"Cross-document search for '{topic}' with {len(queries)} query variations")
+        logger.info(
+            "Cross-document search (topic_chars=%d, variations=%d)",
+            len(topic or ""),
+            len(queries),
+        )
 
         # Use the enhanced search with document-specific handling
         all_results = []

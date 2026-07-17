@@ -413,6 +413,45 @@ def test_openai_arity_mismatch_raises():
         p.embed_with_provenance(["a", "b", "c"], input_type="document")
 
 
+class _FixedCountVoyageClient:
+    """Voyage double returning a FIXED number of embeddings, ignoring input size.
+
+    Simulates a provider that answers with too few / too many vectors than the
+    request carried — the only failure Voyage's bare ``embeddings`` list exposes.
+    """
+
+    def __init__(self, dimension: int, returned_count: int) -> None:
+        self.dimension = dimension
+        self.returned_count = returned_count
+
+    def embed(self, texts, model, input_type, output_dimension, output_dtype):
+        embeddings = [[float(i)] * self.dimension for i in range(self.returned_count)]
+        return _FakeVoyageResponse(embeddings)
+
+
+def test_voyage_arity_mismatch_too_few_raises():
+    p = _make_voyage(dimension=4)
+    p.client = _FixedCountVoyageClient(dimension=4, returned_count=2)
+    # Requested 3 inputs but the client returns only 2 embeddings.
+    with pytest.raises(RuntimeError, match="arity mismatch"):
+        p.embed_with_provenance(["a", "b", "c"], input_type="document")
+
+
+def test_voyage_arity_mismatch_too_many_raises():
+    p = _make_voyage(dimension=4)
+    p.client = _FixedCountVoyageClient(dimension=4, returned_count=3)
+    # Requested 2 inputs but the client returns 3 embeddings.
+    with pytest.raises(RuntimeError, match="arity mismatch"):
+        p.embed_with_provenance(["a", "b"], input_type="document")
+
+
+def test_voyage_matching_arity_still_ok():
+    """The added arity guard must not reject a correct one-to-one response."""
+    p = _make_voyage(dimension=4)
+    resp = p.embed_with_provenance(["a", "b", "c"], input_type="document")
+    assert [item.index for item in resp.items] == [0, 1, 2]
+
+
 # ---------------------------------------------------------------------------
 # 6. OpenAI role authority is ``declared`` (not ``reported``), value preserved
 # ---------------------------------------------------------------------------

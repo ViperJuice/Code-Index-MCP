@@ -132,9 +132,12 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
     ) -> EmbeddingResponseV1:
         role = _role_from_input_type(input_type)
 
+        texts_list = list(texts)
+        request_size = len(texts_list)
+
         started = time.perf_counter()
         response = self.client.embed(
-            list(texts),
+            texts_list,
             model=self.model_name,
             input_type=input_type,
             output_dimension=self.vector_dimension,
@@ -142,7 +145,20 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
         )
         latency_ms = (time.perf_counter() - started) * 1000.0
 
+        # Fail closed on request<->response arity. Voyage returns a bare
+        # ``embeddings`` list with no per-item server index, so the ONLY defense
+        # against a short/over-long batch is a length check: a mismatch means we
+        # cannot know which input each vector answers. Refuse rather than
+        # positionally misattach vectors to the wrong texts.
         vectors = response.embeddings
+        if len(vectors) != request_size:
+            raise RuntimeError(
+                "Voyage embedding arity mismatch for model "
+                f"{self.model_name}: requested {request_size} inputs but the "
+                f"response carried {len(vectors)} embeddings. Refusing to "
+                "positionally attach a partial/short embedding batch."
+            )
+
         items = [
             EmbeddingItem(
                 index=idx,

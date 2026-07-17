@@ -20,6 +20,13 @@ except Exception:
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
+try:
+    from qdrant_client.http.exceptions import (
+        ResponseHandlingException as _QdrantResponseHandlingException,
+    )
+except Exception:  # pragma: no cover - defensive: client layout drift
+    _QdrantResponseHandlingException = None  # type: ignore[assignment]
+
 from ..artifacts.semantic_namespace import SemanticNamespaceResolver
 from ..artifacts.semantic_profiles import (
     REINDEX_REMEDIATION,
@@ -39,6 +46,37 @@ if TYPE_CHECKING:
     from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
+
+
+class TransientCollectionReadError(RuntimeError):
+    """A live-collection shape read failed transiently (connectivity/timeout).
+
+    Distinct from a genuine, readable shape mismatch: the collection's shape
+    could not be READ at all because the Qdrant backend was unreachable or timed
+    out. The correct remediation is therefore to RETRY once the backend is
+    reachable again — NOT to reindex/rebuild the collection. Conflating the two
+    would emit a misleading ``blocked``/reindex diagnostic for what is really a
+    backend-reachability problem.
+    """
+
+
+def _is_transient_qdrant_read_error(exc: BaseException) -> bool:
+    """Classify ``exc`` as a transient connectivity/timeout read failure.
+
+    Returns ``True`` for an unreachable/timed-out backend (retryable) and
+    ``False`` for a reachable backend that returned an unreadable/unexpected
+    shape (which must fail closed / block). Only exceptions raised while READING
+    the live shape reach this classifier — a readable shape mismatch never
+    raises, so it is never misclassified here.
+    """
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        return True
+    if _QdrantResponseHandlingException is not None and isinstance(
+        exc, _QdrantResponseHandlingException
+    ):
+        return True
+    name = type(exc).__name__.lower()
+    return "timeout" in name or "connect" in name
 
 
 @dataclass
@@ -1611,9 +1649,21 @@ class SemanticIndexer:
                 actual_dimension != self.embedding_dimension
                 or actual_distance != expected_distance
             )
-        except Exception:
-            # An unknown/unreadable live shape must fail closed (block), never be
-            # silently treated as a compatible reuse.
+        except Exception as exc:
+            if _is_transient_qdrant_read_error(exc):
+                # Connectivity/timeout: the shape could not be READ at all. This is
+                # retryable, NOT a reindex-requiring shape mismatch. Surface it
+                # distinctly so callers emit a retry (not a blocked/reindex)
+                # diagnostic for what is really a backend-reachability problem.
+                raise TransientCollectionReadError(
+                    f"Could not read the shape of Qdrant collection "
+                    f"'{self.collection}': the backend was unreachable or timed out "
+                    f"({type(exc).__name__}: {exc}). This is retryable — retry once "
+                    "the Qdrant backend is reachable again; it is NOT a shape "
+                    "mismatch requiring a reindex."
+                ) from exc
+            # Server reachable but the live shape is genuinely unknown/unreadable:
+            # fail closed (block), never silently treat as a compatible reuse.
             return True
 
     # ------------------------------------------------------------------
@@ -1694,7 +1744,22 @@ class SemanticIndexer:
         # v9) one. Validate the live shape (read-only) BEFORE persisting attested
         # metadata, so we never stamp attested=True at the new dimension over
         # vectors still stored at the old one.
-        if self._existing_collection_shape_blocked():
+        try:
+            shape_blocked = self._existing_collection_shape_blocked()
+        except TransientCollectionReadError as exc:
+            # Backend unreachable/timed out while reading the live shape: this is
+            # retryable, NOT a reindex-requiring shape mismatch. Report it as such
+            # so the operator retries rather than rebuilds. Nothing is mutated.
+            return {
+                "status": "retryable",
+                "collection": self.collection,
+                "message": str(exc),
+                "remediation": (
+                    "Retry after the Qdrant backend is reachable again; this is "
+                    "not a reindex-requiring shape mismatch."
+                ),
+            }
+        if shape_blocked:
             if allow_reindex:
                 # Operator authorized a destructive rebuild for the profile-
                 # migrated collection: recreate to the active shape FIRST, then

@@ -414,6 +414,18 @@ def test_learned_models_allowed_only_forbidden_under_explicit_lexical_only():
     assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "lexical_only"}) is False
 
 
+def test_learned_models_allowed_unknown_profile_fails_closed():
+    """An explicit but UNKNOWN profile forbids learned models (fail-closed),
+    symmetric with :func:`commercial_egress_allowed`."""
+    assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"}) is False
+    # Symmetry: both siblings fail closed on the same unknown explicit profile.
+    assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"}) is False
+    assert (
+        learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"})
+        is commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"})
+    )
+
+
 # ---------------------------------------------------------------------------
 # Provider-construction enforcement (SemanticIndexer._enforce_commercial_egress_policy)
 # ---------------------------------------------------------------------------
