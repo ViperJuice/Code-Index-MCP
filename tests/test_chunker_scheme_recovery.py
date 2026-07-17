@@ -635,3 +635,42 @@ def test_delete_remote_points_error_does_not_trip_upsert_circuit_breaker(tmp_pat
     # Upserts remain available after the delete failure (the run is not degraded).
     indexer.qdrant.upsert(collection_name="col-a", points=["p"])
     assert qdrant.upserted == [("col-a", ["p"])]
+
+
+def test_delete_during_rebuild_is_symmetric_with_insert(tmp_path):
+    """Cleanup item 3: a cross-scheme DELETE during the rebuild window is admitted
+    or refused by exactly the same rule as the corresponding INSERT.
+
+    Before the fix ``_assert_chunk_scheme_deletable`` had no ``rebuilding`` branch,
+    so an ordinary cross-scheme writer's INSERT was refused while its DELETE was
+    silently admitted -- an asymmetry that let a non-rebuild actor erase old-scheme
+    rows the finalize step would then restamp (mixed-scheme corruption). Both choke
+    points must now make the SAME admit/refuse decision."""
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    store.ensure_repository_row(tmp_path, name="test-repo")
+
+    rebuild_target = current_chunk_id_scheme()
+    other_scheme = FOREIGN_SCHEME  # a scheme this rebuild is NOT building
+
+    # Enter the blocked 'rebuilding' state scoped to rebuild_target.
+    store.begin_chunk_scheme_rebuild(target_scheme=rebuild_target)
+
+    with store._get_connection() as conn:
+        status, marker, _t = evaluate_chunk_scheme(conn, rebuild_target)
+        assert status == "rebuilding" and marker == rebuild_target
+
+        # The rebuild writer (target == marker): both insert and delete admitted.
+        store._assert_chunk_scheme_writable(conn, chunk_type="code", target=rebuild_target)
+        store._assert_chunk_scheme_deletable(conn, target=rebuild_target)
+
+        # An ordinary cross-scheme actor (target != marker): the insert is refused,
+        # and the delete must now be refused symmetrically (previously admitted).
+        with pytest.raises(ChunkSchemeMismatchError) as insert_exc:
+            store._assert_chunk_scheme_writable(conn, chunk_type="code", target=other_scheme)
+        with pytest.raises(ChunkSchemeMismatchError) as delete_exc:
+            store._assert_chunk_scheme_deletable(conn, target=other_scheme)
+
+        # Same admit/refuse decision AND same state classification on both paths.
+        assert insert_exc.value.state == delete_exc.value.state == "rebuilding"
+
+    store.close()

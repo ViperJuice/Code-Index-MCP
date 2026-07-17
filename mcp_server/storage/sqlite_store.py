@@ -1622,6 +1622,24 @@ class SQLiteStore:
         index)."""
         target = target or self._current_scheme()
         status, marker, target = evaluate_chunk_scheme(conn, target)
+        if status == "rebuilding":
+            # Symmetric with ``_assert_chunk_scheme_writable``: during the
+            # begin->finalize rebuild window ONLY the explicitly-scoped rebuild
+            # writer (whose target equals the persisted rebuild target) may touch
+            # code_chunks. An ordinary cross-scheme deleter would otherwise erase
+            # old-scheme rows that finalize then restamps, matching the mixed-scheme
+            # corruption the guard exists to prevent -- so refuse it exactly as the
+            # writable assert refuses the corresponding insert.
+            if target != marker:
+                raise ChunkSchemeMismatchError(
+                    f"code_chunks is rebuilding to {marker!r}; refusing a delete "
+                    f"scoped to {target!r}. Only the rebuild writer (scheme_target="
+                    f"{marker!r}) may modify chunks until the rebuild is finalized.",
+                    expected=marker,
+                    found=target,
+                    state=status,
+                )
+            return
         if status in _SCHEME_WRITE_BLOCKING:
             raise ChunkSchemeMismatchError(
                 f"code_chunks scheme is {status!r} (index marker={marker!r}, "

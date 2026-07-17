@@ -29,6 +29,7 @@ class RepositoryReadinessState(str, Enum):
     UNSUPPORTED_WORKTREE = "unsupported_worktree"
     AMBIGUOUS_SELECTOR = "ambiguous_selector"
     CORRUPT_SQLITE = "corrupt_sqlite"
+    INDEX_LOCKED = "index_locked"
     MISSING_SCHEMA = "missing_schema"
     MISSING_PROVENANCE = "missing_provenance"
     SCHEME_MISMATCH = "scheme_mismatch"
@@ -180,6 +181,18 @@ def _inspect_index_uncached(index_path: Path) -> Optional[RepositoryReadinessSta
                 return RepositoryReadinessState.INDEX_REBUILDING
             if scheme_status in ("mismatch", "missing_marker"):
                 return RepositoryReadinessState.SCHEME_MISMATCH
+    except sqlite3.OperationalError as exc:
+        # A "database is locked"/"database is busy" OperationalError is a
+        # concurrent-writer contention signal over a busy-but-HEALTHY index, not
+        # on-disk corruption. Classify it distinctly (and BEFORE the DatabaseError
+        # catch-all, since OperationalError subclasses DatabaseError) so a
+        # transient lock is never reported as CORRUPT_SQLITE and never triggers a
+        # destructive quarantine/reindex. Any other OperationalError falls through
+        # to the corruption fail-closed default.
+        message = str(exc).lower()
+        if "database is locked" in message or "database is busy" in message or "locked" in message:
+            return RepositoryReadinessState.INDEX_LOCKED
+        return RepositoryReadinessState.CORRUPT_SQLITE
     except sqlite3.DatabaseError:
         return RepositoryReadinessState.CORRUPT_SQLITE
     return None
@@ -269,7 +282,13 @@ class ReadinessClassifier:
         else:
             db_state = cls._inspect_index(index_path)
 
-            if db_state == RepositoryReadinessState.CORRUPT_SQLITE:
+            if db_state == RepositoryReadinessState.INDEX_LOCKED:
+                state = RepositoryReadinessState.INDEX_LOCKED
+                remediation = (
+                    "The index is temporarily locked by a concurrent writer; the "
+                    "index is healthy -- retry the query shortly (do not reindex)."
+                )
+            elif db_state == RepositoryReadinessState.CORRUPT_SQLITE:
                 state = RepositoryReadinessState.CORRUPT_SQLITE
                 remediation = "Run reindex to quarantine the corrupt bytes and rebuild the index."
             elif db_state == RepositoryReadinessState.MISSING_SCHEMA:
