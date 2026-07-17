@@ -12,6 +12,15 @@ import pytest
 from mcp_server.benchmarks.retrieval_eval_harness import (
     ARMS,
     DEPTHS,
+    PROVENANCE_COLLECTION_MISMATCH,
+    PROVENANCE_CORPUS_UNBOUND,
+    PROVENANCE_MISSING,
+    PROVENANCE_MIXED_RUN,
+    PROVENANCE_PROFILE_MISMATCH,
+    PROVENANCE_PROVIDER_MISMATCH,
+    PROVENANCE_STALE,
+    PROVENANCE_TAMPERED,
+    PROVENANCE_VERSION,
     ArmSpec,
     FrozenEvalError,
     HoldoutViolationError,
@@ -22,6 +31,7 @@ from mcp_server.benchmarks.retrieval_eval_harness import (
     percentile,
     recall_at_k,
     reciprocal_rank,
+    verify_collection_provenance,
 )
 
 # ---------------------------------------------------------------------------
@@ -123,6 +133,7 @@ def _write_eval_dir(tmp_path: Path, *, signed=True, break_checksum=None, omit_ma
     corpus = {
         "repo": "test-repo",
         "doc_count": 2,
+        "commit": "a" * 40,
         "corpus_sha256": corpus_sha,
         "corpus_sha256_algorithm": "sha256 of sorted included relative paths",
     }
@@ -386,3 +397,191 @@ def test_load_frozen_eval_real_dataset():
 
     # Result must be JSON-serializable.
     json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Collection-resident provenance verification (INFERLIVEGATE, IF-0-INFERLIVEGATE-1)
+# ---------------------------------------------------------------------------
+#
+# The gate counts a dense/hybrid/rerank arm's metrics ONLY when the live Qdrant
+# collection's resident provenance verifies against the frozen corpus. These
+# cases pin the not_run reason taxonomy — one distinct reason_code per failure
+# mode — using a fabricated manifest and no live services.
+
+def _frozen_for_provenance(tmp_path):
+    """A loaded FrozenEval whose corpus commit is ``a*40`` and corpus_sha256 is
+    ``c*64`` (from ``_write_eval_dir``)."""
+    return load_frozen_eval(_write_eval_dir(tmp_path))
+
+
+def _valid_manifest():
+    """A well-formed ``collection-provenance.v1`` manifest that matches the fake
+    frozen corpus (commit ``a*40`` / corpus_sha256 ``c*64``)."""
+    return {
+        "provenance_version": PROVENANCE_VERSION,
+        "collection": "code-embeddings",
+        "indexed_commit": "a" * 40,
+        "corpus_sha256": "c" * 64,
+        "profile_fingerprint": "profile-abc123",
+        "provider_id": "openai_compatible",
+        "provider_revision": "voyage-code-3@2026-07-01",
+        "point_set_id": "build-42",
+        "written_at": "2026-07-11T00:00:00Z",
+    }
+
+
+def test_provenance_valid_manifest_verifies(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    result = verify_collection_provenance(
+        _valid_manifest(), frozen, expected_point_set_id="build-42"
+    )
+    assert result.verified is True
+    assert result.reason_code is None
+    # Verified with no point-set expectation is also fine.
+    assert verify_collection_provenance(_valid_manifest(), frozen).verified is True
+
+
+def test_provenance_missing_binding_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    for empty in (None, {}):
+        result = verify_collection_provenance(empty, frozen)
+        assert result.verified is False
+        assert result.reason_code == PROVENANCE_MISSING
+        assert "provenance_mismatch" in result.not_run_reason
+        assert PROVENANCE_MISSING in result.not_run_reason
+
+
+def test_provenance_stale_commit_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    manifest["indexed_commit"] = "b" * 40  # different revision than the frozen corpus
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_STALE
+
+
+def test_provenance_stale_corpus_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    manifest["corpus_sha256"] = "d" * 64  # indexed a different corpus
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_STALE
+
+
+def test_provenance_mixed_run_point_set_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()  # matches commit + corpus, but wrong point_set
+    result = verify_collection_provenance(
+        manifest, frozen, expected_point_set_id="build-99"
+    )
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_MIXED_RUN
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda m: m.update({"provenance_version": "collection-provenance.v0"}),
+        lambda m: m.pop("provenance_version"),
+        lambda m: m.pop("point_set_id"),          # missing required key
+        lambda m: m.update({"profile_fingerprint": ""}),  # recorded field empty
+    ],
+)
+def test_provenance_tampered_schema_is_not_run(tmp_path, mutate):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    mutate(manifest)
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_TAMPERED
+
+
+@pytest.mark.parametrize("corpus_value", [None, ""])
+def test_provenance_null_corpus_is_corpus_unbound_not_stale(tmp_path, corpus_value):
+    """A manifest whose ``corpus_sha256`` is null/absent means the producer never
+    bound a corpus — it is classified UNBOUND, not stale (which means a real
+    mismatch)."""
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    manifest["corpus_sha256"] = corpus_value  # producer did not bind a corpus
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_CORPUS_UNBOUND
+    assert result.reason_code != PROVENANCE_STALE
+    assert "provenance_corpus_unbound" in result.not_run_reason
+
+
+def test_provenance_collection_mismatch_is_not_run(tmp_path):
+    """A sentinel copied from another collection is rejected when the run supplies
+    the target collection name."""
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()  # collection == "code-embeddings", commit+corpus match
+    result = verify_collection_provenance(
+        manifest, frozen, expected_collection="some-other-collection"
+    )
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_COLLECTION_MISMATCH
+
+
+def test_provenance_profile_mismatch_is_not_run(tmp_path):
+    """A collection embedded under a different profile fingerprint is rejected when
+    the run supplies the expected fingerprint."""
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()  # profile_fingerprint == "profile-abc123"
+    result = verify_collection_provenance(
+        manifest, frozen, expected_profile_fingerprint="profile-DIFFERENT"
+    )
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_PROFILE_MISMATCH
+
+
+def test_provenance_provider_id_mismatch_is_not_run(tmp_path):
+    """A collection embedded under a DIFFERENT embedding model (provider_id) is
+    rejected when the run supplies the expected provider id — Fable's finding."""
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()  # provider_id == "openai_compatible"
+    result = verify_collection_provenance(
+        manifest, frozen, expected_provider_id="voyage-code-3"
+    )
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_PROVIDER_MISMATCH
+
+
+def test_provenance_provider_revision_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()  # provider_revision == "voyage-code-3@2026-07-01"
+    result = verify_collection_provenance(
+        manifest, frozen, expected_provider_revision="voyage-code-3@2099-01-01"
+    )
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_PROVIDER_MISMATCH
+
+
+def test_provenance_all_expectations_matched_verifies(tmp_path):
+    """Supplying every expectation with the recorded values still verifies."""
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    result = verify_collection_provenance(
+        manifest,
+        frozen,
+        expected_point_set_id="build-42",
+        expected_collection="code-embeddings",
+        expected_profile_fingerprint="profile-abc123",
+        expected_provider_id="openai_compatible",
+        expected_provider_revision="voyage-code-3@2026-07-01",
+    )
+    assert result.verified is True
+    assert result.reason_code is None
+
+
+def test_provenance_unsupplied_expectations_do_not_over_tighten(tmp_path):
+    """When no expectation is supplied for an identity field, it is only required
+    to be recorded, not matched — so a valid frozen-corpus binding verifies even
+    with a different-looking embedding model, until the run passes an expectation.
+    """
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    manifest["provider_id"] = "a-totally-different-model"
+    # No expected_provider_id passed -> recorded-non-empty check only -> verified.
+    assert verify_collection_provenance(manifest, frozen).verified is True

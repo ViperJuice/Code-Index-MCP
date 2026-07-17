@@ -67,6 +67,62 @@ def test_report_states_holdout_not_used_for_tuning(report_text: str) -> None:
     ), "report must explicitly state the holdout was NOT used for tuning"
 
 
+def test_report_documents_collection_resident_provenance_precondition(report_text: str) -> None:
+    """A live provider run's numbers count ONLY after the collection-resident
+    provenance binding verifies against the frozen corpus (IF-0-INFERLIVEGATE-1).
+    The report must document that precondition, the manifest schema, and the
+    distinct not_run reason codes."""
+    low = report_text.lower()
+    assert "collection-resident provenance" in low, (
+        "report must document the collection-resident provenance precondition"
+    )
+    assert "collection-provenance.v1" in report_text, (
+        "report must cite the collection-provenance.v1 manifest schema"
+    )
+    # Every distinct not_run reason code the verifier can emit must be documented,
+    # so the report's enforced-bindings text matches exactly what the code checks.
+    for code in (
+        "provenance_missing",
+        "provenance_stale",
+        "provenance_corpus_unbound",
+        "provenance_mixed_run",
+        "provenance_tampered",
+        "provenance_collection_mismatch",
+        "provenance_profile_mismatch",
+        "provenance_provider_mismatch",
+    ):
+        assert code in report_text, f"report must document reason code {code!r}"
+    # The verdict must stay dark_opt_in absent a passing, provenance-bound run.
+    m = re.search(r"verdict:\s*(\w+)", report_text)
+    assert m and m.group(1) == "dark_opt_in", "verdict must stay dark_opt_in here"
+
+
+def test_report_enforced_bindings_match_code(report_text: str) -> None:
+    """The report must not OVERSTATE enforcement (Fable finding #4): identity
+    fields are value-matched only when the run supplies the expectation, a null
+    corpus is classified unbound (not stale), and the target collection is matched.
+    """
+    low = report_text.lower()
+    # corpus_sha256 null/absent is honestly classified as unbound, not a mismatch.
+    assert "unbound" in low, "report must classify a null corpus_sha256 as unbound"
+    # Identity matching is conditional on the run supplying the expectation.
+    assert "only when the run supplies" in low or "only when supplied" in low, (
+        "report must state identity fields are matched only when an expectation is supplied"
+    )
+    # The target collection name is always matched (rejects a copied sentinel).
+    assert "collection" in low and "matches" in low
+
+
+def test_report_documents_operator_run_procedure(report_text: str) -> None:
+    """The report must land the operator run procedure for a live provider run."""
+    low = report_text.lower()
+    assert "operator run procedure" in low, "report must include an operator run procedure"
+    assert "expected_point_set_id" in report_text.lower(), (
+        "run procedure must document the EXPECTED_POINT_SET_ID expectation"
+    )
+    assert "run_inference_gate.py" in report_text
+
+
 def test_support_matrix_keeps_semantic_and_rerank_experimental_optin() -> None:
     text = SUPPORT_MATRIX.read_text()
     sem = [l for l in text.splitlines() if l.startswith("| Semantic search")]
