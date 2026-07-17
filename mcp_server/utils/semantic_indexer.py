@@ -259,6 +259,22 @@ def ensure_qdrant_collection(
 class SemanticIndexer:
     """Index code using semantic profile embeddings stored in Qdrant."""
 
+    # INFERLIVEGATE Lane A: collection-resident provenance manifest.
+    #
+    # After a successful index build the producer upserts ONE reserved sentinel
+    # point into the live Qdrant collection whose payload is the
+    # ``collection-provenance.v1`` manifest (tagged ``__provenance__: True`` so
+    # ordinary semantic search never surfaces it). A benchmark querying the live
+    # collection can then bind the points it queried to the build provenance
+    # WITHOUT reading the local ``.index_metadata.json`` file.
+    PROVENANCE_VERSION = "collection-provenance.v1"
+    # Reserved point id for the provenance sentinel. Ordinary points use
+    # content-hash-derived 64-bit ids (``_symbol_id``), so id 0 is never minted
+    # for a real chunk and is safe to reserve.
+    PROVENANCE_POINT_ID = 0
+    # Payload key marking the reserved sentinel; excluded from all search results.
+    PROVENANCE_TAG = "__provenance__"
+
     # Document type weights for similarity calculations
     DOCUMENT_TYPE_WEIGHTS = {
         "markdown": 1.2,  # Documentation gets higher weight
@@ -2572,6 +2588,7 @@ class SemanticIndexer:
             "file_summary_indexed": file_embed is not None,
             "used_fallback_chunks": prep["used_fallback_chunks"],
             "semantic_points_linked": len(point_links),
+            "point_ids": [int(point.id) for point in points],
         }
 
     def index_file(
@@ -2746,14 +2763,22 @@ class SemanticIndexer:
         # Phase 4: store per-file using pre-computed embeddings
         indexed = 0
         failed = 0
+        built_point_ids: List[int] = []
         for path, prep, start, end in file_slices:
             file_embeds = all_embeds[start:end]
             try:
-                self._store_file_embeddings(path, prep, file_embeds)
+                store_result = self._store_file_embeddings(path, prep, file_embeds)
+                built_point_ids.extend(store_result.get("point_ids", []))
                 indexed += 1
             except Exception as exc:
                 logger.error("Failed to store embeddings for %s: %s", path, exc)
                 failed += 1
+
+        # Phase 5: stamp collection-resident provenance for this successful build.
+        # Best-effort: a provenance-write failure is logged but never fails the
+        # index build that already durably wrote its points.
+        if indexed:
+            self._write_collection_provenance_best_effort(point_ids=built_point_ids)
 
         logger.info(
             "Batch semantic indexing complete: %d indexed, %d failed, %d skipped",
@@ -2830,6 +2855,9 @@ class SemanticIndexer:
             rerank_input: List[dict[str, Any]] = []
             for res in results:
                 payload = dict(res.payload or {})
+                # Never surface the reserved collection-provenance sentinel.
+                if payload.get(self.PROVENANCE_TAG):
+                    continue
                 payload["score"] = res.score
                 payload.update(self._semantic_result_metadata())
                 rerank_input.append(payload)
@@ -2841,6 +2869,148 @@ class SemanticIndexer:
             raise RuntimeError(
                 f"Semantic search failed - Qdrant error: {e}. " "Connection may have been lost."
             )
+
+    # ------------------------------------------------------------------
+    # INFERLIVEGATE Lane A: collection-resident provenance
+    # ------------------------------------------------------------------
+    def _served_model_provenance(self) -> tuple[str, str]:
+        """Resolve ``(provider_id, provider_revision)`` for the manifest.
+
+        Reuses the attested embedding provenance already available on the write
+        path (``self._attestation``). ``provider_id`` is the served model id when
+        the endpoint reported one, else the declared model name. ``provider_revision``
+        is the reported model revision when available, otherwise the literal source
+        label (``'declared'`` or ``'unknown'``) per the collection-provenance.v1
+        contract.
+        """
+        provider_id = self.embedding_model
+        provider_revision = "unknown"
+        attestation = getattr(self, "_attestation", None)
+        derived = getattr(attestation, "derived", None) if attestation is not None else None
+        if isinstance(derived, dict):
+            served = derived.get("served_model_id") or {}
+            if isinstance(served, dict) and served.get("value"):
+                provider_id = str(served["value"])
+            revision = derived.get("model_revision") or {}
+            if isinstance(revision, dict):
+                source = revision.get("source")
+                if source == "reported" and revision.get("value"):
+                    provider_revision = str(revision["value"])
+                elif source in ("declared", "unknown"):
+                    provider_revision = source
+        return provider_id, provider_revision
+
+    def _compute_point_set_id(self, point_ids: Iterable[Any]) -> str:
+        """Deterministic id for this build from its point/chunk ids.
+
+        Order-independent (sorted) and duplicate-insensitive so the same built
+        point set always yields the same id, and any change to the set of points
+        yields a different id. The reserved provenance sentinel id is never part
+        of the set it describes.
+        """
+        normalized = sorted(
+            {
+                str(pid)
+                for pid in point_ids
+                if pid is not None and str(pid) != str(self.PROVENANCE_POINT_ID)
+            }
+        )
+        digest = hashlib.sha256("\n".join(normalized).encode("utf-8")).hexdigest()
+        return digest
+
+    def build_collection_provenance_manifest(
+        self,
+        point_ids: Optional[Iterable[Any]] = None,
+        *,
+        corpus_sha256: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Build the ``collection-provenance.v1`` manifest for this build."""
+        provider_id, provider_revision = self._served_model_provenance()
+        return {
+            "provenance_version": self.PROVENANCE_VERSION,
+            "collection": self.collection,
+            "indexed_commit": self._get_git_commit_hash(),
+            "corpus_sha256": corpus_sha256,
+            "profile_fingerprint": self.compatibility_fingerprint,
+            "provider_id": provider_id,
+            "provider_revision": provider_revision,
+            "point_set_id": self._compute_point_set_id(point_ids or []),
+            "written_at": datetime.now().isoformat(),
+        }
+
+    def write_collection_provenance(
+        self,
+        point_ids: Optional[Iterable[Any]] = None,
+        *,
+        corpus_sha256: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Upsert the reserved collection-provenance sentinel point.
+
+        Writes ONE reserved point (id ``PROVENANCE_POINT_ID``) whose payload is the
+        ``collection-provenance.v1`` manifest tagged ``__provenance__: True`` so
+        ordinary semantic search never returns it. Returns the manifest that was
+        written, or ``None`` when Qdrant is unavailable.
+        """
+        if not getattr(self, "_qdrant_available", False):
+            return None
+        manifest = self.build_collection_provenance_manifest(
+            point_ids, corpus_sha256=corpus_sha256
+        )
+        payload = {self.PROVENANCE_TAG: True, **manifest}
+        dimension = int(self.embedding_dimension)
+        # A unit-norm sentinel vector (never a zero vector, which cosine-distance
+        # backends reject). The point is filtered out of search regardless.
+        vector = [0.0] * dimension
+        if dimension:
+            vector[0] = 1.0
+        point = models.PointStruct(
+            id=self.PROVENANCE_POINT_ID, vector=vector, payload=payload
+        )
+        self.qdrant.upsert(collection_name=self.collection, points=[point])
+        logger.info(
+            "Wrote collection-provenance sentinel to '%s' (point_set_id=%s)",
+            self.collection,
+            manifest["point_set_id"],
+        )
+        return manifest
+
+    def _write_collection_provenance_best_effort(
+        self,
+        point_ids: Optional[Iterable[Any]] = None,
+        *,
+        corpus_sha256: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Best-effort provenance write: log and swallow failures.
+
+        A provenance-write failure must never corrupt or fail an otherwise
+        successful index build, so this is called inside the build success path
+        but never propagates an exception.
+        """
+        try:
+            return self.write_collection_provenance(
+                point_ids, corpus_sha256=corpus_sha256
+            )
+        except Exception as exc:  # pragma: no cover - defensive best-effort guard
+            logger.warning(
+                "Failed to write collection provenance for '%s': %s: %s",
+                self.collection,
+                type(exc).__name__,
+                exc,
+            )
+            return None
+
+    def read_collection_provenance(
+        self, collection: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch the reserved provenance sentinel manifest from a collection.
+
+        Returns the ``collection-provenance.v1`` manifest dict, or ``None`` when
+        the sentinel is absent, unreadable, or not a provenance record.
+        """
+        target = collection or self.collection
+        if not getattr(self, "_qdrant_available", False):
+            return None
+        return _read_collection_provenance_sentinel(self.qdrant, target)
 
     # ------------------------------------------------------------------
     def index_symbol(
@@ -3327,6 +3497,10 @@ class SemanticIndexer:
         for res in results:
             payload = res.payload or {}
 
+            # Never surface the reserved collection-provenance sentinel.
+            if payload.get(self.PROVENANCE_TAG):
+                continue
+
             # Filter by document types if specified
             if doc_types:
                 doc_type = payload.get("doc_type", "code")
@@ -3683,3 +3857,62 @@ class SemanticIndexer:
     def _file_summary_chunk_id(relative_path: str) -> str:
         """Return a deterministic file-summary chunk id for a file."""
         return f"{relative_path}:file-summary"
+
+
+# ---------------------------------------------------------------------------
+# INFERLIVEGATE Lane A: module-level provenance reader (Lane B integration seam)
+# ---------------------------------------------------------------------------
+def _read_collection_provenance_sentinel(
+    client: Any, collection: str
+) -> Optional[Dict[str, Any]]:
+    """Read + parse the reserved collection-provenance sentinel from a raw client.
+
+    Retrieves the reserved sentinel point (``PROVENANCE_POINT_ID``) from ``client``,
+    verifies it carries the ``__provenance__`` tag and the ``collection-provenance.v1``
+    schema version, and returns the manifest with the internal tag stripped. Returns
+    ``None`` for any absent/unreadable/non-provenance case — it never fabricates a
+    binding.
+    """
+    if client is None or not hasattr(client, "retrieve"):
+        return None
+    try:
+        records = client.retrieve(
+            collection_name=collection,
+            ids=[SemanticIndexer.PROVENANCE_POINT_ID],
+            with_payload=True,
+        )
+    except Exception as exc:
+        logger.debug(
+            "Could not read collection provenance from '%s': %s: %s",
+            collection,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    for record in records or []:
+        payload = dict(getattr(record, "payload", None) or {})
+        if not payload.get(SemanticIndexer.PROVENANCE_TAG):
+            continue
+        manifest = {
+            key: value
+            for key, value in payload.items()
+            if key != SemanticIndexer.PROVENANCE_TAG
+        }
+        if manifest.get("provenance_version") != SemanticIndexer.PROVENANCE_VERSION:
+            return None
+        return manifest
+    return None
+
+
+def read_collection_provenance(
+    client: Any, collection: str
+) -> Optional[Dict[str, Any]]:
+    """Canonical module-level reader for the collection-resident provenance manifest.
+
+    A live-collection consumer (the INFERLIVEGATE benchmark) passes a raw Qdrant
+    ``client`` and ``collection`` name and gets back the ``collection-provenance.v1``
+    manifest dict written by :meth:`SemanticIndexer.write_collection_provenance`, or
+    ``None`` when no verified provenance sentinel is present. This stays in lockstep
+    with the producer's sentinel id/tag so consumers never need to hardcode them.
+    """
+    return _read_collection_provenance_sentinel(client, collection)

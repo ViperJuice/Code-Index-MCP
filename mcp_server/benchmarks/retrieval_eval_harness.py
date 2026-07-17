@@ -242,6 +242,217 @@ def load_frozen_eval(eval_dir: str | Path) -> FrozenEval:
 
 
 # ---------------------------------------------------------------------------
+# Collection-resident provenance verification (INFERLIVEGATE, IF-0-INFERLIVEGATE-1)
+# ---------------------------------------------------------------------------
+#
+# Lane A (the semantic-index PRODUCER) persists an immutable provenance manifest
+# *inside the live Qdrant collection* (not only the local
+# ``.index_metadata.json`` the benchmark cannot bind to the queried points). The
+# gate reads that collection-resident manifest and verifies it against the frozen
+# corpus BEFORE any dense/hybrid/rerank arm's metrics are allowed to count. This
+# module owns the verifier (Lane B) so the gate's counting decision is testable
+# with a fake manifest and needs no live services.
+
+#: The one accepted provenance schema/version tag. Any other value (or a missing
+#: tag) is a tampered/unrecognized binding — its metrics never count.
+PROVENANCE_VERSION = "collection-provenance.v1"
+
+#: Keys the ``collection-provenance.v1`` manifest MUST carry. A manifest missing
+#: any of these is treated as tampered (schema does not match the contract).
+PROVENANCE_REQUIRED_KEYS: Tuple[str, ...] = (
+    "provenance_version",
+    "collection",
+    "indexed_commit",
+    "corpus_sha256",
+    "profile_fingerprint",
+    "provider_id",
+    "provider_revision",
+    "point_set_id",
+    "written_at",
+)
+
+#: Identity fields that must additionally be *recorded* (non-empty) for a
+#: verified binding: the indexed commit, the embedding profile fingerprint, and
+#: the provider revision. (``corpus_sha256`` is checked by value below.)
+PROVENANCE_RECORDED_FIELDS: Tuple[str, ...] = (
+    "indexed_commit",
+    "profile_fingerprint",
+    "provider_revision",
+)
+
+#: not_run reason codes, one per distinct failure mode. Each maps a live
+#: collection's binding to a truthful, non-overlapping cause.
+PROVENANCE_MISSING = "provenance_missing"      # no binding written into the collection
+PROVENANCE_STALE = "provenance_stale"          # commit or corpus checksum mismatch
+PROVENANCE_MIXED_RUN = "provenance_mixed_run"  # point_set_id != the run's expectation
+PROVENANCE_TAMPERED = "provenance_tampered"    # schema/version wrong or fields absent
+
+
+@dataclass
+class ProvenanceVerification:
+    """Result of verifying a live collection's resident provenance manifest.
+
+    ``verified`` is True only when the collection's resident binding proves the
+    queried points were built from the *frozen* corpus (matching commit +
+    ``corpus_sha256``), with the embedding profile / provider revision recorded
+    and, when the run declares an expected ``point_set_id``, the same build id.
+
+    When ``verified`` is False, ``reason_code`` is exactly one of
+    :data:`PROVENANCE_MISSING`, :data:`PROVENANCE_STALE`,
+    :data:`PROVENANCE_MIXED_RUN`, :data:`PROVENANCE_TAMPERED` — the distinct
+    per-case cause — and :attr:`not_run_reason` is the operator-facing string the
+    gate records for the arm.
+    """
+
+    verified: bool
+    reason_code: Optional[str]
+    detail: str
+    manifest: Optional[Dict[str, Any]] = None
+
+    @property
+    def not_run_reason(self) -> str:
+        """The ``provenance_mismatch`` reason string recorded for a gated arm.
+
+        Names the general ``provenance_mismatch`` class plus the specific
+        ``reason_code`` and human detail, so the artifact never asserts a live
+        collection is trustworthy when its resident binding does not verify.
+        """
+        if self.verified:
+            return "collection-resident provenance verified against the frozen corpus"
+        return f"provenance_mismatch ({self.reason_code}): {self.detail}"
+
+
+def verify_collection_provenance(
+    manifest: Optional[Mapping[str, Any]],
+    frozen: "FrozenEval",
+    *,
+    expected_point_set_id: Optional[str] = None,
+) -> ProvenanceVerification:
+    """Verify a live collection's resident provenance against the frozen corpus.
+
+    This is the gate precondition for counting a dense/hybrid/rerank arm's
+    metrics: the queried Qdrant points must prove they were built from the exact
+    frozen corpus this eval binds. It is a pure function of a manifest dict and
+    the loaded :class:`FrozenEval`, so the gate's counting logic is testable with
+    a fabricated manifest and no live services.
+
+    Verification (in precedence order, so each failure has ONE cause):
+
+    1. **missing** — no resident manifest at all -> :data:`PROVENANCE_MISSING`.
+    2. **tampered** — wrong/absent ``provenance_version``, a missing required key,
+       or an empty identity field -> :data:`PROVENANCE_TAMPERED`.
+    3. **stale** — ``indexed_commit`` != the frozen corpus commit, or
+       ``corpus_sha256`` != the frozen ``corpus_sha256`` -> :data:`PROVENANCE_STALE`.
+    4. **mixed-run** — a run that declares ``expected_point_set_id`` sees a
+       collection whose ``point_set_id`` differs -> :data:`PROVENANCE_MIXED_RUN`.
+
+    Otherwise the binding is **verified**.
+    """
+    if not manifest:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_MISSING,
+            detail=(
+                "no collection-resident provenance manifest was found in the live "
+                "collection; the producer did not persist a "
+                f"{PROVENANCE_VERSION!r} binding, so the queried points cannot be "
+                "bound to the frozen corpus"
+            ),
+            manifest=None,
+        )
+    if not isinstance(manifest, Mapping):
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_TAMPERED,
+            detail=f"provenance is not a mapping (got {type(manifest).__name__})",
+            manifest=None,
+        )
+
+    snapshot = dict(manifest)
+
+    version = snapshot.get("provenance_version")
+    if version != PROVENANCE_VERSION:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_TAMPERED,
+            detail=(
+                f"provenance_version {version!r} is not the accepted "
+                f"{PROVENANCE_VERSION!r} schema"
+            ),
+            manifest=snapshot,
+        )
+
+    missing_keys = [k for k in PROVENANCE_REQUIRED_KEYS if k not in snapshot]
+    if missing_keys:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_TAMPERED,
+            detail=f"provenance manifest missing required keys: {missing_keys}",
+            manifest=snapshot,
+        )
+
+    for field_name in PROVENANCE_RECORDED_FIELDS:
+        if not snapshot.get(field_name):
+            return ProvenanceVerification(
+                verified=False,
+                reason_code=PROVENANCE_TAMPERED,
+                detail=f"provenance manifest field {field_name!r} is empty/absent",
+                manifest=snapshot,
+            )
+
+    expected_commit = frozen.corpus_manifest.get("commit")
+    indexed_commit = snapshot.get("indexed_commit")
+    if expected_commit and indexed_commit != expected_commit:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_STALE,
+            detail=(
+                f"collection indexed_commit {indexed_commit!r} != frozen corpus "
+                f"commit {expected_commit!r}; the queried points were built from a "
+                "different revision than the frozen corpus"
+            ),
+            manifest=snapshot,
+        )
+
+    corpus_sha = snapshot.get("corpus_sha256")
+    if corpus_sha != frozen.corpus_sha256:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_STALE,
+            detail=(
+                f"collection corpus_sha256 {corpus_sha!r} != frozen corpus_sha256 "
+                f"{frozen.corpus_sha256!r}; the indexed corpus does not match the "
+                "frozen dataset this gate binds"
+            ),
+            manifest=snapshot,
+        )
+
+    if expected_point_set_id is not None and snapshot.get("point_set_id") != expected_point_set_id:
+        return ProvenanceVerification(
+            verified=False,
+            reason_code=PROVENANCE_MIXED_RUN,
+            detail=(
+                f"collection point_set_id {snapshot.get('point_set_id')!r} != this "
+                f"run's expected point_set_id {expected_point_set_id!r}; the "
+                "collection mixes a different index build than the run scores"
+            ),
+            manifest=snapshot,
+        )
+
+    return ProvenanceVerification(
+        verified=True,
+        reason_code=None,
+        detail=(
+            "collection-resident provenance verified against the frozen corpus "
+            f"(indexed_commit {indexed_commit}, corpus_sha256 matches, "
+            f"profile {snapshot.get('profile_fingerprint')!r}, "
+            f"provider_revision {snapshot.get('provider_revision')!r})"
+        ),
+        manifest=snapshot,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Metrics (pure functions)
 # ---------------------------------------------------------------------------
 

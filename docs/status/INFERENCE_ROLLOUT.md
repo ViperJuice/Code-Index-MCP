@@ -71,20 +71,94 @@ In **this** environment the embedding endpoint is down and the functional rerank
 probe fails, so all three provider arms stay `not_run` and the verdict stays
 `dark_opt_in`. That is the expected offline outcome.
 
-### Precondition for a LIVE provider run to count
+### Precondition for a LIVE provider run to count — collection-resident provenance
 
 A live provider run cannot be validated in this offline environment, and its
-numbers do **not** count toward the gate until an additional precondition is
-met: **the live Qdrant collection must be verified against the frozen corpus
-before scoring.** Specifically, a live run must confirm the collection's indexed
-**commit**, **corpus checksum** (`corpus_sha256`), **profile fingerprint**, and
-**provider revision** match the frozen corpus this gate binds (`corpus_commit`
-`f7c060b…`, `corpus_sha256` above). A collection indexed against a different
-commit, corpus, embedding profile, or provider revision would make dense/hybrid/
-hybrid_rerank metrics unattributable to the frozen eval set, so such a run is
-**invalid** and its verdict must not be recorded as gate evidence. This is a
-stated gate precondition, not an implementation detail: numbers from an
-unverified live collection are out of contract.
+numbers do **not** count toward the gate until an additional, now-enforced
+precondition is met (IF-0-INFERLIVEGATE-1): **the queried Qdrant points must
+carry a collection-resident provenance binding that verifies against the frozen
+corpus BEFORE any of the arm's metrics are counted.**
+
+This is stronger than a local `.index_metadata.json` sidecar, which the
+benchmark cannot bind to the points it actually queries. The semantic-index
+**producer** persists an immutable `collection-provenance.v1` manifest *inside
+the collection*, and the gate reads it back and verifies it. The manifest binds:
+
+```
+collection-provenance.v1 = {
+  "provenance_version": "collection-provenance.v1",
+  "collection": "…", "indexed_commit": "<git sha>", "corpus_sha256": "<sha|null>",
+  "profile_fingerprint": "…", "provider_id": "…", "provider_revision": "…",
+  "point_set_id": "…", "written_at": "…"
+}
+```
+
+The gate's verifier (`verify_collection_provenance`, in
+`mcp_server/benchmarks/retrieval_eval_harness.py`) requires, before counting
+`dense` / `hybrid` / `hybrid_rerank`:
+
+- `corpus_sha256` **matches** the frozen dataset's corpus
+  (`corpus_sha256` `93c894e…` above);
+- `indexed_commit` **matches** the frozen corpus commit (`f7c060b…`) and is
+  present;
+- `profile_fingerprint` and `provider_revision` are **recorded**; and
+- when the run declares an expected `point_set_id`, the collection's
+  `point_set_id` **matches** it (so a run never scores a mixed index build).
+
+Any binding that fails records the affected arm **`not_run`** with a distinct,
+per-case `provenance_mismatch` reason code — never invented metrics:
+
+| Case | Meaning | `reason_code` |
+| --- | --- | --- |
+| **missing** | no resident binding was written into the collection | `provenance_missing` |
+| **stale** | `indexed_commit` or `corpus_sha256` does not match the frozen corpus | `provenance_stale` |
+| **mixed-run** | `point_set_id` differs from the run's expectation (a mixed index build) | `provenance_mixed_run` |
+| **tampered** | wrong/absent `provenance_version`, a missing required key, or an empty identity field | `provenance_tampered` |
+
+The provider arms are gated on **both** the live probes (embedding endpoint +
+Qdrant, plus the functional `rerank.v1` probe for `hybrid_rerank`) **and**
+collection-resident provenance verification. A collection indexed against a
+different commit, corpus, embedding profile, provider revision, or index build
+makes dense/hybrid/hybrid_rerank metrics unattributable to the frozen eval set,
+so such a run is **invalid** and its verdict must not be recorded as gate
+evidence. Numbers from an unverified live collection are out of contract.
+
+In **this** offline environment the embedding endpoint is down, so the provider
+arms never reach provenance verification; the run records
+`provenance_verified: "not_applicable"` (evaluated only once the provider is
+reachable) and the verdict stays `dark_opt_in`.
+
+### Operator run procedure (live provider)
+
+Only an operator with a reachable, provenance-verified collection may produce
+gate-counting numbers. Steps:
+
+1. **Index with a provenance-writing producer.** Run the semantic-index producer
+   so it persists the `collection-provenance.v1` manifest into the collection
+   (not only the local `.index_metadata.json`). The producer records
+   `indexed_commit`, the full `corpus_sha256`, the embedding `profile_fingerprint`,
+   `provider_id` / `provider_revision`, and a `point_set_id` for the build.
+2. **Bring up the live services.** Qdrant on `localhost:6333`, the OpenAI-compatible
+   embedding endpoint, and (for `hybrid_rerank`) a `rerank.v1` endpoint. Export:
+   - `SEMANTIC_COLLECTION_NAME` — the collection to score;
+   - `SEMANTIC_EMBEDDING_HOST` / `SEMANTIC_EMBEDDING_PORT` / `SEMANTIC_EMBEDDING_BASE_URL`;
+   - `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_VECTOR_DIMENSION`, `OPENAI_API_KEY`;
+   - `RERANK_ENDPOINT_URL`;
+   - `EXPECTED_POINT_SET_ID` — the build id this run intends to score (enables the
+     mixed-run check).
+3. **Run the gate driver:**
+   ```
+   uv run --no-sync python benchmarks/retrieval_eval/runs/inferbound-v10/run_inference_gate.py
+   ```
+   The driver reads the collection's resident provenance, verifies it against the
+   frozen corpus, and only then scores the provider arms. If verification fails,
+   the arms are recorded `not_run` with the matching `provenance_mismatch` reason
+   and the verdict stays `dark_opt_in`.
+4. **Only a verified, passing run may move a default.** Update
+   `INFERENCE_ROLLOUT.md` / `SUPPORT_MATRIX.md` off `dark_opt_in` **only** from a
+   run where `provenance_verified: true`, the `hybrid_rerank` arm ran and cleared
+   every frozen predicate, and the holdout was not used for tuning. No default is
+   flipped here.
 
 ## Metrics produced (lexical arm only)
 

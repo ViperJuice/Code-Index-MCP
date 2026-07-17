@@ -12,6 +12,11 @@ import pytest
 from mcp_server.benchmarks.retrieval_eval_harness import (
     ARMS,
     DEPTHS,
+    PROVENANCE_MISSING,
+    PROVENANCE_MIXED_RUN,
+    PROVENANCE_STALE,
+    PROVENANCE_TAMPERED,
+    PROVENANCE_VERSION,
     ArmSpec,
     FrozenEvalError,
     HoldoutViolationError,
@@ -22,6 +27,7 @@ from mcp_server.benchmarks.retrieval_eval_harness import (
     percentile,
     recall_at_k,
     reciprocal_rank,
+    verify_collection_provenance,
 )
 
 # ---------------------------------------------------------------------------
@@ -123,6 +129,7 @@ def _write_eval_dir(tmp_path: Path, *, signed=True, break_checksum=None, omit_ma
     corpus = {
         "repo": "test-repo",
         "doc_count": 2,
+        "commit": "a" * 40,
         "corpus_sha256": corpus_sha,
         "corpus_sha256_algorithm": "sha256 of sorted included relative paths",
     }
@@ -386,3 +393,101 @@ def test_load_frozen_eval_real_dataset():
 
     # Result must be JSON-serializable.
     json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Collection-resident provenance verification (INFERLIVEGATE, IF-0-INFERLIVEGATE-1)
+# ---------------------------------------------------------------------------
+#
+# The gate counts a dense/hybrid/rerank arm's metrics ONLY when the live Qdrant
+# collection's resident provenance verifies against the frozen corpus. These
+# cases pin the not_run reason taxonomy — one distinct reason_code per failure
+# mode — using a fabricated manifest and no live services.
+
+def _frozen_for_provenance(tmp_path):
+    """A loaded FrozenEval whose corpus commit is ``a*40`` and corpus_sha256 is
+    ``c*64`` (from ``_write_eval_dir``)."""
+    return load_frozen_eval(_write_eval_dir(tmp_path))
+
+
+def _valid_manifest():
+    """A well-formed ``collection-provenance.v1`` manifest that matches the fake
+    frozen corpus (commit ``a*40`` / corpus_sha256 ``c*64``)."""
+    return {
+        "provenance_version": PROVENANCE_VERSION,
+        "collection": "code-embeddings",
+        "indexed_commit": "a" * 40,
+        "corpus_sha256": "c" * 64,
+        "profile_fingerprint": "profile-abc123",
+        "provider_id": "openai_compatible",
+        "provider_revision": "voyage-code-3@2026-07-01",
+        "point_set_id": "build-42",
+        "written_at": "2026-07-11T00:00:00Z",
+    }
+
+
+def test_provenance_valid_manifest_verifies(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    result = verify_collection_provenance(
+        _valid_manifest(), frozen, expected_point_set_id="build-42"
+    )
+    assert result.verified is True
+    assert result.reason_code is None
+    # Verified with no point-set expectation is also fine.
+    assert verify_collection_provenance(_valid_manifest(), frozen).verified is True
+
+
+def test_provenance_missing_binding_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    for empty in (None, {}):
+        result = verify_collection_provenance(empty, frozen)
+        assert result.verified is False
+        assert result.reason_code == PROVENANCE_MISSING
+        assert "provenance_mismatch" in result.not_run_reason
+        assert PROVENANCE_MISSING in result.not_run_reason
+
+
+def test_provenance_stale_commit_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    manifest["indexed_commit"] = "b" * 40  # different revision than the frozen corpus
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_STALE
+
+
+def test_provenance_stale_corpus_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    manifest["corpus_sha256"] = "d" * 64  # indexed a different corpus
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_STALE
+
+
+def test_provenance_mixed_run_point_set_mismatch_is_not_run(tmp_path):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()  # matches commit + corpus, but wrong point_set
+    result = verify_collection_provenance(
+        manifest, frozen, expected_point_set_id="build-99"
+    )
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_MIXED_RUN
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda m: m.update({"provenance_version": "collection-provenance.v0"}),
+        lambda m: m.pop("provenance_version"),
+        lambda m: m.pop("point_set_id"),          # missing required key
+        lambda m: m.update({"profile_fingerprint": ""}),  # recorded field empty
+    ],
+)
+def test_provenance_tampered_schema_is_not_run(tmp_path, mutate):
+    frozen = _frozen_for_provenance(tmp_path)
+    manifest = _valid_manifest()
+    mutate(manifest)
+    result = verify_collection_provenance(manifest, frozen)
+    assert result.verified is False
+    assert result.reason_code == PROVENANCE_TAMPERED

@@ -10,19 +10,28 @@ Reproducible driver for the retrieval-rollout gate. It:
    endpoint (TCP), and — crucially — a *functional* rerank probe that POSTs a
    minimal ``rerank.v1`` request and requires a contract-valid response. TCP
    reachability alone is not enough for the reranker.
-4. Runs only the arms that can actually run:
+4. Verifies the live collection's **resident provenance** against the frozen
+   corpus (IF-0-INFERLIVEGATE-1). Before any dense/hybrid/rerank arm's metrics
+   are allowed to count, the queried Qdrant points must carry a
+   ``collection-provenance.v1`` binding whose ``corpus_sha256`` /
+   ``indexed_commit`` match the frozen corpus (with profile fingerprint +
+   provider revision recorded, and — when the run declares one — the expected
+   ``point_set_id``). A missing / stale / mixed-run / tampered binding records
+   the provider arms ``not_run`` with a distinct ``provenance_mismatch`` reason.
+5. Runs only the arms that can actually run:
      * ``lexical`` — a real, reproducible BM25-lite ranker over the frozen
        corpus file *paths + names* (NOT file contents). This never sends source
        text off-host, so it trivially satisfies the zero-egress bound.
      * ``dense`` / ``hybrid`` — recorded ``not_run`` with a reason when the live
-       embedding provider or Qdrant is unreachable.
+       embedding provider or Qdrant is unreachable, or when collection-resident
+       provenance does not verify against the frozen corpus.
      * ``hybrid_rerank`` — additionally gated on the functional rerank probe: if
        the rerank endpoint is down (or not speaking ``rerank.v1``) it is recorded
        ``not_run`` rather than run as an arm-with-errors, so the gate's decisive
        arm is never scored against a dead reranker. When it *does* run, the
        reranker candidate text is the retrieved **document content** (loaded from
        the pinned corpus commit), not just file paths. No numbers are invented.
-5. Computes the verdict IN CODE from the frozen ``decision_algorithm`` in
+6. Computes the verdict IN CODE from the frozen ``decision_algorithm`` in
    ``gate_thresholds.json`` — the verdict is derived, not authored.
 
 Evaluation uses ONLY the non-holdout (``main``) split, per the frozen decision
@@ -50,8 +59,10 @@ from typing import Any, Dict, List, Mapping
 
 from mcp_server.benchmarks.retrieval_eval_harness import (
     ArmSpec,
+    ProvenanceVerification,
     RetrievalBenchmarkHarness,
     load_frozen_eval,
+    verify_collection_provenance,
 )
 
 EVAL_DIR = Path("benchmarks/retrieval_eval")
@@ -280,6 +291,65 @@ def rerank_not_run_reason(rerank_url: str) -> str:
         "gate decision hinges on, so it is recorded not_run rather than run with "
         "errors — no invented rerank scores."
     )
+
+
+# ---------------------------------------------------------------------------
+# Collection-resident provenance read (INFERLIVEGATE, IF-0-INFERLIVEGATE-1)
+# ---------------------------------------------------------------------------
+
+# Fallback sentinel conventions, matching the Lane A producer
+# (``mcp_server/utils/semantic_indexer.py``): the producer upserts ONE reserved
+# point (id ``PROVENANCE_POINT_ID``) whose payload is the ``collection-provenance.v1``
+# manifest merged with a ``PROVENANCE_TAG`` marker. These defaults are used only
+# if the producer module cannot be imported to read its published constants.
+_DEFAULT_PROVENANCE_POINT_ID = 0
+_DEFAULT_PROVENANCE_TAG = "__provenance__"
+
+
+def read_live_collection_provenance(client: Any, collection: str) -> Dict[str, Any] | None:
+    """Read the collection-resident provenance manifest from the live collection.
+
+    Per the shared contract, the semantic-index producer (Lane A) writes a
+    reserved sentinel point into the collection whose payload is the
+    ``collection-provenance.v1`` manifest. This reader parses that sentinel point
+    directly, using the producer's OWN published constants
+    (``SemanticIndexer.PROVENANCE_POINT_ID`` / ``PROVENANCE_TAG``) so it stays in
+    lock-step with the producer without instantiating a full indexer (which would
+    require live embedding-provider config). The producer's ``__provenance__``
+    marker key is stripped so the returned dict is the bare manifest.
+
+    Any failure (producer not importable, no sentinel point, unreadable payload)
+    returns ``None`` so :func:`verify_collection_provenance` records a truthful
+    ``provenance_missing`` rather than guessing — this reader never fabricates a
+    binding.
+    """
+    point_id: Any = _DEFAULT_PROVENANCE_POINT_ID
+    tag = _DEFAULT_PROVENANCE_TAG
+    try:
+        from mcp_server.utils.semantic_indexer import SemanticIndexer  # noqa: WPS433 - lazy
+
+        point_id = getattr(SemanticIndexer, "PROVENANCE_POINT_ID", point_id)
+        tag = getattr(SemanticIndexer, "PROVENANCE_TAG", tag)
+    except Exception:  # noqa: BLE001 - use the default sentinel conventions
+        pass
+
+    try:
+        points = client.retrieve(
+            collection_name=collection,
+            ids=[point_id],
+            with_payload=True,
+        )
+    except Exception:  # noqa: BLE001 - no sentinel point / retrieve unsupported
+        return None
+    for point in points or []:
+        payload = dict(getattr(point, "payload", None) or {})
+        if not payload:
+            continue
+        # Strip the producer's reserved marker; the remainder is the manifest.
+        payload.pop(tag, None)
+        if payload:
+            return payload
+    return None
 
 
 def build_provider_arms(
@@ -518,47 +588,99 @@ def main() -> None:
         "lexical": ArmSpec(fn=lambda q: ranker.rank(q["query"]), inference_cost=0.0, egress=False)
     }
 
-    # --- provider arms: dense/hybrid RUN iff the embedding endpoint AND Qdrant
-    # are both reachable; hybrid_rerank ADDITIONALLY requires the functional
-    # rerank probe to pass. Any arm that cannot run gets a truthful, probe-derived
-    # not_run reason. Arms are never unconditionally marked not_run.
+    # --- provider arms: dense/hybrid RUN iff (a) the embedding endpoint AND
+    # Qdrant are both reachable AND (b) the live collection's RESIDENT provenance
+    # verifies against the frozen corpus; hybrid_rerank ADDITIONALLY requires the
+    # functional rerank probe to pass. Provenance verification is the new gate
+    # precondition: even with live services up, an arm's metrics are only counted
+    # when the queried Qdrant points prove they were built from the frozen corpus.
+    # A missing/stale/mixed-run/tampered binding records the provider arms
+    # not_run with a distinct provenance_mismatch reason. Any arm that cannot run
+    # gets a truthful reason; arms are never unconditionally marked not_run.
+    collection = os.environ.get("SEMANTIC_COLLECTION_NAME", "code-embeddings")
+    expected_point_set_id = os.environ.get("EXPECTED_POINT_SET_ID") or None
+
     not_run: Dict[str, str] = {}
-    provider_ready = embed_up and qdrant_up           # dense + hybrid
-    rerank_ready = provider_ready and rerank_up        # hybrid_rerank
+    provider_ready = embed_up and qdrant_up           # dense + hybrid live probes
+    rerank_ready = provider_ready and rerank_up        # hybrid_rerank live probe
+
+    # provenance_verified is tri-state:
+    #   "not_applicable" — live provider not reachable, so provenance was never
+    #                      evaluated (this offline environment).
+    #   False            — provider up but the resident binding did not verify.
+    #   True             — resident binding verified against the frozen corpus.
+    provenance_verified: Any = "not_applicable"
+    provenance_detail: Dict[str, Any] = {
+        "evaluated": False,
+        "reason": (
+            "live embedding provider unreachable, so the collection-resident "
+            "provenance was never read or verified; the provider arms are gated on "
+            "the live probes first"
+        ),
+    }
+    provenance: ProvenanceVerification | None = None
+
     if provider_ready:
         base_url = os.environ.get("SEMANTIC_EMBEDDING_BASE_URL") or os.environ.get(
             "OPENAI_API_BASE", f"http://{embed_host}:{embed_port}/v1"
         )
-        try:
-            arms.update(
-                build_provider_arms(
-                    corpus,
-                    ranker,
-                    embed_base_url=base_url,
-                    embed_model=os.environ.get("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
-                    embed_api_key=os.environ.get("OPENAI_API_KEY", "vllm-local"),
-                    embed_dim=int(os.environ.get("SEMANTIC_VECTOR_DIMENSION", "1024")),
-                    qdrant_host="localhost",
-                    qdrant_port=6333,
-                    collection=os.environ.get("SEMANTIC_COLLECTION_NAME", "code-embeddings"),
-                    rerank_url=rerank_url,
-                    corpus_commit=frozen.corpus_manifest["commit"],
-                    top_k=100,
-                    include_rerank=rerank_ready,
-                )
-            )
-        except Exception as exc:  # noqa: BLE001 - honest failure record, not invented metrics
-            reason = (
-                "embedding endpoint and Qdrant probes reported up, but live "
-                f"provider/reranker construction failed: {type(exc).__name__}: {exc}"
-            )
+        # Read + verify the live collection's resident provenance BEFORE building
+        # any provider arm, so unverified points can never be scored.
+        from qdrant_client import QdrantClient  # noqa: WPS433 - lazy; offline path never imports
+
+        prov_client = QdrantClient(host="localhost", port=6333)
+        manifest = read_live_collection_provenance(prov_client, collection)
+        provenance = verify_collection_provenance(
+            manifest, frozen, expected_point_set_id=expected_point_set_id
+        )
+        provenance_verified = provenance.verified
+        provenance_detail = {
+            "evaluated": True,
+            "verified": provenance.verified,
+            "reason_code": provenance.reason_code,
+            "detail": provenance.detail,
+            "expected_point_set_id": expected_point_set_id,
+            "manifest": provenance.manifest,
+        }
+
+        if not provenance.verified:
+            # Live services are up, but the queried points do not verifiably come
+            # from the frozen corpus -> every provider arm is not_run with the
+            # distinct provenance_mismatch reason. No metrics are counted.
             for a in PROVIDER_ARMS:
-                not_run[a] = reason
+                not_run[a] = provenance.not_run_reason
         else:
-            # dense/hybrid ran; hybrid_rerank only if the functional rerank probe
-            # passed. Otherwise record it not_run (dead reranker != ran-with-errors).
-            if not rerank_ready:
-                not_run["hybrid_rerank"] = rerank_not_run_reason(rerank_url)
+            try:
+                arms.update(
+                    build_provider_arms(
+                        corpus,
+                        ranker,
+                        embed_base_url=base_url,
+                        embed_model=os.environ.get("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                        embed_api_key=os.environ.get("OPENAI_API_KEY", "vllm-local"),
+                        embed_dim=int(os.environ.get("SEMANTIC_VECTOR_DIMENSION", "1024")),
+                        qdrant_host="localhost",
+                        qdrant_port=6333,
+                        collection=collection,
+                        rerank_url=rerank_url,
+                        corpus_commit=frozen.corpus_manifest["commit"],
+                        top_k=100,
+                        include_rerank=rerank_ready,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001 - honest failure record, not invented metrics
+                reason = (
+                    "embedding endpoint, Qdrant, and collection-resident provenance "
+                    "all verified, but live provider/reranker construction failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                for a in PROVIDER_ARMS:
+                    not_run[a] = reason
+            else:
+                # dense/hybrid ran; hybrid_rerank only if the functional rerank
+                # probe passed. Otherwise not_run (dead reranker != ran-with-errors).
+                if not rerank_ready:
+                    not_run["hybrid_rerank"] = rerank_not_run_reason(rerank_url)
     else:
         reason = not_run_reason(embed_up, qdrant_up, embed_host, embed_port)
         for a in PROVIDER_ARMS:
@@ -619,6 +741,12 @@ def main() -> None:
             f"embedding_endpoint_{embed_host}_{embed_port}": embed_up,
             "rerank_endpoint_functional": rerank_up,
         },
+        # Collection-resident provenance gate (IF-0-INFERLIVEGATE-1): a provider
+        # arm's metrics count ONLY when the live collection's resident binding
+        # verifies against the frozen corpus. Tri-state: true / false /
+        # "not_applicable" (provider unreachable, so provenance was never read).
+        "provenance_verified": provenance_verified,
+        "provenance_check": provenance_detail,
         "split_evaluated": "main",
         "holdout_used_for_tuning": False,
         "holdout_ids": sorted(frozen.holdout_ids),
@@ -638,6 +766,7 @@ def main() -> None:
         "arms_ran": list(artifact["arms_ran"].keys()),
         "arms_not_run": list(artifact["arms_not_run"].keys()),
         "corpus_verified": corpus_verified,
+        "provenance_verified": provenance_verified,
         "code_commit": code_commit,
         "lexical_all_pass": lexical_eval["all_pass"],
     }, indent=2))
