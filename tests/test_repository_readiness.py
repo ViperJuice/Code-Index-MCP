@@ -48,6 +48,7 @@ def test_readiness_state_values_are_exact():
         "unsupported_worktree",
         "ambiguous_selector",
         "corrupt_sqlite",
+        "index_locked",
         "missing_schema",
         "missing_provenance",
         "scheme_mismatch",
@@ -386,6 +387,47 @@ def test_sqlite_query_exception_fails_closed_as_corrupt(tmp_path, monkeypatch):
     readiness = ReadinessClassifier.classify_registered(repo_info)
 
     assert readiness.state == RepositoryReadinessState.CORRUPT_SQLITE
+
+
+def test_locked_database_classifies_as_index_locked_not_corrupt(tmp_path, monkeypatch):
+    """Cleanup item 4: a 'database is locked'/'database is busy' OperationalError is
+    a busy-but-HEALTHY index (concurrent writer contention), not corruption, and
+    must classify as the distinct INDEX_LOCKED state -- never the alarming
+    CORRUPT_SQLITE, which would advise a destructive quarantine/reindex."""
+    ReadinessClassifier.clear_index_inspection_cache()
+    repo_info = make_repo_info(tmp_path)
+
+    def locked_connect(*_args, **_kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(sqlite3, "connect", locked_connect)
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+
+    assert readiness.state == RepositoryReadinessState.INDEX_LOCKED
+    assert readiness.state != RepositoryReadinessState.CORRUPT_SQLITE
+    assert readiness.ready is False
+    # Remediation must NOT tell the operator to quarantine/reindex a healthy index.
+    assert "quarantine" not in (readiness.remediation or "").lower()
+    assert "retry" in (readiness.remediation or "").lower()
+    ReadinessClassifier.clear_index_inspection_cache()
+
+
+def test_non_lock_operational_error_still_classifies_as_corrupt(tmp_path, monkeypatch):
+    """The lock guard is specific: an OperationalError that is NOT a lock/busy
+    contention signal still fails closed as CORRUPT_SQLITE."""
+    ReadinessClassifier.clear_index_inspection_cache()
+    repo_info = make_repo_info(tmp_path)
+
+    def broken_connect(*_args, **_kwargs):
+        raise sqlite3.OperationalError("unable to open database file")
+
+    monkeypatch.setattr(sqlite3, "connect", broken_connect)
+
+    readiness = ReadinessClassifier.classify_registered(repo_info)
+
+    assert readiness.state == RepositoryReadinessState.CORRUPT_SQLITE
+    ReadinessClassifier.clear_index_inspection_cache()
 
 
 def test_unchanged_index_reuses_cached_integrity_inspection(tmp_path, monkeypatch):

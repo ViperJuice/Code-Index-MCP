@@ -802,3 +802,74 @@ def test_write_summaries_remains_summary_only(tmp_path, monkeypatch):
     assert data["chunks_summarized"] == 3
     assert data["semantic_vectors_written"] is False
     assert data["summary_missing_chunks"] == 1
+
+
+def _run_summarization_gate(monkeypatch, scheme_status: str) -> bool:
+    """Drive handle_search_code past the lazy-summarization pre-check with the
+    given chunk-scheme status and report whether a chunk was enqueued.
+
+    Cleanup item 2 regression harness: the gate must admit ``compatible_legacy``
+    (a legacy unmarked index) so summarization is not skipped until the first
+    write auto-stamps the marker."""
+    from mcp_server.cli import tool_handlers as th
+
+    item = SimpleNamespace(
+        file="pkg/mod.py",
+        line=10,
+        line_end=20,
+        symbol="fn",
+        snippet="def fn(): ...",
+        last_indexed=None,
+        source_metadata=None,
+        semantic_source=None,
+        semantic_profile_id=None,
+        semantic_collection_name=None,
+    )
+    fake_result = SimpleNamespace(
+        results=(item,),
+        semantic_requested=False,
+        source_type=None,
+        friction_categories=(),
+        history_labels=(),
+        history_repos=(),
+        include_source_metadata=False,
+        readiness={},
+        semantic_readiness=None,
+        index_unavailable=None,
+        code=None,
+        message=None,
+        semantic_profile_id=None,
+        semantic_collection_name=None,
+    )
+    monkeypatch.setattr(th, "execute_search_service", lambda **_kwargs: fake_result)
+
+    lazy_summarizer = MagicMock()
+    lazy_summarizer.can_summarize.return_value = True
+    sqlite_store = MagicMock()
+    sqlite_store.get_chunk_scheme_status.return_value = (scheme_status, None, "scheme-x")
+    sqlite_store.find_chunk_at_line.return_value = {"chunk_id": "c1"}
+
+    _run(
+        th.handle_search_code(
+            arguments={"query": "fn"},
+            dispatcher=MagicMock(),
+            repo_resolver=object(),  # no .classify -> selector path skipped
+            sqlite_store=sqlite_store,
+            lazy_summarizer=lazy_summarizer,
+        )
+    )
+    return lazy_summarizer.enqueue.called
+
+
+def test_compatible_legacy_scheme_allows_summarization(monkeypatch):
+    """A ``compatible_legacy`` (legacy unmarked) index must NOT skip lazy
+    summarization -- the pre-check now accepts it alongside compatible/empty."""
+    assert _run_summarization_gate(monkeypatch, "compatible_legacy") is True
+
+
+def test_incompatible_scheme_still_skips_summarization(monkeypatch):
+    """The gate stays fail-closed: a mismatched/rebuilding scheme still skips
+    summarization (proves the compatible_legacy admission is scoped, not a
+    blanket open of the gate)."""
+    assert _run_summarization_gate(monkeypatch, "mismatch") is False
+    assert _run_summarization_gate(monkeypatch, "rebuilding") is False

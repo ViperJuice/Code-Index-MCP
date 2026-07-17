@@ -599,3 +599,26 @@ def test_scheme_probe_reraises_non_schema_operational_error():
 
     # An older/minimal schema (table present, column absent) is absent, not corrupt.
     assert sqlite_store_module._has_chunker_rows(_NoColumnConn()) is False
+
+
+# --------------------------------------------------------------------------- #
+# Cleanup item 1: _escape_like is deduplicated (single canonical helper)
+# --------------------------------------------------------------------------- #
+def test_escape_like_is_single_canonical_helper():
+    """The chunk_id LIKE-escape helper lives once in sqlite_store; the incremental
+    indexer imports that canonical function instead of keeping a divergent copy.
+
+    Asserts both call sites resolve to the SAME object and escape ``%``, ``_``,
+    and the backslash ESCAPE char identically for a range of inputs (so a future
+    edit to one cannot silently drift the two escapings apart)."""
+    from mcp_server.indexing.incremental_indexer import _escape_like as indexer_escape
+    from mcp_server.storage.sqlite_store import _escape_like as store_escape
+
+    # Deduplicated: the indexer no longer defines its own copy.
+    assert indexer_escape is store_escape
+
+    for sample in ("plain", "a_b", "50%", "a\\b", "x_%\\y", "a:part:%", ""):
+        assert indexer_escape(sample) == store_escape(sample)
+
+    # Behavior is unchanged: backslash escaped first, then %/_ wildcards.
+    assert store_escape("a_b%c\\d") == "a\\_b\\%c\\\\d"

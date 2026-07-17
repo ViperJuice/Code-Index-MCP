@@ -678,7 +678,11 @@ async def handle_search_code(
             scheme_readable = True
             try:
                 scheme_status, _sc_marker, _sc_target = sqlite_store.get_chunk_scheme_status()
-                scheme_readable = scheme_status in ("compatible", "empty")
+                scheme_readable = scheme_status in (
+                    "compatible",
+                    "compatible_legacy",
+                    "empty",
+                )
             except Exception:
                 scheme_readable = False
             if scheme_readable:

@@ -14,7 +14,11 @@ from typing import Any, Dict, List, Optional
 from ..core.path_resolver import PathResolver
 from ..core.repo_context import RepoContext
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from ..storage.sqlite_store import SQLiteStore, assert_chunk_scheme_readable
+from ..storage.sqlite_store import (
+    SQLiteStore,
+    _escape_like,
+    assert_chunk_scheme_readable,
+)
 from ..storage.two_phase import two_phase_commit
 from ..utils.subprocess_env import get_full_env
 from .change_detector import FileChange
@@ -27,18 +31,6 @@ from .checkpoint import save as _save_ckpt
 from .lock_registry import lock_registry
 
 logger = logging.getLogger(__name__)
-
-
-def _escape_like(text: str) -> str:
-    """Escape SQL LIKE metacharacters so a literal chunk_id matches only itself.
-
-    Backslash is the ESCAPE char (see ``LIKE ? ESCAPE '\\'`` below), so it must be
-    escaped first; then the ``%`` and ``_`` wildcards are neutralised. Under v4's
-    collision-free ids a ``chunk_id`` may legitimately contain ``%``/``_``, which
-    would otherwise cause a ``chunk_id LIKE '<id>:part:%'`` query to mis-match
-    unrelated rows.
-    """
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 @dataclass
