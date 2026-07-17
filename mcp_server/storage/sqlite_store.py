@@ -509,6 +509,144 @@ class SQLiteStore:
                 removed += cursor.rowcount
             return removed
 
+    def get_live_semantic_point_ids(
+        self,
+        profile_id: Optional[str],
+        collection: Optional[str],
+        point_ids: List[Any],
+    ) -> set:
+        """Return the subset of ``point_ids`` that still have a live mapping.
+
+        A ledger point id may have been legitimately RE-CREATED (deterministic,
+        content-derived point ids) by an incremental index pass before the drain
+        runs.  Such a point id has a fresh ``semantic_points`` row and its remote
+        vector is in active use - it is NOT an orphan and must NOT be remote
+        deleted.  This resolves, in a single batched query per group, which of the
+        candidate ``point_ids`` still map to a live ``semantic_points`` row for the
+        given ``profile_id`` / ``collection``.  When the ledger row recorded no
+        ``collection`` we protect the point id across any collection for the
+        profile (err toward never deleting a live vector).
+        """
+        if not point_ids:
+            return set()
+        live: set = set()
+        with self._get_connection() as conn:
+            for start in range(0, len(point_ids), 500):
+                batch = point_ids[start : start + 500]
+                placeholders = ",".join("?" * len(batch))
+                if collection is None:
+                    sql = (
+                        f"SELECT point_id FROM semantic_points "
+                        f"WHERE profile_id = ? AND point_id IN ({placeholders})"
+                    )
+                    params: List[Any] = [profile_id, *batch]
+                else:
+                    sql = (
+                        f"SELECT point_id FROM semantic_points "
+                        f"WHERE profile_id = ? AND collection = ? "
+                        f"AND point_id IN ({placeholders})"
+                    )
+                    params = [profile_id, collection, *batch]
+                for row in conn.execute(sql, params).fetchall():
+                    live.add(row[0])
+        return live
+
+    def drain_pending_vector_deletions(
+        self,
+        delete_remote: Callable[[Optional[str], List[Any]], None],
+    ) -> Dict[str, int]:
+        """Best-effort recovery drain of the remote-vector crash-ledger (I4).
+
+        When a chunk-scheme rebuild deletes the local ``semantic_points`` rows but
+        crashes before the caller finishes the matching *remote* (Qdrant) delete,
+        the orphaned remote point ids survive only in the durable
+        ``pending_vector_deletions`` ledger.  Nothing else will ever clean them up
+        because the local mapping is already gone.  This drains that ledger: it
+        reads the pending rows, groups them by ``(profile_id, collection)`` so each
+        remote delete targets the right collection, and asks
+        ``delete_remote(collection, point_ids)`` to remove those remote points.
+
+        Guarantees:
+
+        * **no live-vector loss** - because point ids are deterministic and
+          content-derived, an incremental index pass can legitimately RE-CREATE a
+          ledger point id (fresh ``semantic_points`` row + remote vector) before
+          this drain runs.  Such a revived point id is in active use and is NEVER
+          remote deleted; only true orphans (ledger point ids with no live
+          ``semantic_points`` mapping) are deleted.  A revived row's ledger debt is
+          still cleared on success (the remote vector it pointed to is now owned by
+          the live mapping).
+        * **fail-safe** - a group's ledger rows are cleared ONLY when its
+          ``delete_remote`` returns without raising; a raise leaves that group's
+          rows in the ledger for the next attempt (an un-drained row is never
+          cleared), while OTHER healthy groups still drain.
+        * **idempotent** - an empty ledger (including a re-run after a successful
+          drain) is a no-op.
+
+        Best-effort: a remote-delete error for one group is isolated (logged and
+        swallowed) and never raises; but the ledger read/clear I/O
+        (:meth:`get_pending_vector_deletions` / :meth:`clear_pending_vector_deletions`)
+        sits outside the per-group guard and may propagate to the caller (the
+        dispatcher drain hook catches it).
+
+        Returns a small counts dict (``rows_drained``, ``rows_remaining``,
+        ``groups_failed``) for observability and tests.
+        """
+        pending = self.get_pending_vector_deletions()
+        if not pending:
+            return {"rows_drained": 0, "rows_remaining": 0, "groups_failed": 0}
+
+        groups: Dict[Tuple[Optional[str], Optional[str]], Dict[str, List[Any]]] = {}
+        for row in pending:
+            key = (row.get("profile_id"), row.get("collection"))
+            group = groups.setdefault(key, {"ledger_ids": [], "point_ids": []})
+            group["ledger_ids"].append(row["id"])
+            point_id = row.get("point_id")
+            if point_id is not None:
+                group["point_ids"].append(point_id)
+
+        drainable_ids: List[int] = []
+        groups_failed = 0
+        for (profile_id, collection), group in groups.items():
+            point_ids = list(dict.fromkeys(group["point_ids"]))
+            try:
+                # A group with no remote point ids carries no remote debt; its
+                # rows are ledger noise we can clear without a remote call.
+                if point_ids:
+                    # Partition into true orphans vs. revived point ids: a point id
+                    # that still has a live ``semantic_points`` mapping was
+                    # legitimately RE-CREATED before this drain ran and must NOT be
+                    # deleted (its remote vector is in active use).  Only orphans
+                    # (no live mapping) are remote deleted; the revived rows' ledger
+                    # debt is still cleared below on success.
+                    live = self.get_live_semantic_point_ids(
+                        profile_id, collection, point_ids
+                    )
+                    orphan_ids = [p for p in point_ids if p not in live]
+                    if orphan_ids:
+                        delete_remote(collection, orphan_ids)
+            except Exception as exc:  # best-effort recovery: keep this group's rows
+                groups_failed += 1
+                logger.warning(
+                    "Deferred pending-vector-deletion drain for profile %r / "
+                    "collection %r (%d point ids): %s",
+                    profile_id,
+                    collection,
+                    len(point_ids),
+                    exc,
+                )
+                continue
+            drainable_ids.extend(group["ledger_ids"])
+
+        rows_drained = (
+            self.clear_pending_vector_deletions(drainable_ids) if drainable_ids else 0
+        )
+        return {
+            "rows_drained": rows_drained,
+            "rows_remaining": len(pending) - rows_drained,
+            "groups_failed": groups_failed,
+        }
+
     def _ensure_chunk_summary_audit_columns(self) -> None:
         """Ensure additive chunk summary audit columns exist."""
         with self._get_connection() as conn:

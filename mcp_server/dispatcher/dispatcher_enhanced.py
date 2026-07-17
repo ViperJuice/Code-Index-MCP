@@ -3497,6 +3497,47 @@ class EnhancedDispatcher:
             record_handled_error(__name__, exc)
             return {"total": 0, "by_language": {}}
 
+    def _drain_pending_vector_deletions(self, ctx: RepoContext) -> None:
+        """Best-effort recovery drain of the remote-vector crash-ledger (I4).
+
+        A crashed chunk-scheme rebuild durably records orphaned remote (Qdrant)
+        point ids in the SQLite ``pending_vector_deletions`` ledger, but the local
+        ``semantic_points`` mappings are already gone, so nothing else will ever
+        clean the remote vectors. Reindex is the natural recovery point: here BOTH
+        the store and a semantic (Qdrant) client are available, so finish the
+        deferred remote delete and clear only the rows actually drained.
+
+        No-ops cleanly when semantic indexing is disabled (no client) or the store
+        predates the ledger, and never raises - a recovery failure must not crash
+        the reindex it is hooked into.
+        """
+        store = getattr(ctx, "sqlite_store", None)
+        if store is None or not hasattr(store, "drain_pending_vector_deletions"):
+            return
+        try:
+            sem = self._get_semantic_indexer(ctx)
+        except Exception:  # semantic client build is best-effort here
+            sem = None
+        if sem is None or not hasattr(sem, "delete_remote_points"):
+            return
+        try:
+            result = store.drain_pending_vector_deletions(
+                lambda collection, point_ids: sem.delete_remote_points(
+                    point_ids, collection=collection
+                )
+            )
+        except Exception as exc:  # store method is fail-safe, but never crash reindex
+            logger.warning("Pending-vector-deletion drain skipped: %s", exc)
+            return
+        if result.get("rows_drained") or result.get("groups_failed"):
+            logger.info(
+                "Pending-vector-deletion drain: %s drained, %s remaining, "
+                "%s group(s) deferred",
+                result.get("rows_drained"),
+                result.get("rows_remaining"),
+                result.get("groups_failed"),
+            )
+
     def index_directory(
         self,
         ctx: RepoContext,
@@ -3507,6 +3548,12 @@ class EnhancedDispatcher:
     ) -> Dict[str, Any]:
         """Index all files in a directory, respecting ignore patterns."""
         logger.info(f"Indexing directory: {directory} (recursive={recursive})")
+
+        # Recovery point (I4): finish any deferred remote-vector deletions left by
+        # a crashed chunk-scheme rebuild before we repopulate. Reindex is where both
+        # the store and a semantic (Qdrant) client are available; best-effort so a
+        # recovery failure can never block the reindex.
+        self._drain_pending_vector_deletions(ctx)
 
         # Note: We don't use ignore patterns during indexing
         # ALL files are indexed for local search capability

@@ -3229,6 +3229,46 @@ class SemanticIndexer:
         sqlite_store.delete_semantic_point_mappings(profile_id, chunk_ids)
         return len(point_ids)
 
+    def delete_remote_points(
+        self,
+        point_ids: List[Any],
+        *,
+        collection: Optional[str] = None,
+    ) -> int:
+        """Delete specific remote (Qdrant) points by id from ``collection``.
+
+        Mirrors the remote delete in :meth:`delete_stale_vectors`, but takes raw
+        remote point ids instead of chunk ids.  Used by the crash-ledger drain
+        (:meth:`SQLiteStore.drain_pending_vector_deletions`), whose rows record
+        only the remote point id + collection because the local chunk mapping is
+        already gone.  ``collection`` defaults to this indexer's collection when
+        the ledger row did not record one.  Raises on a remote failure so the
+        caller can leave the ledger row for a later attempt.
+        """
+        point_ids = list(dict.fromkeys(point_ids))
+        if not point_ids:
+            return 0
+        if not self._qdrant_available:
+            raise RuntimeError("Qdrant client unavailable for remote point deletion")
+        target = collection or self.collection
+        try:
+            self.qdrant.delete(
+                collection_name=target,
+                points_selector=models.PointIdsList(points=point_ids),
+            )
+        except Exception as e:
+            logger.error(
+                "Failed deleting ledger points from collection '%s': %s", target, e
+            )
+            # NOTE: deliberately do NOT set ``self._qdrant_available = False`` here.
+            # That flag is the upsert path's circuit breaker (``_batch_upsert``).
+            # The drain runs at the FRONT of every reindex against the shared cached
+            # indexer, so a transient DELETE blip must not degrade indexing
+            # availability for the rest of the run.  We still raise so the caller
+            # (the ledger drain) leaves the row for a later attempt.
+            raise RuntimeError(f"Failed to delete remote points from Qdrant: {e}")
+        return len(point_ids)
+
     def cleanup_stale_semantic_artifacts(
         self,
         profile_id: str,

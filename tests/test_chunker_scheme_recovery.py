@@ -403,3 +403,235 @@ def test_inplace_rebuild_preserves_synthetic_and_returns_stale_vector_ids(tmp_pa
     assert summary_hashes == {"history:issue"}  # chunker summaries dropped, no dangling
     assert point_ids == {900}  # chunker point mappings dropped, no dangling
     store.close()
+
+
+# --------------------------------------------------------------------------- #
+# Production drain of the pending_vector_deletions crash-ledger (I4)
+#
+# A crashed chunk-scheme rebuild deletes local semantic_points but leaves the
+# orphaned REMOTE (Qdrant) point ids only in the durable ledger. The reindex/
+# startup drain finishes that remote cleanup and clears the drained rows.
+# --------------------------------------------------------------------------- #
+class _FakeVectorClient:
+    """Records remote-delete calls; can fail selected collections (per-profile)."""
+
+    def __init__(self, fail_collections=frozenset()):
+        self.calls = []  # list of (collection, sorted point_ids)
+        self._fail = set(fail_collections)
+
+    def delete_remote_points(self, point_ids, *, collection=None):
+        self.calls.append((collection, sorted(point_ids)))
+        if collection in self._fail:
+            raise RuntimeError(f"Qdrant unavailable for collection {collection!r}")
+        return len(point_ids)
+
+
+def _drain_callback(client):
+    return lambda collection, point_ids: client.delete_remote_points(
+        point_ids, collection=collection
+    )
+
+
+def _seed_ledger(store, points):
+    """Insert crash-ledger rows exactly as a mid-rebuild crash would leave them."""
+    with store._get_connection() as conn:
+        store._record_pending_vector_deletions(conn, points)
+
+
+def test_drain_deletes_recorded_orphans_and_clears_rows(tmp_path):
+    """(a) A ledger of recorded orphans -> drain deletes exactly those remote point
+    ids (per collection) and clears the ledger."""
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    _seed_ledger(
+        store,
+        [
+            {"profile_id": "profile-a", "chunk_id": "c1", "point_id": 101, "collection": "col-a"},
+            {"profile_id": "profile-a", "chunk_id": "c2", "point_id": 102, "collection": "col-a"},
+        ],
+    )
+
+    client = _FakeVectorClient()
+    result = store.drain_pending_vector_deletions(_drain_callback(client))
+
+    assert client.calls == [("col-a", [101, 102])]
+    assert result == {"rows_drained": 2, "rows_remaining": 0, "groups_failed": 0}
+    assert store.get_pending_vector_deletions() == []
+    store.close()
+
+
+def test_drain_is_fail_safe_per_profile(tmp_path):
+    """(b) A remote-delete failure for one profile/collection leaves ITS rows in the
+    ledger for a later attempt, still clears the healthy profile's rows, and the
+    drain call itself never raises."""
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    _seed_ledger(
+        store,
+        [
+            {"profile_id": "profile-a", "chunk_id": "a1", "point_id": 101, "collection": "col-a"},
+            {"profile_id": "profile-a", "chunk_id": "a2", "point_id": 102, "collection": "col-a"},
+            {"profile_id": "profile-b", "chunk_id": "b1", "point_id": 201, "collection": "col-b"},
+        ],
+    )
+
+    client = _FakeVectorClient(fail_collections={"col-b"})
+    # Must not raise despite the remote failure for col-b.
+    result = store.drain_pending_vector_deletions(_drain_callback(client))
+
+    assert result["groups_failed"] == 1
+    assert result["rows_drained"] == 2
+    assert result["rows_remaining"] == 1
+
+    # Healthy profile drained; failed profile's rows REMAIN for the next attempt.
+    remaining = store.get_pending_vector_deletions()
+    assert {row["point_id"] for row in remaining} == {201}
+    assert {row["profile_id"] for row in remaining} == {"profile-b"}
+
+    # Second attempt with a now-healthy client finishes the deferred delete.
+    healthy = _FakeVectorClient()
+    result2 = store.drain_pending_vector_deletions(_drain_callback(healthy))
+    assert healthy.calls == [("col-b", [201])]
+    assert result2["rows_drained"] == 1
+    assert store.get_pending_vector_deletions() == []
+    store.close()
+
+
+def test_drain_empty_ledger_is_noop(tmp_path):
+    """(c) An empty ledger is a no-op: no remote calls, nothing cleared."""
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    client = _FakeVectorClient()
+    result = store.drain_pending_vector_deletions(_drain_callback(client))
+    assert client.calls == []
+    assert result == {"rows_drained": 0, "rows_remaining": 0, "groups_failed": 0}
+    store.close()
+
+
+def test_drain_is_idempotent_on_second_run(tmp_path):
+    """(d) A successful drain followed by a re-run is a no-op (idempotent)."""
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    _seed_ledger(
+        store,
+        [{"profile_id": "profile-a", "chunk_id": "c1", "point_id": 101, "collection": "col-a"}],
+    )
+    client = _FakeVectorClient()
+    store.drain_pending_vector_deletions(_drain_callback(client))
+    assert store.get_pending_vector_deletions() == []
+
+    # Re-run: ledger already empty, so no further remote calls happen.
+    client2 = _FakeVectorClient()
+    result2 = store.drain_pending_vector_deletions(_drain_callback(client2))
+    assert client2.calls == []
+    assert result2 == {"rows_drained": 0, "rows_remaining": 0, "groups_failed": 0}
+    store.close()
+
+
+def test_dispatcher_drain_wiring_noops_without_semantic(tmp_path):
+    """The reindex hook (EnhancedDispatcher._drain_pending_vector_deletions) drains
+    when a semantic client is present and no-ops cleanly when it is not - without
+    constructing a full dispatcher."""
+    from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    _seed_ledger(
+        store,
+        [{"profile_id": "profile-a", "chunk_id": "c1", "point_id": 101, "collection": "col-a"}],
+    )
+
+    class _Ctx:
+        sqlite_store = store
+
+    ctx = _Ctx()
+
+    # Semantic disabled -> no client -> clean no-op, ledger untouched.
+    class _NoSem:
+        def _get_semantic_indexer(self, ctx):
+            return None
+
+    EnhancedDispatcher._drain_pending_vector_deletions(_NoSem(), ctx)
+    assert {r["point_id"] for r in store.get_pending_vector_deletions()} == {101}
+
+    # Semantic present -> drains through delete_remote_points, clears the ledger.
+    client = _FakeVectorClient()
+
+    class _WithSem:
+        def _get_semantic_indexer(self, ctx):
+            return client
+
+    EnhancedDispatcher._drain_pending_vector_deletions(_WithSem(), ctx)
+    assert client.calls == [("col-a", [101])]
+    assert store.get_pending_vector_deletions() == []
+    store.close()
+
+
+def test_drain_skips_revived_point_ids_but_clears_their_ledger_rows(tmp_path):
+    """(e) Finding 1: point ids are deterministic and content-derived, so an
+    incremental index pass can legitimately RE-CREATE a ledger point id (fresh
+    ``semantic_points`` row + remote vector) BEFORE the drain runs.  Such a revived
+    point id is in active use and must NOT be remote deleted - deleting it would
+    silently drop a live vector and leave its fresh mapping dangling.  Its ledger
+    debt is still cleared (resolved).  A true-orphan point id in the SAME group
+    (no live mapping) IS remote deleted."""
+    store = SQLiteStore(str(tmp_path / "code_index.db"))
+    _seed_ledger(
+        store,
+        [
+            {"profile_id": "profile-a", "chunk_id": "c1", "point_id": 101, "collection": "col-a"},
+            {"profile_id": "profile-a", "chunk_id": "c2", "point_id": 102, "collection": "col-a"},
+        ],
+    )
+    # Point 101 was revived by an incremental pass: it has a LIVE semantic_points
+    # mapping in the same profile/collection.  Point 102 stays a true orphan.
+    store.upsert_semantic_point("profile-a", "c1-revived", 101, "col-a")
+
+    client = _FakeVectorClient()
+    result = store.drain_pending_vector_deletions(_drain_callback(client))
+
+    # Only the true orphan (102) is remote deleted; the revived point (101) is
+    # SKIPPED so its live remote vector survives.
+    assert client.calls == [("col-a", [102])]
+    # ... but BOTH ledger rows are cleared (debt resolved either way).
+    assert result == {"rows_drained": 2, "rows_remaining": 0, "groups_failed": 0}
+    assert store.get_pending_vector_deletions() == []
+    # The live mapping is untouched.
+    assert store.get_semantic_point_ids("profile-a", ["c1-revived"]) == [101]
+    store.close()
+
+
+def test_delete_remote_points_error_does_not_trip_upsert_circuit_breaker(tmp_path):
+    """(f) Finding 2: a remote-delete failure in ``delete_remote_points`` (the
+    ledger-drain remote hook) must RAISE (so the ledger row survives) WITHOUT
+    setting ``_qdrant_available = False``.  That flag is the UPSERT path's circuit
+    breaker; because the drain runs at the FRONT of every reindex against the
+    shared cached indexer, a transient delete blip must not degrade indexing for
+    the rest of the run."""
+    from types import SimpleNamespace  # noqa: F401
+    from mcp_server.core.path_resolver import PathResolver
+    from mcp_server.utils.semantic_indexer import SemanticIndexer
+
+    class _FailingDeleteQdrant:
+        def __init__(self):
+            self.upserted = []
+
+        def delete(self, collection_name, points_selector):
+            raise RuntimeError("transient Qdrant blip during delete")
+
+        def upsert(self, collection_name, points):
+            self.upserted.append((collection_name, points))
+
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    qdrant = _FailingDeleteQdrant()
+    indexer = SemanticIndexer.__new__(SemanticIndexer)
+    indexer.qdrant = qdrant
+    indexer.collection = "code-index"
+    indexer._qdrant_available = True
+    indexer.path_resolver = PathResolver(repo_path)
+
+    with pytest.raises(RuntimeError, match="Failed to delete remote points"):
+        indexer.delete_remote_points([101, 102], collection="col-a")
+
+    # The DELETE failure must NOT flip the upsert circuit breaker.
+    assert indexer._qdrant_available is True
+
+    # Upserts remain available after the delete failure (the run is not degraded).
+    indexer.qdrant.upsert(collection_name="col-a", points=["p"])
+    assert qdrant.upserted == [("col-a", ["p"])]
