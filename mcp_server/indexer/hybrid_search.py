@@ -19,7 +19,7 @@ from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
 from .bm25_indexer import BM25Indexer
 from .query_optimizer import QueryType
-from .reranker import IReranker, RerankerFactory
+from .reranker import IReranker, RerankerFactory, _redact_error
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class HybridSearch:
             # Initialize reranker asynchronously will be done on first use
             logger.info(f"Initialized {self.reranking_settings.reranker_type} reranker")
         except Exception as e:
-            logger.error(f"Failed to initialize reranker: {e}")
+            logger.error("Failed to initialize reranker: %s", _redact_error(e))
             self.reranker = None
 
     async def search(
@@ -281,7 +281,7 @@ class HybridSearch:
                 if bm25_results:
                     all_results.append(bm25_results)
             except Exception as e:
-                logger.error(f"BM25 search error: {e}")
+                logger.error("BM25 search error: %s", _redact_error(e))
 
         if self.config.enable_semantic and self.semantic_indexer:
             try:
@@ -289,7 +289,7 @@ class HybridSearch:
                 if semantic_results:
                     all_results.append(semantic_results)
             except Exception as e:
-                logger.error(f"Semantic search error: {e}")
+                logger.error("Semantic search error: %s", _redact_error(e))
 
         if self.config.enable_fuzzy and self.fuzzy_indexer:
             try:
@@ -297,7 +297,7 @@ class HybridSearch:
                 if fuzzy_results:
                     all_results.append(fuzzy_results)
             except Exception as e:
-                logger.error(f"Fuzzy search error: {e}")
+                logger.error("Fuzzy search error: %s", _redact_error(e))
 
         return all_results
 
@@ -399,8 +399,9 @@ class HybridSearch:
                 return search_results
             except Exception as e:
                 logger.error(
-                    f"Semantic search failed with error: {e}. "
-                    "Temporarily disabling semantic search."
+                    "Semantic search failed with error: %s. "
+                    "Temporarily disabling semantic search.",
+                    _redact_error(e),
                 )
                 self._semantic_temporarily_disabled = True
                 self._search_stats["semantic_search_errors"] += 1

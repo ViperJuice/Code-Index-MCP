@@ -661,3 +661,71 @@ def test_reconcile_unattestable_for_legacy_provider(tmp_path):
     result = ix.reconcile_existing_collection()
     assert result["status"] == "unattestable"
     assert "reindex" in result["message"].lower()
+
+
+# ===========================================================================
+# 7. Transient live-shape read is retryable, NOT a reindex-requiring block
+# ===========================================================================
+
+
+class _TransientReadQdrant(_RecordingQdrant):
+    """Qdrant double whose live-shape read fails transiently (connectivity)."""
+
+    def get_collections(self):
+        raise ConnectionError("connection refused: qdrant backend unreachable")
+
+
+def test_existing_shape_blocked_raises_transient_on_connectivity_error(tmp_path):
+    """A connectivity read failure surfaces distinctly as retryable, not blocked."""
+    from mcp_server.utils.semantic_indexer import TransientCollectionReadError
+
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    ix.qdrant = _TransientReadQdrant()
+    with pytest.raises(TransientCollectionReadError):
+        ix._existing_collection_shape_blocked()
+
+
+def test_existing_shape_blocked_true_on_real_readable_mismatch(tmp_path):
+    """A genuinely mismatched (readable) live shape is blocked, not retryable."""
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    # Readable collection whose dimension does NOT match the active profile (8).
+    ix.qdrant.collections["semantic-oss-high"] = (
+        16,
+        SemanticIndexer.resolve_qdrant_distance("cosine"),
+    )
+    assert ix._existing_collection_shape_blocked() is True
+
+
+def test_reconcile_transient_read_is_retryable_not_reindex(tmp_path):
+    """Compatible probe + a transient live-shape read -> 'retryable', no mutation."""
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    ix.qdrant = _TransientReadQdrant()
+
+    result = ix.reconcile_existing_collection()
+
+    # Classified as retryable, NOT reindex_required (the misattribution we fix).
+    assert result["status"] == "retryable"
+    assert result["status"] != "reindex_required"
+    assert "retry" in result["message"].lower()
+    # The message names the true cause: a backend-reachability problem.
+    assert "unreachable" in result["message"].lower() or "timed out" in result["message"].lower()
+    # Nothing mutated: no attested metadata persisted, gate stays shut.
+    assert ix._writes_prepared is False
+    assert not (tmp_path / ".index_metadata.json").exists()
+    assert all(kind != "recreate" for kind, _ in ix.qdrant.calls)
+
+
+def test_reconcile_real_shape_mismatch_is_blocked_reindex(tmp_path):
+    """Compatible probe + a readable stale shape -> 'reindex_required' (blocked)."""
+    ix = _make_indexer(tmp_path, _FakeProvenanceProvider(_openai_response), dim=8)
+    # Active profile is dim 8; the on-disk collection is a stale dim-16 shape.
+    ix.qdrant.collections["semantic-oss-high"] = (
+        16,
+        SemanticIndexer.resolve_qdrant_distance("cosine"),
+    )
+
+    result = ix.reconcile_existing_collection()
+
+    assert result["status"] == "reindex_required"
+    assert "reindex" in result["message"].lower()
+    assert all(kind != "recreate" for kind, _ in ix.qdrant.calls)

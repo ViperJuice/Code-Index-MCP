@@ -378,3 +378,41 @@ async def test_dispatcher_failure_redacts_secret(caplog):
     assert BEARER_SECRET not in (diag.error or "")
     assert QUERY_SENTINEL not in caplog.text
     assert DOC_SENTINEL not in caplog.text
+
+
+# --------------------------------------------------------------------------
+# INFERPOLISH item 2: the HybridSearch._search_semantic exception path (the
+# semantic indexer's own .search() raising, distinct from a reranker failure)
+# must redact a credential AND never log the raw query body.
+# --------------------------------------------------------------------------
+async def test_hybrid_semantic_search_failure_redacts_secret(caplog):
+    from collections import defaultdict
+
+    hs = HybridSearch.__new__(HybridSearch)
+    hs._semantic_temporarily_disabled = False
+    hs._search_stats = defaultdict(int)
+    hs.config = types.SimpleNamespace(individual_limit=10, min_semantic_score=0.0)
+
+    class _RaisingSemanticIndexer:
+        is_available = True
+        connection_mode = "server"
+
+        def validate_connection(self):
+            return True
+
+        def search(self, query, limit):
+            raise RuntimeError(SECRET_MSG)
+
+    hs.semantic_indexer = _RaisingSemanticIndexer()
+
+    with caplog.at_level(logging.DEBUG):
+        out = await hs._search_semantic(QUERY_SENTINEL, None)
+
+    assert out == []
+    # The failure disables semantic search and the instrumented log fired...
+    assert hs._semantic_temporarily_disabled is True
+    assert "Semantic search failed with error" in caplog.text
+    # ...but neither the credential nor the raw query body leaked.
+    assert BEARER_SECRET not in caplog.text
+    assert QUERY_SENTINEL not in caplog.text
+    assert "[REDACTED]" in caplog.text

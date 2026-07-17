@@ -329,3 +329,126 @@ def test_dispatcher_search_logs_no_raw_query_body(caplog):
     assert "Using fuzzy trigram search" in caplog.text
     # ...but the raw query body never appears in any dispatcher log.
     assert query_sentinel not in caplog.text
+
+
+# ==========================================================================
+# INFERPOLISH item 1: the ASYNC BaseReranker trio (Cohere / cross-encoder /
+# TF-IDF) rerank() exception paths must route the provider exception through
+# ``_redact_error`` before logging -- a credential embedded in the exception
+# must never reach caplog.
+# ==========================================================================
+import asyncio as _asyncio
+
+from mcp_server.indexer.reranker import (
+    CohereReranker,
+    LocalCrossEncoderReranker,
+    SearchResult,
+    TFIDFReranker,
+)
+
+_ASYNC_SECRET = "sk-ASYNCSECRET789"
+_ASYNC_EXC_MSG = f"provider auth failed Bearer {_ASYNC_SECRET}"
+
+
+def _async_results():
+    return [
+        SearchResult(
+            file_path="a.py",
+            start_line=1,
+            end_line=1,
+            column=0,
+            snippet="alpha",
+            match_type="semantic",
+            score=0.5,
+        ),
+        SearchResult(
+            file_path="b.py",
+            start_line=2,
+            end_line=2,
+            column=0,
+            snippet="beta",
+            match_type="semantic",
+            score=0.4,
+        ),
+    ]
+
+
+def test_async_cohere_rerank_failure_redacts_log(caplog):
+    r = CohereReranker({})
+    r.initialized = True
+
+    class _FakeClient:
+        def rerank(self, **kwargs):
+            raise RuntimeError(_ASYNC_EXC_MSG)
+
+    r.client = _FakeClient()
+
+    with caplog.at_level(logging.DEBUG):
+        result = _asyncio.run(r.rerank("secretqueryzz", _async_results(), top_k=2))
+
+    assert not result.is_success
+    assert "Cohere reranking failed" in caplog.text
+    assert _ASYNC_SECRET not in caplog.text
+    assert "[REDACTED]" in caplog.text
+
+
+def test_async_crossencoder_rerank_failure_redacts_log(caplog):
+    r = LocalCrossEncoderReranker({})
+    r.initialized = True
+
+    class _FakeModel:
+        def predict(self, pairs):
+            raise RuntimeError(_ASYNC_EXC_MSG)
+
+    r.model = _FakeModel()
+
+    with caplog.at_level(logging.DEBUG):
+        result = _asyncio.run(r.rerank("secretqueryzz", _async_results(), top_k=2))
+
+    assert not result.is_success
+    assert "Cross-encoder reranking failed" in caplog.text
+    assert _ASYNC_SECRET not in caplog.text
+    assert "[REDACTED]" in caplog.text
+
+
+def test_async_tfidf_rerank_failure_redacts_log(caplog):
+    r = TFIDFReranker({})
+    r.initialized = True
+
+    class _FakeVectorizer:
+        def fit_transform(self, texts):
+            raise RuntimeError(_ASYNC_EXC_MSG)
+
+    r.vectorizer = _FakeVectorizer()
+
+    with caplog.at_level(logging.DEBUG):
+        result = _asyncio.run(r.rerank("secretqueryzz", _async_results(), top_k=2))
+
+    assert not result.is_success
+    assert "TF-IDF reranking failed" in caplog.text
+    assert _ASYNC_SECRET not in caplog.text
+    assert "[REDACTED]" in caplog.text
+
+
+# ==========================================================================
+# INFERPOLISH item 3: search_documentation() logs topic metadata only
+# (topic_chars), never the raw topic body.
+# ==========================================================================
+def test_search_documentation_logs_no_raw_topic_body(caplog):
+    from unittest.mock import MagicMock
+
+    d = EnhancedDispatcher.__new__(EnhancedDispatcher)
+    # search_documentation only touches self.search (mocked empty) before/while
+    # logging; no other dispatcher wiring is exercised on this path.
+    d.search = MagicMock(return_value=[])
+
+    topic_sentinel = "zzz_raw_topic_body_sentinel_zzz"
+    ctx = MagicMock()
+
+    with caplog.at_level(logging.DEBUG):
+        list(d.search_documentation(ctx, topic_sentinel, limit=5))
+
+    # The instrumented cross-document log fired...
+    assert "Cross-document search" in caplog.text
+    # ...but the raw topic body never appears in any dispatcher log.
+    assert topic_sentinel not in caplog.text
