@@ -151,11 +151,25 @@ reachable) and the verdict stays `dark_opt_in`.
 Only an operator with a reachable, provenance-verified collection may produce
 gate-counting numbers. Steps:
 
-1. **Index with a provenance-writing producer.** Run the semantic-index producer
-   so it persists the `collection-provenance.v1` manifest into the collection
-   (not only the local `.index_metadata.json`). The producer records
+> **Never score the live index.** The driver connects to Qdrant on
+> `localhost:6333`; the production MCP index lives in the `code-embeddings`
+> collection. Point this run at a **dedicated** `SEMANTIC_COLLECTION_NAME`
+> (e.g. `inferbound-v10-eval`) so indexing the frozen corpus can never
+> overwrite the live index.
+
+1. **Index the frozen corpus with a provenance-writing producer.** Index the
+   corpus **at the frozen commit** (`corpus_manifest.json` → `commit`
+   `f7c060b`; use a worktree/checkout at that revision so the file set and the
+   producer's recorded `indexed_commit` match the frozen contract) into the
+   dedicated collection. A normal full build now binds the corpus automatically:
+   `index_files_batch` computes `corpus_sha256` from the sorted+deduped indexed
+   relative paths (the same recipe as `corpus_manifest.json`) and writes the
+   `collection-provenance.v1` sentinel into the collection — recording
    `indexed_commit`, the full `corpus_sha256`, the embedding `profile_fingerprint`,
-   `provider_id` / `provider_revision`, and a `point_set_id` for the build.
+   `provider_id` / `provider_revision`, and a `point_set_id`. (Incremental
+   mutations after the build deliberately invalidate the sentinel, so the scored
+   collection must come from one clean full build, not an incrementally-patched
+   index.)
 2. **Bring up the live services.** Qdrant on `localhost:6333`, the OpenAI-compatible
    embedding endpoint, and (for `hybrid_rerank`) a `rerank.v1` endpoint. Export:
    - `SEMANTIC_COLLECTION_NAME` — the collection to score;
@@ -185,6 +199,37 @@ gate-counting numbers. Steps:
    run where `provenance_verified: true`, the `hybrid_rerank` arm ran and cleared
    every frozen predicate, and the holdout was not used for tuning. No default is
    flipped here.
+
+### Scaffolding verification (2026-07-17)
+
+The gate machinery this procedure relies on was exercised end-to-end on the
+current host; only the two live provider services are absent, so the verdict
+cannot move here. What was verified:
+
+- **Frozen contract intact.** `dataset_sha256` and `thresholds_sha256` recompute
+  to the values recorded in `MANIFEST.json`; the driver's own corpus
+  reconstruction verifies (`corpus_reconstruction_verified: true`, 872 docs at
+  commit `f7c060b`).
+- **Offline gate is honest.** Re-running the driver on this host reproduces the
+  committed artifact: the lexical arm runs, `dense` / `hybrid` / `hybrid_rerank`
+  record `not_run` with truthful `embedding endpoint … unreachable` reasons,
+  `provenance_verified: not_applicable`, verdict `dark_opt_in`.
+- **Provenance write → read → verify round-trips against live Qdrant.** Using a
+  throwaway collection (never `code-embeddings`), the producer's
+  `write_collection_provenance` persisted a `collection-provenance.v1` sentinel
+  bound to the frozen `corpus_sha256` and commit; the gate's module-level
+  `read_collection_provenance` round-tripped it; `verify_collection_provenance`
+  returned **verified** against the frozen corpus; and every tampered manifest
+  mapped to its exact reason code (`stale` for a wrong commit or corpus,
+  `corpus_unbound` for a null corpus, `tampered` for a bad version, `missing`
+  for an absent sentinel, `collection_mismatch` for the wrong collection).
+
+**What remains to produce counting numbers on this host:** a reachable
+OpenAI-compatible embedding endpoint (`SEMANTIC_EMBEDDING_HOST:PORT`, currently
+`ai:8001` unreachable) and a `rerank.v1` endpoint, plus one clean full index of
+the frozen corpus into a dedicated collection. Qdrant on `localhost:6333` is
+already up. With those two services present, this procedure runs unchanged and
+the driver will score the provider arms.
 
 ## Metrics produced (lexical arm only)
 
