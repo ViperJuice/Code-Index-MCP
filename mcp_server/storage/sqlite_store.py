@@ -509,6 +509,48 @@ class SQLiteStore:
                 removed += cursor.rowcount
             return removed
 
+    def get_live_semantic_point_ids(
+        self,
+        profile_id: Optional[str],
+        collection: Optional[str],
+        point_ids: List[Any],
+    ) -> set:
+        """Return the subset of ``point_ids`` that still have a live mapping.
+
+        A ledger point id may have been legitimately RE-CREATED (deterministic,
+        content-derived point ids) by an incremental index pass before the drain
+        runs.  Such a point id has a fresh ``semantic_points`` row and its remote
+        vector is in active use - it is NOT an orphan and must NOT be remote
+        deleted.  This resolves, in a single batched query per group, which of the
+        candidate ``point_ids`` still map to a live ``semantic_points`` row for the
+        given ``profile_id`` / ``collection``.  When the ledger row recorded no
+        ``collection`` we protect the point id across any collection for the
+        profile (err toward never deleting a live vector).
+        """
+        if not point_ids:
+            return set()
+        live: set = set()
+        with self._get_connection() as conn:
+            for start in range(0, len(point_ids), 500):
+                batch = point_ids[start : start + 500]
+                placeholders = ",".join("?" * len(batch))
+                if collection is None:
+                    sql = (
+                        f"SELECT point_id FROM semantic_points "
+                        f"WHERE profile_id = ? AND point_id IN ({placeholders})"
+                    )
+                    params: List[Any] = [profile_id, *batch]
+                else:
+                    sql = (
+                        f"SELECT point_id FROM semantic_points "
+                        f"WHERE profile_id = ? AND collection = ? "
+                        f"AND point_id IN ({placeholders})"
+                    )
+                    params = [profile_id, collection, *batch]
+                for row in conn.execute(sql, params).fetchall():
+                    live.add(row[0])
+        return live
+
     def drain_pending_vector_deletions(
         self,
         delete_remote: Callable[[Optional[str], List[Any]], None],
@@ -526,14 +568,26 @@ class SQLiteStore:
 
         Guarantees:
 
+        * **no live-vector loss** - because point ids are deterministic and
+          content-derived, an incremental index pass can legitimately RE-CREATE a
+          ledger point id (fresh ``semantic_points`` row + remote vector) before
+          this drain runs.  Such a revived point id is in active use and is NEVER
+          remote deleted; only true orphans (ledger point ids with no live
+          ``semantic_points`` mapping) are deleted.  A revived row's ledger debt is
+          still cleared on success (the remote vector it pointed to is now owned by
+          the live mapping).
         * **fail-safe** - a group's ledger rows are cleared ONLY when its
           ``delete_remote`` returns without raising; a raise leaves that group's
           rows in the ledger for the next attempt (an un-drained row is never
-          cleared), while OTHER healthy groups still drain.  A remote-delete error
-          is logged and swallowed, so this method itself never raises and can never
-          crash the reindex/startup it is hooked into.
+          cleared), while OTHER healthy groups still drain.
         * **idempotent** - an empty ledger (including a re-run after a successful
           drain) is a no-op.
+
+        Best-effort: a remote-delete error for one group is isolated (logged and
+        swallowed) and never raises; but the ledger read/clear I/O
+        (:meth:`get_pending_vector_deletions` / :meth:`clear_pending_vector_deletions`)
+        sits outside the per-group guard and may propagate to the caller (the
+        dispatcher drain hook catches it).
 
         Returns a small counts dict (``rows_drained``, ``rows_remaining``,
         ``groups_failed``) for observability and tests.
@@ -559,7 +613,18 @@ class SQLiteStore:
                 # A group with no remote point ids carries no remote debt; its
                 # rows are ledger noise we can clear without a remote call.
                 if point_ids:
-                    delete_remote(collection, point_ids)
+                    # Partition into true orphans vs. revived point ids: a point id
+                    # that still has a live ``semantic_points`` mapping was
+                    # legitimately RE-CREATED before this drain ran and must NOT be
+                    # deleted (its remote vector is in active use).  Only orphans
+                    # (no live mapping) are remote deleted; the revived rows' ledger
+                    # debt is still cleared below on success.
+                    live = self.get_live_semantic_point_ids(
+                        profile_id, collection, point_ids
+                    )
+                    orphan_ids = [p for p in point_ids if p not in live]
+                    if orphan_ids:
+                        delete_remote(collection, orphan_ids)
             except Exception as exc:  # best-effort recovery: keep this group's rows
                 groups_failed += 1
                 logger.warning(

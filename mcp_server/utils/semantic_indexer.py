@@ -3260,7 +3260,12 @@ class SemanticIndexer:
             logger.error(
                 "Failed deleting ledger points from collection '%s': %s", target, e
             )
-            self._qdrant_available = False
+            # NOTE: deliberately do NOT set ``self._qdrant_available = False`` here.
+            # That flag is the upsert path's circuit breaker (``_batch_upsert``).
+            # The drain runs at the FRONT of every reindex against the shared cached
+            # indexer, so a transient DELETE blip must not degrade indexing
+            # availability for the rest of the run.  We still raise so the caller
+            # (the ledger drain) leaves the row for a later attempt.
             raise RuntimeError(f"Failed to delete remote points from Qdrant: {e}")
         return len(point_ids)
 
