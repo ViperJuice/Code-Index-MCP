@@ -7,7 +7,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    {name = "Jenner Torrence"}
+    { name = "ViperJuice", email = "viperjuice@users.noreply.github.com" }
 ]
 requires-python = ">=3.12"
 classifiers = [
