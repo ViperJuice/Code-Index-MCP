@@ -40,6 +40,16 @@ OWNER_DERIVED_WORKFLOWS = (
     ".github/workflows/release-automation.yml",
 )
 
+# Every job that builds/pushes/signs an image must carry its OWN owner-derivation
+# step (GITHUB_ENV is job-scoped), so assert the derive-step count per workflow —
+# a file-level "present at least once" check would still pass if only one of the
+# container jobs derived while the others silently resolved an empty namespace.
+OWNER_DERIVED_STEP_COUNTS = {
+    ".github/workflows/container-registry.yml": 3,  # alpha-build, push-manifests, sign
+    ".github/workflows/release-automation.yml": 1,  # build-release
+}
+_DERIVE_STEP = 'owner="${GITHUB_REPOSITORY_OWNER,,}"'
+
 
 def _read(relative_path: str) -> str:
     return (REPO / relative_path).read_text(encoding="utf-8")
@@ -143,10 +153,20 @@ def test_ghcr_image_namespace_is_owner_derived_across_release_surfaces():
         if GHCR_IMAGE in _read(relative_path):
             note(relative_path, "hardcoded current namespace; expected owner derivation")
 
-    # Build/push/sign workflows must derive the namespace from the repo owner.
+    # Build/push/sign workflows must derive the namespace from the repo owner --
+    # once per image-consuming job, not merely once per file.
     for relative_path in OWNER_DERIVED_WORKFLOWS:
         text = _read(relative_path)
-        if 'owner="${GITHUB_REPOSITORY_OWNER,,}"' not in text:
+        derive_count = text.count(_DERIVE_STEP)
+        expected = OWNER_DERIVED_STEP_COUNTS.get(relative_path)
+        if expected is not None:
+            if derive_count != expected:
+                note(
+                    relative_path,
+                    f"expected {expected} owner-derivation steps "
+                    f"(one per image-consuming job), found {derive_count}",
+                )
+        elif derive_count == 0:
             note(relative_path, "missing owner-derivation step")
         if "${{ env.IMAGE_REF }}" not in text:
             note(relative_path, "image tags not derived from env.IMAGE_REF")
