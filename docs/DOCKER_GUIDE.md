@@ -68,13 +68,13 @@ authentication and suitable repository permissions.
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
+curl -sSL https://raw.githubusercontent.com/Consiliency/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 ```
 
 ### Quick Install (Windows PowerShell)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/Consiliency/Code-Index-MCP/main/scripts/install-mcp-docker.ps1 | iex
 ```
 
 ### Manual Installation

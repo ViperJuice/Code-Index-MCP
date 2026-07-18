@@ -222,6 +222,15 @@ jobs:
       - name: Sign container images
         env:
           COSIGN_EXPERIMENTAL: 1
+          # Bind the tag name to an env var rather than interpolating the
+          # ${{ github.ref_name }} context directly into the shell script.
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          IMAGE_DIGEST=$(crane digest "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}")
-          cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}"
+          # Resolve the manifest digest with docker buildx (preinstalled and
+          # already authenticated above); avoids a crane binary that is not on
+          # the runner and was never installed, which previously made this
+          # signing step fail after a successful push.
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          IMAGE_DIGEST=$(docker buildx imagetools inspect \
+            "${IMAGE}:${REF_NAME}" --format '{{.Manifest.Digest}}')
+          cosign sign --yes "${IMAGE}@${IMAGE_DIGEST}"
