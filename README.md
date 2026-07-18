@@ -17,7 +17,7 @@ Code-Index-MCP is a fast, **local-first** search index for your code. It plugs i
 ## Project Status
 **Version**: 1.3.1 (repo-owned prepared surface; unpublished as of July 10, 2026)
 **Python distribution**: `index-it-mcp`
-**Container image**: `ghcr.io/viperjuice/code-index-mcp`
+**Container image**: `ghcr.io/consiliency/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
 **Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
@@ -160,7 +160,7 @@ quality or default sandbox behavior.
 
 Supported install paths before publication are native Python/STDIO with
 `uv sync --locked`, a locally built `index-it-mcp` wheel, and the locally built
-`ghcr.io/viperjuice/code-index-mcp:local-smoke` image. The prepared `v1.3.1`
+`ghcr.io/consiliency/code-index-mcp:local-smoke` image. The prepared `v1.3.1`
 container commands become valid only after protected-main publication.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
@@ -192,7 +192,7 @@ prepared but unpublished, so the installer also defaults to `local-smoke`.
 make release-smoke-container
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:local-smoke
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:local-smoke
 ```
 
 #### Option 2: AI-Powered Search
@@ -201,7 +201,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:local-smok
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:local-smoke
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/consiliency/code-index-mcp:local-smoke
 ```
 
 ### 💻 Environment-Specific Setup
@@ -212,7 +212,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:local-smoke
+docker run -it -v ${PWD}:/workspace ghcr.io/consiliency/code-index-mcp:local-smoke
 ```
 
 #### 🍎 macOS
@@ -289,7 +289,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:local-smoke"
+        "ghcr.io/consiliency/code-index-mcp:local-smoke"
       ]
     }
   }
@@ -421,7 +421,7 @@ install target.
 
 ### Costs & Optional Features
 
-The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
+The documented container package is `ghcr.io/consiliency/code-index-mcp`.
 BM25 code search works without provider credentials. Semantic search, reranking,
 artifact sync, and monitoring depend on extras, environment variables, and
 service configuration. See [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)

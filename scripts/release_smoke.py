@@ -18,7 +18,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 REPO = Path(__file__).resolve().parents[1]
-IMAGE = "ghcr.io/viperjuice/code-index-mcp:local-smoke"
+IMAGE = "ghcr.io/consiliency/code-index-mcp:local-smoke"
 CANONICAL_ENTRYPOINTS = ("mcp-index", "index-it-mcp")
 REMOVED_ENTRYPOINTS = ("code-index-mcp",)
 

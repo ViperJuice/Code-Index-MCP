@@ -57,7 +57,7 @@ def test_readme_distribution_identity_remains_stable():
     readme = _read_text("README.md")
 
     assert "**Python distribution**: `index-it-mcp`" in readme
-    assert "**Container image**: `ghcr.io/viperjuice/code-index-mcp`" in readme
+    assert "**Container image**: `ghcr.io/consiliency/code-index-mcp`" in readme
     assert "docs/status/public-package-identity.md" in readme
 
 
@@ -82,7 +82,8 @@ def test_release_workflow_separates_prepare_from_protected_main_publish():
     assert 'grep -Fxq "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
     assert 'grep -Fxq "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
     assert "prerelease: ${{ contains(inputs.version, '-') }}" in workflow
-    assert "ghcr.io/viperjuice/code-index-mcp:${{ inputs.version }}" in workflow
+    assert "${{ env.IMAGE_REF }}:${{ inputs.version }}" in workflow
+    assert 'owner="${GITHUB_REPOSITORY_OWNER,,}"' in workflow
     assert "pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b" in workflow
     assert "softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b" in workflow
 
@@ -122,7 +123,7 @@ def test_installers_and_download_helper_match_stable_identity_contract():
         text = _read_text(relative_path)
         assert EXPECTED_TAG in text
         assert "local-smoke" in text
-        assert "ghcr.io/viperjuice/code-index-mcp" in text
+        assert "ghcr.io/consiliency/code-index-mcp" in text
         assert "latest" in text
 
     shell = _read_text("scripts/install-mcp-docker.sh")
@@ -138,7 +139,7 @@ def test_installers_and_download_helper_match_stable_identity_contract():
     readme = _read_text("README.md")
     quick_start = readme.split("## 🚀 Quick Start", 1)[1].split("## Using Against Many Repos", 1)[0]
     assert "after protected-main publication" in quick_start
-    assert "ghcr.io/viperjuice/code-index-mcp:v1.3.1" not in quick_start
+    assert "ghcr.io/consiliency/code-index-mcp:v1.3.1" not in quick_start
 
     for expected in (
         "index_it_mcp-",

@@ -12,8 +12,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: viperjuice/code-index-mcp
-  IMAGE_REF: ghcr.io/viperjuice/code-index-mcp
 
 jobs:
   alpha-docker-build-smoke:
@@ -23,6 +21,12 @@ jobs:
       contents: read
       packages: read
     steps:
+      - name: Derive lowercase GHCR image name (follows repo owner across transfers)
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE_NAME=${owner}/code-index-mcp" >> "$GITHUB_ENV"
+          echo "IMAGE_REF=${REGISTRY}/${owner}/code-index-mcp" >> "$GITHUB_ENV"
+
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -111,6 +115,12 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Derive lowercase GHCR image name (follows repo owner across transfers)
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE_NAME=${owner}/code-index-mcp" >> "$GITHUB_ENV"
+          echo "IMAGE_REF=${REGISTRY}/${owner}/code-index-mcp" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
@@ -178,6 +188,12 @@ jobs:
       packages: write
       id-token: write
     steps:
+      - name: Derive lowercase GHCR image name (follows repo owner across transfers)
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE_NAME=${owner}/code-index-mcp" >> "$GITHUB_ENV"
+          echo "IMAGE_REF=${REGISTRY}/${owner}/code-index-mcp" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0

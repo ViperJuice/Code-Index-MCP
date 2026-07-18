@@ -8,7 +8,7 @@ The supported deployment surfaces remain local-first and operator-owned:
 
 - `uv sync --locked` plus the local checkout
 - the published Python package `index-it-mcp`
-- the container image `ghcr.io/viperjuice/code-index-mcp`
+- the container image `ghcr.io/consiliency/code-index-mcp`
 
 Use [`../SUPPORT_MATRIX.md`](../SUPPORT_MATRIX.md) for support tiers and
 [`../validation/ga-readiness-checklist.md`](../validation/ga-readiness-checklist.md)

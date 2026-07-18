@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 MCP_VERSION="${MCP_VERSION:-v1.3.1}"
 MCP_VARIANT="${MCP_VARIANT:-local-smoke}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io}"
-MCP_IMAGE="${DOCKER_REGISTRY}/viperjuice/code-index-mcp"
+MCP_IMAGE="${DOCKER_REGISTRY}/consiliency/code-index-mcp"
 
 # Functions
 print_banner() {
@@ -164,7 +164,7 @@ create_launcher() {
 
 # Default settings
 MCP_VARIANT="${MCP_VARIANT:-local-smoke}"
-MCP_IMAGE="${MCP_IMAGE:-ghcr.io/viperjuice/code-index-mcp}"
+MCP_IMAGE="${MCP_IMAGE:-ghcr.io/consiliency/code-index-mcp}"
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 
 # Handle commands

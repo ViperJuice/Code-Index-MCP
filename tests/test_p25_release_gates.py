@@ -135,9 +135,10 @@ def test_release_automation_marks_prerelease_and_keeps_latest_stable_only():
     workflow_text = _read(".github/workflows/release-automation.yml")
 
     assert "prerelease: ${{ contains(inputs.version, '-') }}" in workflow_text
-    assert "ghcr.io/viperjuice/code-index-mcp:${{ inputs.version }}" in workflow_text
+    assert "${{ env.IMAGE_REF }}:${{ inputs.version }}" in workflow_text
     assert "!contains(inputs.version, '-')" in workflow_text
-    assert "ghcr.io/viperjuice/code-index-mcp:latest" in workflow_text
+    assert "format('{0}:latest', env.IMAGE_REF)" in workflow_text
+    assert 'owner="${GITHUB_REPOSITORY_OWNER,,}"' in workflow_text
     assert 'find docs -name "*.md" -exec sed -i' not in workflow_text
 
 

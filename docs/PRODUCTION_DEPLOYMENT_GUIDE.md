@@ -11,7 +11,7 @@ freeze.
 - Operators own promotion, rollback, observability, and support triage.
 - The supported deployment surfaces are the local checkout, the `index-it-mcp`
   package at `1.2.0-rc8`, and the
-  `ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8` image.
+  `ghcr.io/consiliency/code-index-mcp:v1.2.0-rc8` image.
 - The authoritative procedure sources are
   `docs/validation/ga-readiness-checklist.md`,
   `docs/operations/deployment-runbook.md`,
