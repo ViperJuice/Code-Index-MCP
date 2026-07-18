@@ -132,7 +132,7 @@ def test_workflows_and_evidence_share_release_channel_policy():
 
     for expected in (
         "release_type=custom",
-        "ghcr.io/viperjuice/code-index-mcp:latest",
+        "format('{0}:latest', env.IMAGE_REF)",
         "Alpha Gate - Docker Build And Smoke",
         "Alpha Gate - Dependency Sync",
     ):

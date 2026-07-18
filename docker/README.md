@@ -20,12 +20,17 @@ docker/
 
 ### Using Pre-built Images
 
+> **Publication gate:** `v1.3.1` is prepared but unpublished. The GHCR commands
+> below become valid only after the protected-main publish workflow passes.
+> Before then, build the image locally with `make release-smoke-container` and
+> substitute `local-smoke` for the tag — see `docs/DOCKER_GUIDE.md`.
+
 ```bash
 # Basic search (no API keys required) - 2 minute setup
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1
 
 # AI-powered search (requires Voyage AI key; lexical search is the image default)
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY=your-key ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY=your-key ghcr.io/consiliency/code-index-mcp:v1.3.1
 
 # Install helper script (recommended)
 curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash

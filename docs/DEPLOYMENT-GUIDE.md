@@ -12,7 +12,10 @@ The supported deployment surfaces are:
 - local checkout plus `uv sync --locked`
 - the published package `index-it-mcp` at the current follow-up RC
   `1.2.0-rc8`
-- the container image `ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8`
+- the container image `ghcr.io/consiliency/code-index-mcp` (publication-gated:
+  it publishes to the owner namespace only after the protected-main publish
+  workflow passes; until then build locally with `make release-smoke-container`
+  — see `docs/DOCKER_GUIDE.md`)
 
 These are the only supported deployment surfaces referenced by the GAOPS
 operator path. For executable procedures, use:

@@ -82,7 +82,7 @@ Removed legacy alias:
 | Legacy console-script alias | `code-index-mcp` | drop | It collides with an external package name and is not needed as the canonical install surface. |
 | Click program name | `code-index-mcp` in `mcp_server/cli/__init__.py` | defer | Runtime label is outside PUBNAME ownership and needs a later runtime-facing phase if it should change. |
 | MCP client server IDs / labels | `code-index`, `code-index-mcp`, `code-index-native`, similar example IDs | keep | These are client-local labels, not Python package names. |
-| Container image name | `ghcr.io/viperjuice/code-index-mcp` | keep | Container naming remains a separate public surface from the Python distribution name. |
+| Container image name | `ghcr.io/consiliency/code-index-mcp` | keep | Container naming remains a separate public surface from the Python distribution name. |
 | Profile/config filename | `code-index-mcp.profiles.yaml` | keep | Repo-shipped configuration filename, not an install target. |
 | `.mcp.json` example labels | `code-index-mcp` and related server keys | keep | Example keys identify local client config entries only. |
 | Repository name | `Code-Index-MCP` | keep | Repo rename is outside PUBNAME scope. |

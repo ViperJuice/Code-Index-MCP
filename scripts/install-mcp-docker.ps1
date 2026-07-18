@@ -8,7 +8,7 @@ param(
 
 # Configuration
 $MCPRegistry = "ghcr.io"
-$MCPImage = "$MCPRegistry/viperjuice/code-index-mcp"
+$MCPImage = "$MCPRegistry/consiliency/code-index-mcp"
 $ErrorActionPreference = "Stop"
 
 # Colors
@@ -125,7 +125,7 @@ REM MCP Index Docker Launcher for Windows
 SET MCP_VARIANT=%MCP_VARIANT%
 IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke
 
-SET MCP_IMAGE=ghcr.io/viperjuice/code-index-mcp
+SET MCP_IMAGE=ghcr.io/consiliency/code-index-mcp
 SET WORKSPACE=%CD%
 
 IF "%1"=="setup" (

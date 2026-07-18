@@ -101,7 +101,7 @@ def test_public_alpha_history_and_current_release_surfaces_include_required_trut
     assert "GADISP" in readme
     assert "rollback" in _read("docs/operations/deployment-runbook.md").lower()
     assert "uv sync --locked" in readme
-    assert "ghcr.io/viperjuice/code-index-mcp" in readme
+    assert "ghcr.io/consiliency/code-index-mcp" in readme
 
     lower_changelog = changelog.lower()
     assert "docs/validation/private-alpha-decision.md" in changelog

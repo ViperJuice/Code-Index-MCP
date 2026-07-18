@@ -112,7 +112,7 @@ def test_docker_docs_use_current_image_package_only():
                 failures.append(f"{path.relative_to(REPO_ROOT)}: {stale}")
     assert failures == []
     for path in DOCKER_DOCS:
-        assert "ghcr.io/viperjuice/code-index-mcp" in _read(path)
+        assert "ghcr.io/consiliency/code-index-mcp" in _read(path)
 
 
 def test_active_release_docs_name_stable_surface_and_support_status():
