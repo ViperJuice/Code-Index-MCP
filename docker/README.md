@@ -33,7 +33,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1
 docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY=your-key ghcr.io/consiliency/code-index-mcp:v1.3.1
 
 # Install helper script (recommended)
-curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
+curl -sSL https://raw.githubusercontent.com/Consiliency/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 mcp-index  # Now available as a command
 ```
 
