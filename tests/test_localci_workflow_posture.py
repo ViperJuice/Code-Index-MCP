@@ -15,6 +15,7 @@ EXPECTED_CLASSIFICATIONS = {
     "maintenance.yml": "offloaded",
     "mcp-index.yml": "manual-only",
     "release-automation.yml": "manual-only",
+    "sign-published-image.yml": "manual-only",
 }
 
 
