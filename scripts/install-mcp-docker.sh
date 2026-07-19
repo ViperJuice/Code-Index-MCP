@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-MCP_VERSION="${MCP_VERSION:-v1.3.1}"
+MCP_VERSION="${MCP_VERSION:-v1.4.0}"
 MCP_VARIANT="${MCP_VARIANT:-local-smoke}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io}"
 MCP_IMAGE="${DOCKER_REGISTRY}/consiliency/code-index-mcp"
@@ -116,7 +116,7 @@ choose_variant() {
     echo
     echo "Choose MCP Index variant:"
     echo "1) local-smoke - Local image built by make release-smoke-container (default)"
-    echo "2) v1.3.1      - Available only after protected-main publication"
+    echo "2) v1.4.0      - Available only after protected-main publication"
     echo "3) latest      - Stable-only channel"
     echo
     
@@ -125,8 +125,8 @@ choose_variant() {
     
     case $REPLY in
         2)
-            MCP_VARIANT="v1.3.1"
-            print_info "Selected: v1.3.1"
+            MCP_VARIANT="v1.4.0"
+            print_info "Selected: v1.4.0"
             ;;
         3)
             MCP_VARIANT="latest"
@@ -141,7 +141,7 @@ choose_variant() {
 
 pull_image() {
     if [ "$MCP_VARIANT" = "local-smoke" ]; then
-        print_warn "v1.3.1 is prepared but unpublished; using the local smoke image."
+        print_warn "v1.4.0 is prepared but unpublished; using the local smoke image."
         if ! docker image inspect "${MCP_IMAGE}:local-smoke" >/dev/null 2>&1; then
             print_error "Local smoke image not found. Run 'make release-smoke-container' first."
             exit 1

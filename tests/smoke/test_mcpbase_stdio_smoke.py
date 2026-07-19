@@ -70,7 +70,7 @@ async def test_official_sdk_client_can_initialize_list_tools_and_call_baseline_t
 
             status = _text_payload(await session.call_tool("get_status", {}))
             assert status["status"] in {"healthy", "unknown"}
-            assert status["version"] == "1.3.1"
+            assert status["version"] == "1.4.0"
 
             plugins = _text_payload(await session.call_tool("list_plugins", {}))
             assert "plugin_availability" in plugins

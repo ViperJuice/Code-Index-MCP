@@ -532,7 +532,7 @@ No operator actions required. P12 is fully codebase-internal.
 
 - [ ] **Prepare only the repo-owned stable surface.** Update package metadata,
   runtime version, active install docs, Docker install defaults, and release
-  workflow defaults to `v1.3.1` / `1.3.1` without dispatching the release.
+  workflow defaults to `v1.4.0` / `1.4.0` without dispatching the release.
 - [ ] **Route release evidence to the downstream owner.** Keep
   `docs/validation/ga-release-evidence.md` absent during GAREL and reserve it
   for `GADISP`.
@@ -546,7 +546,7 @@ No operator actions required. P12 is fully codebase-internal.
   release evidence belong only to `GADISP`.
 - [ ] **Treat older downstream dispatch plans as stale.** If a `GADISP` plan
   predates the accepted `actions/download-artifact@v8` warning disposition or
-  the prepared `v1.3.1` surface, re-plan it before execution.
+  the prepared `v1.4.0` surface, re-plan it before execution.
 
 ---
 

@@ -1,6 +1,6 @@
 # Docker Guide for MCP Index Server
 
-This guide documents the prepared stable-surface Docker path for Code-Index-MCP `1.3.1`.
+This guide documents the prepared stable-surface Docker path for Code-Index-MCP `1.4.0`.
 The documented container naming surface is `ghcr.io/consiliency/code-index-mcp`.
 MCP STDIO is the primary LLM surface; FastAPI remains a secondary admin
 surface. The pre-GA release boundary and evidence map are frozen in
@@ -10,7 +10,7 @@ The Docker path is one explicit support surface in
 language/runtime or topology contract. The container name is a separate surface
 from the canonical Python distribution name `index-it-mcp`.
 
-> **Publication gate:** `v1.3.1` is prepared but unpublished. GHCR commands in
+> **Publication gate:** `v1.4.0` is prepared but unpublished. GHCR commands in
 > this guide become valid only after the protected-main publish workflow passes.
 > Before then, run `make release-smoke-container` and substitute `local-smoke`;
 > the installer helpers default to that local image and fail clearly if it has
@@ -55,7 +55,7 @@ for the canonical support contract.
 P23 documents one image package:
 
 ```bash
-ghcr.io/consiliency/code-index-mcp:v1.3.1
+ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 Enable optional behavior with environment variables and installed extras rather
@@ -86,13 +86,13 @@ iwr -useb https://raw.githubusercontent.com/Consiliency/Code-Index-MCP/main/scri
 
 2. **Pull the image**:
    ```bash
-   docker pull ghcr.io/consiliency/code-index-mcp:v1.3.1
+   docker pull ghcr.io/consiliency/code-index-mcp:v1.4.0
    ```
 
 3. **Create launcher script**:
    ```bash
    # Linux/macOS
-   echo 'docker run -i --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 "$@"' > /usr/local/bin/mcp-index
+   echo 'docker run -i --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0 "$@"' > /usr/local/bin/mcp-index
    chmod +x /usr/local/bin/mcp-index
    ```
 
@@ -107,7 +107,7 @@ Configure the Docker container using environment variables:
 docker run -it \
   -e LOG_LEVEL=DEBUG \
   -e MCP_WORKSPACE_ROOT=/workspace \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 ### Configuration File (.env)
@@ -183,13 +183,13 @@ mcp-index upgrade
 
 ```bash
 # Minimal version - basic search
-docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0
 
 # Standard version - with API key
 docker run -it \
   -v $(pwd):/workspace \
   -e VOYAGE_API_KEY=your-key \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 
 # Full version - with external services
 docker run -it \
@@ -197,7 +197,7 @@ docker run -it \
   -e VOYAGE_API_KEY=your-key \
   -e REDIS_URL=redis://redis:6379 \
   -e QDRANT_URL=http://qdrant:6333 \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 For many unrelated repositories, mount each root deliberately, set
@@ -209,7 +209,7 @@ docker run -it \
   -v /abs/repo-a:/repos/repo-a \
   -v /abs/repo-b:/repos/repo-b \
   -e MCP_ALLOWED_ROOTS=/repos/repo-a:/repos/repo-b \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 
 mcp-index repository register /repos/repo-a
 mcp-index repository register /repos/repo-b
@@ -229,7 +229,7 @@ version: '3.8'
 
 services:
   mcp-index:
-    image: ghcr.io/consiliency/code-index-mcp:v1.3.1
+    image: ghcr.io/consiliency/code-index-mcp:v1.4.0
     volumes:
       - ./:/workspace
       - ~/.mcp-index:/app/.mcp-index
@@ -296,13 +296,13 @@ Control index sharing per repository:
 
 ```bash
 # Check sync status
-docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 artifact status
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0 artifact status
 
 # Download latest index
-docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 artifact pull
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0 artifact pull
 
 # Upload your index
-docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 artifact push
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0 artifact push
 ```
 
 ### Security Features
@@ -331,7 +331,7 @@ Create `.mcp.json` in your project root:
         "-v", "${HOME}/.mcp-index:/app/.mcp-index",
         "-e", "VOYAGE_API_KEY=${VOYAGE_API_KEY:-}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
-        "ghcr.io/consiliency/code-index-mcp:v1.3.1"
+        "ghcr.io/consiliency/code-index-mcp:v1.4.0"
       ]
     }
   }
@@ -447,7 +447,7 @@ Connect to Docker running on the host:
 ```bash
 # Inside dev container
 export DOCKER_HOST=tcp://host.docker.internal:2375
-docker run -it -v /mnt/c/path/to/code:/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1
+docker run -it -v /mnt/c/path/to/code:/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 **Note:** Requires Docker Desktop with exposed daemon.
@@ -460,7 +460,7 @@ For WSL2 with Docker Desktop:
 2. **Use WSL paths** for volume mounts:
    ```bash
    # Convert Windows path to WSL path
-   docker run -it -v /mnt/c/Users/name/project:/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1
+   docker run -it -v /mnt/c/Users/name/project:/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0
    ```
 
 3. **Configure .mcp.json for WSL:**
@@ -473,7 +473,7 @@ For WSL2 with Docker Desktop:
            "run", "-i", "--rm",
            "-v", "${workspace}:/workspace",
            "-v", "/mnt/c/Users/${USER}/.mcp-index:/app/.mcp-index",
-           "ghcr.io/consiliency/code-index-mcp:v1.3.1"
+           "ghcr.io/consiliency/code-index-mcp:v1.4.0"
          ]
        }
      }
@@ -534,7 +534,7 @@ docker version
 
 # Test MCP connection
 echo '{"jsonrpc":"2.0","method":"initialize","id":1}' | \
-  docker run -i --rm ghcr.io/consiliency/code-index-mcp:v1.3.1
+  docker run -i --rm ghcr.io/consiliency/code-index-mcp:v1.4.0
 
 # Verify volume mounts
 docker run --rm -v $(pwd):/workspace alpine ls -la /workspace
@@ -580,7 +580,7 @@ docker run -it \
   -e LOG_LEVEL=DEBUG \
   -e MCP_LOG_FILE=/workspace/mcp-debug.log \
   -v $(pwd):/workspace \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 ### Health Checks
@@ -589,13 +589,13 @@ Check container health:
 
 ```bash
 # Check if MCP server is responsive
-docker run --rm ghcr.io/consiliency/code-index-mcp:v1.3.1 --health
+docker run --rm ghcr.io/consiliency/code-index-mcp:v1.4.0 --health
 
 # Test database connection
-docker run --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 test db
+docker run --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0 test db
 
 # Verify index status
-docker run --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 index status
+docker run --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0 index status
 ```
 
 ## Advanced Topics
@@ -605,7 +605,7 @@ docker run --rm -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.3.1 i
 Extend the base images for your needs:
 
 ```dockerfile
-FROM ghcr.io/consiliency/code-index-mcp:v1.3.1
+FROM ghcr.io/consiliency/code-index-mcp:v1.4.0
 
 # Add custom dependencies
 RUN pip install --no-cache-dir custom-package
@@ -641,12 +641,12 @@ docker run -it \
   -v $(pwd):/workspace \
   -v mcp-index-data:/app/data \
   -v mcp-index-cache:/app/.cache \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 
 # Read-only workspace
 docker run -it \
   -v $(pwd):/workspace:ro \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 ### Network Configuration
@@ -664,7 +664,7 @@ docker run -d --name redis --network mcp-network redis:alpine
 docker run -it \
   --network mcp-network \
   -e REDIS_URL=redis://redis:6379 \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 ### Performance Tuning
@@ -678,7 +678,7 @@ docker run -it \
   -e CACHE_MAX_MEMORY_MB=1000 \
   --cpus="4" \
   --memory="8g" \
-  ghcr.io/consiliency/code-index-mcp:v1.3.1
+  ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 ## Support

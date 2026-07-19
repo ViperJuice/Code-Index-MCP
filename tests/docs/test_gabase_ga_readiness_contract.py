@@ -118,7 +118,7 @@ def test_public_docs_remain_pre_ga_and_route_to_canonical_artifacts():
         text = _read(path)
         lowered = text.lower()
 
-        if "1.3.1" not in text:
+        if "1.4.0" not in text:
             failures.append(f"{path.relative_to(REPO)} missing stable baseline")
         if "stable" not in lowered:
             failures.append(f"{path.relative_to(REPO)} missing stable language")
@@ -149,7 +149,7 @@ def test_runbooks_point_future_ga_work_to_checklist_and_refresh_artifacts():
             "GARC",
             "GAREL",
             "GADISP",
-            "v1.3.1",
+            "v1.4.0",
             "branch protection",
         ):
             assert expected in text, f"{path.relative_to(REPO)} missing {expected!r}"

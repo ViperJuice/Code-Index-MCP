@@ -6,16 +6,16 @@ Code-Index-MCP is a fast, **local-first** search index for your code. It plugs i
 
 > **New to Code-Index-MCP?** Start with the [Getting Started Guide](docs/GETTING_STARTED.md).
 >
-> **Status:** v1.3.1 stable surface prepared — MCP tools (`search_code`, `symbol_lookup`) are the primary interface; a FastAPI admin gateway is available for diagnostics.
+> **Status:** v1.4.0 stable surface prepared — MCP tools (`search_code`, `symbol_lookup`) are the primary interface; a FastAPI admin gateway is available for diagnostics.
 
-> **Stable-surface prep status**: This guide targets the repo-owned `1.3.1`
+> **Stable-surface prep status**: This guide targets the repo-owned `1.4.0`
 > hardening release candidate. MCP STDIO remains the primary LLM surface and
 > FastAPI remains a secondary admin surface. A July 10, 2026 collision check
-> found no live `index-it-mcp==1.3.1`, so this guide uses source and local-wheel
-> proof instead of claiming that the prepared `1.3.1` surface is published.
+> found no live `index-it-mcp==1.4.0`, so this guide uses source and local-wheel
+> proof instead of claiming that the prepared `1.4.0` surface is published.
 
 ## Project Status
-**Version**: 1.3.1 (repo-owned prepared surface; unpublished as of July 10, 2026)
+**Version**: 1.4.0 (repo-owned prepared surface; unpublished as of July 10, 2026)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/consiliency/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -160,7 +160,7 @@ quality or default sandbox behavior.
 
 Supported install paths before publication are native Python/STDIO with
 `uv sync --locked`, a locally built `index-it-mcp` wheel, and the locally built
-`ghcr.io/consiliency/code-index-mcp:local-smoke` image. The prepared `v1.3.1`
+`ghcr.io/consiliency/code-index-mcp:local-smoke` image. The prepared `v1.4.0`
 container commands become valid only after protected-main publication.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
@@ -183,7 +183,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 
 ### 🐳 Docker Setup Before Publication
 
-Build the local smoke image from this checkout. The `v1.3.1` GHCR candidate is
+Build the local smoke image from this checkout. The `v1.4.0` GHCR candidate is
 prepared but unpublished, so the installer also defaults to `local-smoke`.
 
 #### Option 1: Basic Search (No API Keys) - 2 Minutes
@@ -452,12 +452,12 @@ uv run mcp-index --version
 ```bash
 # From the repo root
 uv run --extra dev python -m build --wheel
-python -m pip install dist/index_it_mcp-1.3.1-py3-none-any.whl
+python -m pip install dist/index_it_mcp-1.4.0-py3-none-any.whl
 index-it-mcp --version
 ```
 
 The canonical Python distribution name remains `index-it-mcp`, but the live
-PyPI currently has no published artifact for this repo's prepared `1.3.1` surface.
+PyPI currently has no published artifact for this repo's prepared `1.4.0` surface.
 Use the local wheel or source install above until a later release-evidence
 phase re-proves live package parity.
 
@@ -1326,10 +1326,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Prepare or update the release PR from the feature branch
-gh workflow run "Release Automation" --ref <release-branch> -f mode=prepare -f version=v1.3.1 -f auto_merge=false
+gh workflow run "Release Automation" --ref <release-branch> -f mode=prepare -f version=v1.4.0 -f auto_merge=false
 
 # After that PR merges, publish only from protected main
-gh workflow run "Release Automation" --ref main -f mode=publish -f version=v1.3.1 -f auto_merge=false
+gh workflow run "Release Automation" --ref main -f mode=publish -f version=v1.4.0 -f auto_merge=false
 ```
 
 ### Automatic Index Synchronization
@@ -1399,7 +1399,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.3.1 hardening surface prepared; protected-main publication is still pending
+**Current Status**: 1.4.0 hardening surface prepared; protected-main publication is still pending
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Verified official Python SDK compatibility over STDIO; see `docs/status/MCP_COMPATIBILITY_EVALUATION.md` for named client posture
