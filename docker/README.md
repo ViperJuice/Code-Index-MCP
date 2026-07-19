@@ -20,10 +20,11 @@ docker/
 
 ### Using Pre-built Images
 
-> **Publication gate:** `v1.4.0` is prepared but unpublished. The GHCR commands
-> below become valid only after the protected-main publish workflow passes.
-> Before then, build the image locally with `make release-smoke-container` and
-> substitute `local-smoke` for the tag — see `docs/DOCKER_GUIDE.md`.
+> **Published:** `v1.4.0` is published — pull
+> `ghcr.io/consiliency/code-index-mcp:v1.4.0` (or `:latest`). The GHCR commands
+> below work as written. For local development and testing you can also build the
+> image with `make release-smoke-container` and use the `local-smoke` tag — see
+> `docs/DOCKER_GUIDE.md`.
 
 ```bash
 # Basic search (no API keys required) - 2 minute setup

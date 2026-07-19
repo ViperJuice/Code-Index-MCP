@@ -2,7 +2,7 @@
 # PowerShell script to install and configure MCP Index with Docker
 
 param(
-    [string]$Variant = "local-smoke",
+    [string]$Variant = "v1.4.0",
     [string]$Version = "v1.4.0"
 )
 
@@ -80,25 +80,25 @@ function Install-Docker {
 function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
-    Write-Host "1) local-smoke - Local image built by make release-smoke-container (default)"
-    Write-Host "2) v1.4.0      - Available only after protected-main publication"
-    Write-Host "3) latest      - Stable-only channel"
+    Write-Host "1) v1.4.0      - Published release image (default)"
+    Write-Host "2) local-smoke - Locally built via make release-smoke-container"
+    Write-Host "3) latest      - Stable channel (published)"
     Write-Host ""
-    
+
     $choice = Read-Host "Select variant [1-3] (default: 1)"
-    
+
     switch ($choice) {
         "2" {
-            $script:Variant = "v1.4.0"
-            Write-Host "[INFO] Selected: v1.4.0" -ForegroundColor Green
+            $script:Variant = "local-smoke"
+            Write-Host "[INFO] Selected: local-smoke" -ForegroundColor Green
         }
         "3" {
             $script:Variant = "latest"
             Write-Host "[INFO] Selected: latest" -ForegroundColor Green
         }
         default {
-            $script:Variant = "local-smoke"
-            Write-Host "[INFO] Selected: local-smoke" -ForegroundColor Green
+            $script:Variant = "v1.4.0"
+            Write-Host "[INFO] Selected: v1.4.0" -ForegroundColor Green
         }
     }
 }
@@ -106,7 +106,7 @@ function Select-Variant {
 function Pull-Image {
     $imageTag = "${MCPImage}:${Variant}"
     if ($Variant -eq "local-smoke") {
-        Write-Host "[WARN] v1.4.0 is prepared but unpublished; using the local smoke image." -ForegroundColor Yellow
+        Write-Host "[INFO] Using the locally built smoke image (dev option)." -ForegroundColor Green
         docker image inspect $imageTag *> $null
         if ($LASTEXITCODE -ne 0) {
             throw "Local smoke image not found. Run 'make release-smoke-container' first."
@@ -123,7 +123,7 @@ function Create-Launcher {
 REM MCP Index Docker Launcher for Windows
 
 SET MCP_VARIANT=%MCP_VARIANT%
-IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke
+IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.4.0
 
 SET MCP_IMAGE=ghcr.io/consiliency/code-index-mcp
 SET WORKSPACE=%CD%
