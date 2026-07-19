@@ -2,9 +2,37 @@
 
 # GA RC Evidence
 
+## v1.4.0 Tag Provenance (2026-07-19)
+
+This section records the provenance of the current `v1.4.0` tag so the release
+metadata contract (`tests/test_release_metadata.py::test_release_tag_is_not_reused_locally`)
+can bind the tag to a documented commit. It supersedes, but does not delete, the
+`v1.3.1` and historical `v1.2.0-rc8` records retained below.
+
+- Tag: `v1.4.0`.
+- Tag commit: `0eaf0489914ee948184bb564d6bdcab2e5ad49d5`.
+- Source: merge of PR
+  [#93](https://github.com/Consiliency/Code-Index-MCP/pull/93)
+  ("release: prepare v1.4.0"), which bumps `1.3.1 -> 1.4.0` across the package,
+  docs, install scripts, the release-workflow default, and the doc-truth tests
+  that pin the version, in lockstep.
+- Underlying evidence: the `## [1.4.0] — 2026-07-19` `CHANGELOG.md` entry records
+  everything shipped since `v1.3.1` (13 PRs), including the provider-neutral
+  inference boundary (#74), tree-sitter chunker v4 (#79), the CHUNKERSAFE
+  chunk-identity guard with atomic rebuild and crash-ledger drain (#84), the
+  INFERLIVEGATE provenance-bound rollout gate (#83), the owner-derived GHCR
+  namespace after the org transfer (#89), and signed release images (#92).
+- Channel posture: `v1.4.0` is **prepared but unpublished** — no external release
+  dispatch, no PyPI publication, and Docker `latest` remains stable-only, matching
+  the `docs/SUPPORT_MATRIX.md` "prepared/not yet published" support facts.
+
+This provenance note is a metadata-only bookkeeping record binding the existing
+`v1.4.0` tag to commit `0eaf0489914ee948184bb564d6bdcab2e5ad49d5`; it does not
+itself dispatch or publish a release.
+
 ## v1.3.1 Tag Provenance (2026-07-11)
 
-This section records the provenance of the current `v1.3.1` tag so the release
+This section records the provenance of the `v1.3.1` tag so the release
 metadata contract (`tests/test_release_metadata.py::test_release_tag_is_not_reused_locally`)
 can bind the tag to a documented commit. It supersedes, but does not delete, the
 historical `v1.2.0-rc8` GARECUT record retained below.

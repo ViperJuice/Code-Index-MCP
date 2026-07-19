@@ -252,6 +252,7 @@ jobs:
           grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
 
       - name: Build and push container images
+        id: build-and-push
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
@@ -265,6 +266,28 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ inputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+      # Sign the image in THIS job. A tag pushed by GITHUB_TOKEN does not trigger
+      # other workflows, so container-registry.yml's sign job never fires on the
+      # release path; sign here (job has id-token: write + is logged in to GHCR)
+      # using the digest build-push-action just published.
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      - name: Guard protected main before signing container images
+        run: |
+          VERSION_NO_V=${RELEASE_VERSION#v}
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+          grep -Fxq "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -Fxq "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+
+      - name: Sign the published container image (keyless)
+        env:
+          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: |
+          cosign sign --yes "${IMAGE_REF}@${IMAGE_DIGEST}"
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
