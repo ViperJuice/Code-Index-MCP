@@ -22,9 +22,10 @@ can bind the tag to a documented commit. It supersedes, but does not delete, the
   chunk-identity guard with atomic rebuild and crash-ledger drain (#84), the
   INFERLIVEGATE provenance-bound rollout gate (#83), the owner-derived GHCR
   namespace after the org transfer (#89), and signed release images (#92).
-- Channel posture: `v1.4.0` is **prepared but unpublished** — no external release
-  dispatch, no PyPI publication, and Docker `latest` remains stable-only, matching
-  the `docs/SUPPORT_MATRIX.md` "prepared/not yet published" support facts.
+- Channel posture: `v1.4.0` is **published** — PyPI `index-it-mcp==1.4.0`, GHCR
+  `ghcr.io/consiliency/code-index-mcp:v1.4.0` and `:latest`, and the GitHub release
+  `v1.4.0` (wheel + sdist + SBOM), matching the `docs/SUPPORT_MATRIX.md` published
+  support facts.
 
 This provenance note is a metadata-only bookkeeping record binding the existing
 `v1.4.0` tag to commit `0eaf0489914ee948184bb564d6bdcab2e5ad49d5`; it does not

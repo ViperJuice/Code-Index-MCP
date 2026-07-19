@@ -158,16 +158,17 @@ quality or default sandbox behavior.
 
 ## 🚀 Quick Start
 
-Supported install paths before publication are native Python/STDIO with
-`uv sync --locked`, a locally built `index-it-mcp` wheel, and the locally built
-`ghcr.io/consiliency/code-index-mcp:local-smoke` image. The prepared `v1.4.0`
-container commands become valid only after protected-main publication.
+Supported install paths are the published container image
+`ghcr.io/consiliency/code-index-mcp:v1.4.0` (or `:latest`), native Python/STDIO
+with `uv sync --locked`, and a locally built `index-it-mcp` wheel. The
+`ghcr.io/consiliency/code-index-mcp:local-smoke` image remains an optional dev
+path built from this checkout with `make release-smoke-container`.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
 [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md),
 and rollback procedures live in
 [docs/operations/deployment-runbook.md](docs/operations/deployment-runbook.md).
-Do not treat this prepared stable surface as a universal language support
+Do not treat this published stable surface as a universal language support
 claim; row-level support tiers still live in the support matrix.
 
 ### 🎯 Automatic Setup for Claude Code/Desktop (Recommended)
@@ -181,18 +182,16 @@ claim; row-level support tiers still live in the support matrix.
 
 This automatically detects your environment and creates the appropriate `.mcp.json` configuration.
 
-### 🐳 Docker Setup Before Publication
+### 🐳 Docker Setup
 
-Build the local smoke image from this checkout. The `v1.4.0` GHCR candidate is
-prepared but unpublished, so the installer also defaults to `local-smoke`.
+Pull the published `v1.4.0` image from GHCR. The installer defaults to this
+published image; the `local-smoke` tag remains an optional dev image you can
+build from this checkout with `make release-smoke-container`.
 
 #### Option 1: Basic Search (No API Keys) - 2 Minutes
 ```bash
-# Build and verify the local image
-make release-smoke-container
-
-# Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:local-smoke
+# Index your current directory with the published image
+docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 #### Option 2: AI-Powered Search
@@ -201,7 +200,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/consiliency/code-index-mcp:local-smo
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/consiliency/code-index-mcp:local-smoke
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 ### 💻 Environment-Specific Setup
@@ -212,7 +211,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/consiliency/code-index-mcp:local-smoke
+docker run -it -v ${PWD}:/workspace ghcr.io/consiliency/code-index-mcp:v1.4.0
 ```
 
 #### 🍎 macOS
@@ -289,7 +288,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/consiliency/code-index-mcp:local-smoke"
+        "ghcr.io/consiliency/code-index-mcp:v1.4.0"
       ]
     }
   }

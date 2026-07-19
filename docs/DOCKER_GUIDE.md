@@ -1,6 +1,6 @@
 # Docker Guide for MCP Index Server
 
-This guide documents the prepared stable-surface Docker path for Code-Index-MCP `1.4.0`.
+This guide documents the published stable-surface Docker path for Code-Index-MCP `1.4.0`.
 The documented container naming surface is `ghcr.io/consiliency/code-index-mcp`.
 MCP STDIO is the primary LLM surface; FastAPI remains a secondary admin
 surface. The pre-GA release boundary and evidence map are frozen in
@@ -10,11 +10,12 @@ The Docker path is one explicit support surface in
 language/runtime or topology contract. The container name is a separate surface
 from the canonical Python distribution name `index-it-mcp`.
 
-> **Publication gate:** `v1.4.0` is prepared but unpublished. GHCR commands in
-> this guide become valid only after the protected-main publish workflow passes.
-> Before then, run `make release-smoke-container` and substitute `local-smoke`;
-> the installer helpers default to that local image and fail clearly if it has
-> not been built.
+> **Published:** `v1.4.0` is published — pull
+> `ghcr.io/consiliency/code-index-mcp:v1.4.0` (or `:latest`). GHCR commands in
+> this guide work as written and the installer helpers default to the published
+> image. For local development and testing you can still run
+> `make release-smoke-container` and use the `local-smoke` tag; the installer
+> offers it as a dev option and fails clearly if it has not been built.
 
 Public alpha supports many unrelated repositories from one server when each repo
 has one registered worktree per git common directory and the container

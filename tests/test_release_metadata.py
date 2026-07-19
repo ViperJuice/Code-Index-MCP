@@ -1,4 +1,4 @@
-"""Release metadata assertions for the prepared, unpublished v1.4.0 contract.
+"""Release metadata assertions for the published v1.4.0 contract.
 
 Historical GARC soak target: v1.2.0-rc6.
 """
@@ -130,16 +130,29 @@ def test_installers_and_download_helper_match_stable_identity_contract():
     powershell = _read_text("scripts/install-mcp-docker.ps1")
     download_helper = _read_text("scripts/download-release.py")
 
-    assert 'MCP_VARIANT="${MCP_VARIANT:-local-smoke}"' in shell
-    assert 'param(\n    [string]$Variant = "local-smoke"' in powershell
-    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke' in powershell
-    assert "v1.4.0 is prepared but unpublished" in shell
-    assert "v1.4.0 is prepared but unpublished" in powershell
+    # Installers now default to the published v1.4.0 image, not local-smoke.
+    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.4.0}"' in shell
+    assert 'MCP_VARIANT="${MCP_VARIANT:-local-smoke}"' not in shell
+    assert 'param(\n    [string]$Variant = "v1.4.0"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.4.0' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke' not in powershell
+
+    # local-smoke stays available as a selectable dev option (just not the default).
+    assert "local-smoke" in shell
+    assert "make release-smoke-container" in shell
+    assert "local-smoke" in powershell
+    assert "make release-smoke-container" in powershell
+
+    # v1.4.0 is presented as a published release image, not prepared/unpublished.
+    assert "v1.4.0 is prepared but unpublished" not in shell
+    assert "v1.4.0 is prepared but unpublished" not in powershell
+    assert "Published release image (default)" in shell
+    assert "Published release image (default)" in powershell
 
     readme = _read_text("README.md")
     quick_start = readme.split("## 🚀 Quick Start", 1)[1].split("## Using Against Many Repos", 1)[0]
-    assert "after protected-main publication" in quick_start
-    assert "ghcr.io/consiliency/code-index-mcp:v1.4.0" not in quick_start
+    assert "after protected-main publication" not in quick_start
+    assert "ghcr.io/consiliency/code-index-mcp:v1.4.0" in quick_start
 
     for expected in (
         "index_it_mcp-",
