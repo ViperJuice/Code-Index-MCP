@@ -1,6 +1,6 @@
 # Code-Index-MCP API Reference
 
-> **Beta status**: This API reference describes the prepared `1.3.1` surface
+> **Beta status**: This API reference describes the prepared `1.4.0` surface
 > and should not be read as a GA guarantee.
 
 ## Overview

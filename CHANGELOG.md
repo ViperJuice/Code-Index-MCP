@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: # placeholder for post-rc5 work
 
+## [1.4.0] — 2026-07-19
+
+Minor feature release that lands the provider-neutral inference stack, the
+tree-sitter chunker v4, and safer index rebuild/rollout gating on top of the
+`1.3.1` hardening surface.
+
+### Added
+- Provider-neutral inference boundary so semantic/inference backends can be
+  swapped behind a stable interface without changing caller contracts (#74).
+- Tree-sitter chunker v4 adoption for more accurate and stable code chunking
+  across supported languages (#79).
+- Collection-resident, provenance-bound inference rollout gate (INFERLIVEGATE)
+  that only activates inference for verified, provenance-tracked collections
+  (#83).
+- Roadmap v12 charting the next feature and hardening milestones (#77) and an
+  inference-rollout operations runbook (#86).
+
+### Changed
+- Chunk-identity hardening via the CHUNKERSAFE guard, atomic index rebuild, and
+  crash-ledger drain so interrupted rebuilds recover without corrupt or
+  duplicated chunks (#84).
+- Inference hygiene tightened end to end (INFERPOLISH) (#82).
+- Four Lane A cleanups, including an explicit INDEX_LOCKED readiness state for
+  concurrent index operations (#85).
+- CI now derives the GHCR image namespace from the repository owner so release
+  images publish correctly after the organization transfer (#89).
+- Author standardization and CODEOWNERS added for deterministic review routing
+  (#87, #88).
+
+### Fixed
+- Release container images are signed without crane, and the ownerless install
+  URLs in the release automation and install scripts were corrected (#92).
+
 ## [1.3.1] — 2026-07-10 (Unpublished)
 
 ### Fixed

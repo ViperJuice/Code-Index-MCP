@@ -1,4 +1,4 @@
-"""Release metadata assertions for the prepared, unpublished v1.3.1 contract.
+"""Release metadata assertions for the prepared, unpublished v1.4.0 contract.
 
 Historical GARC soak target: v1.2.0-rc6.
 """
@@ -15,8 +15,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.3.1"
-EXPECTED_TAG = "v1.3.1"
+EXPECTED_VERSION = "1.4.0"
+EXPECTED_TAG = "v1.4.0"
 GA_RC_EVIDENCE = REPO / "docs" / "validation" / "ga-rc-evidence.md"
 DOCKER_INSTALLERS = (
     "scripts/install-mcp-docker.sh",
@@ -64,7 +64,7 @@ def test_readme_distribution_identity_remains_stable():
 def test_changelog_has_prepared_unpublished_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-07-10" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-07-19" in changelog
     assert "Unpublished" in changelog
 
 
@@ -133,13 +133,13 @@ def test_installers_and_download_helper_match_stable_identity_contract():
     assert 'MCP_VARIANT="${MCP_VARIANT:-local-smoke}"' in shell
     assert 'param(\n    [string]$Variant = "local-smoke"' in powershell
     assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=local-smoke' in powershell
-    assert "v1.3.1 is prepared but unpublished" in shell
-    assert "v1.3.1 is prepared but unpublished" in powershell
+    assert "v1.4.0 is prepared but unpublished" in shell
+    assert "v1.4.0 is prepared but unpublished" in powershell
 
     readme = _read_text("README.md")
     quick_start = readme.split("## 🚀 Quick Start", 1)[1].split("## Using Against Many Repos", 1)[0]
     assert "after protected-main publication" in quick_start
-    assert "ghcr.io/consiliency/code-index-mcp:v1.3.1" not in quick_start
+    assert "ghcr.io/consiliency/code-index-mcp:v1.4.0" not in quick_start
 
     for expected in (
         "index_it_mcp-",

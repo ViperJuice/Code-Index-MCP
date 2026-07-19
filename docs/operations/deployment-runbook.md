@@ -1,9 +1,9 @@
-# Deployment Runbook (v1.3.1 hardening preparation baseline)
+# Deployment Runbook (v1.4.0 hardening preparation baseline)
 
 ## Overview
 
 This runbook is the operator playbook for the Code-Index-MCP
-`v1.3.1` hardening preparation baseline. It is not a publication record.
+`v1.4.0` hardening preparation baseline. It is not a publication record.
 The supported deployment surfaces remain local-first and operator-owned:
 
 - `uv sync --locked` plus the local checkout
@@ -64,7 +64,7 @@ historical rc8 soak evidence intact:
 - Branch protection remains enforced via `docs/validation/ga-governance-evidence.md`.
 - The historical `v1.2.0-rc8` recut outcome is `recut succeeded`.
 - Repo-owned package metadata, workflow defaults, installer helpers, and active
-  customer docs now point at the unpublished `v1.3.1` candidate.
+  customer docs now point at the unpublished `v1.4.0` candidate.
 - `docs/validation/ga-release-evidence.md` remains intentionally absent until
   downstream `GADISP` dispatches and verifies the stable release.
 

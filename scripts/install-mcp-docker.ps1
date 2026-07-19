@@ -3,7 +3,7 @@
 
 param(
     [string]$Variant = "local-smoke",
-    [string]$Version = "v1.3.1"
+    [string]$Version = "v1.4.0"
 )
 
 # Configuration
@@ -81,7 +81,7 @@ function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
     Write-Host "1) local-smoke - Local image built by make release-smoke-container (default)"
-    Write-Host "2) v1.3.1      - Available only after protected-main publication"
+    Write-Host "2) v1.4.0      - Available only after protected-main publication"
     Write-Host "3) latest      - Stable-only channel"
     Write-Host ""
     
@@ -89,8 +89,8 @@ function Select-Variant {
     
     switch ($choice) {
         "2" {
-            $script:Variant = "v1.3.1"
-            Write-Host "[INFO] Selected: v1.3.1" -ForegroundColor Green
+            $script:Variant = "v1.4.0"
+            Write-Host "[INFO] Selected: v1.4.0" -ForegroundColor Green
         }
         "3" {
             $script:Variant = "latest"
@@ -106,7 +106,7 @@ function Select-Variant {
 function Pull-Image {
     $imageTag = "${MCPImage}:${Variant}"
     if ($Variant -eq "local-smoke") {
-        Write-Host "[WARN] v1.3.1 is prepared but unpublished; using the local smoke image." -ForegroundColor Yellow
+        Write-Host "[WARN] v1.4.0 is prepared but unpublished; using the local smoke image." -ForegroundColor Yellow
         docker image inspect $imageTag *> $null
         if ($LASTEXITCODE -ne 0) {
             throw "Local smoke image not found. Run 'make release-smoke-container' first."

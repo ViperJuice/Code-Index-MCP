@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
-ACTIVE_STABLE_TAG = "v1.3.1"
+ACTIVE_STABLE_TAG = "v1.4.0"
 
 GA_CHECKLIST = REPO / "docs" / "validation" / "ga-readiness-checklist.md"
 GA_GOVERNANCE = REPO / "docs" / "validation" / "ga-governance-evidence.md"

@@ -18,13 +18,13 @@ def _normalized(relative_path: str) -> str:
 def test_public_install_docs_use_source_or_local_wheel_proof():
     for relative_path in ("README.md", "docs/GETTING_STARTED.md"):
         text = _read(relative_path)
-        assert "pip install index-it-mcp==1.3.1" not in text, relative_path
+        assert "pip install index-it-mcp==1.4.0" not in text, relative_path
         assert "uv sync --locked" in text, relative_path
 
     readme = _read("README.md")
     getting_started = _read("docs/GETTING_STARTED.md")
-    assert "dist/index_it_mcp-1.3.1-py3-none-any.whl" in readme
-    assert "dist/index_it_mcp-1.3.1-py3-none-any.whl" in getting_started
+    assert "dist/index_it_mcp-1.4.0-py3-none-any.whl" in readme
+    assert "dist/index_it_mcp-1.4.0-py3-none-any.whl" in getting_started
     assert "July 10, 2026" in readme
     assert "July 10, 2026" in getting_started
 
