@@ -92,7 +92,7 @@ def test_manifest_change_cannot_reuse_allowance(ledger):
 @pytest.fixture
 def renewal_roots(tmp_path, monkeypatch):
     original = tmp_path / "v13-PILOT-allowance"
-    renewed = tmp_path / "v13-PILOT-allowance-20261004"
+    renewed = tmp_path / "v13-PILOT-allowance-20261012"
     monkeypatch.setattr(budget, "ORIGINAL_ROOT", original)
     monkeypatch.setattr(budget, "RENEWED_ROOT", renewed)
     return original, renewed
@@ -156,25 +156,37 @@ def test_original_canonical_ledger_is_read_only(renewal_roots, tmp_path):
     assert (original / "ledger.sqlite").read_bytes() == before
 
 
-def test_spent_renewal_is_read_only(renewal_roots, tmp_path, monkeypatch):
-    spent = tmp_path / "v13-PILOT-allowance-20260915"
-    monkeypatch.setattr(budget, "SPENT_ROOT", spent)
+@pytest.mark.parametrize(
+    "name, attribute, approval",
+    [
+        ("v13-PILOT-allowance-20260915", "SPENT_ROOT", budget.SPENT_APPROVAL),
+        ("v13-PILOT-allowance-20261004", "REPLACED_ROOT", budget.REPLACED_APPROVAL),
+    ],
+)
+def test_spent_renewal_is_read_only(
+    renewal_roots, tmp_path, monkeypatch, name, attribute, approval
+):
+    spent = tmp_path / name
+    monkeypatch.setattr(budget, attribute, spent)
     fixture = tmp_path / "spent-fixture"
     BudgetLedger.initialize(fixture, "b" * 64)
     with sqlite3.connect(fixture / "ledger.sqlite") as db:
-        db.execute("UPDATE allowance SET approval=?", (budget.SPENT_APPROVAL,))
+        db.execute("UPDATE allowance SET approval=?", (approval,))
     fixture.rename(spent)
     before = (spent / "ledger.sqlite").read_bytes()
     assert (
-        BudgetLedger(spent, "b" * 64, approval=budget.SPENT_APPROVAL, read_only=True).snapshot()[
-            "request_count"
-        ]
+        BudgetLedger(spent, "b" * 64, approval=approval, read_only=True).snapshot()["request_count"]
         == 0
     )
     with pytest.raises(BudgetDenied, match="ledger_read_only"):
-        BudgetLedger(spent, "b" * 64, approval=budget.SPENT_APPROVAL)
+        BudgetLedger(spent, "b" * 64, approval=approval)
     with pytest.raises(BudgetDenied, match="ledger_read_only"):
-        BudgetLedger.initialize(spent, "b" * 64, approval=budget.SPENT_APPROVAL)
+        BudgetLedger.initialize(spent, "b" * 64, approval=approval)
+    for other in (budget.RENEWED_APPROVAL, budget.APPROVAL):
+        with pytest.raises(BudgetDenied):
+            BudgetLedger(spent, "b" * 64, approval=other)
+    with pytest.raises(BudgetDenied, match="approval_root_mismatch"):
+        BudgetLedger(spent, "b" * 64, approval=budget.RENEWED_APPROVAL, read_only=True)
     assert (spent / "ledger.sqlite").read_bytes() == before
 
 
@@ -357,6 +369,88 @@ def test_concurrent_requests_do_not_overlap_upstream(ledger):
             worker.join(5)
     assert not worker.is_alive()
     assert len(observed) == len(results) == 1
+
+
+def test_each_provider_role_admits_one_inflight_request(ledger, clock):
+    embedding = ledger.reserve("embedding", 10)
+    enrichment = ledger.reserve("enrichment", 10)
+    for role in ("embedding", "enrichment"):
+        with pytest.raises(BudgetDenied, match="request_inflight"):
+            ledger.reserve(role, 10)
+    ledger.finish(embedding, "success", 200)
+    ledger.finish(ledger.reserve("embedding", 10), "success", 200)
+    with pytest.raises(BudgetDenied, match="request_inflight"):
+        ledger.reserve("enrichment", 10)
+    ledger.finish(enrichment, "success", 200)
+    assert ledger.snapshot()["reserved_input_units"] == 30
+
+
+def test_role_concurrency_keeps_budget_deadline_and_transport_block_global(ledger, clock):
+    ledger.reserve("embedding", 99990)
+    with pytest.raises(BudgetDenied, match="token_limit"):
+        ledger.reserve("enrichment", 11)
+    request = ledger.reserve("enrichment", 10)
+    ledger.finish(request, "transport_unknown", None)
+    with pytest.raises(BudgetDenied, match="unsettled_transport"):
+        ledger.reserve("enrichment", 1)
+
+
+def test_role_concurrency_deadline_is_shared(ledger, clock):
+    ledger.reserve("embedding", 10)
+    clock[:] = [value + 901 for value in clock]
+    with pytest.raises(BudgetDenied, match="deadline"):
+        ledger.reserve("enrichment", 10)
+
+
+def test_serialized_forwarding_overlaps_only_across_roles(ledger):
+    entered, release = Event(), Event()
+    embedding_body = b'{"model":"fixture","input":["x"]}'
+    chat_body = b'{"model":"fixture","messages":[{"role":"user","content":"x"}]}'
+    outcomes = []
+    with upstream(entered=entered, release=release) as (endpoint, observed):
+        guard = forwarder(ledger, endpoint)
+        first = Thread(
+            target=lambda: outcomes.append(
+                guard.forward_serialized("POST", "/enrichment/v1/chat/completions", chat_body)[0]
+            )
+        )
+        first.start()
+        try:
+            assert entered.wait(5)
+            # A different role is not queued behind the in-flight enrichment request.
+            entered.clear()
+            second = Thread(
+                target=lambda: outcomes.append(
+                    guard.forward_serialized("POST", "/embedding/v1/embeddings", embedding_body)[0]
+                )
+            )
+            second.start()
+            assert entered.wait(5)
+            assert len(observed) == ledger.snapshot()["request_count"] == 2
+            # The same role still waits rather than overlapping upstream.
+            third = Thread(
+                target=lambda: outcomes.append(
+                    guard.forward_serialized("POST", "/embedding/v1/embeddings", embedding_body)[0]
+                )
+            )
+            third.start()
+            assert not release.wait(0.1)
+            assert len(observed) == ledger.snapshot()["request_count"] == 2
+        finally:
+            release.set()
+            for worker in (first, second, third):
+                worker.join(5)
+    assert outcomes == [200, 200, 200]
+    assert len(observed) == ledger.snapshot()["request_count"] == 3
+    for role in ("embedding", "enrichment"):
+        rows = [row for row in ledger.snapshot()["requests"] if row["role"] == role]
+        assert all(b["started_wall"] >= a["finished_wall"] for a, b in zip(rows, rows[1:]))
+
+
+def test_serialized_forwarding_refuses_unknown_route_before_queueing(ledger):
+    with pytest.raises(BudgetDenied, match="route_refused"):
+        forwarder(ledger, "http://127.0.0.1:9/v1").forward_serialized("POST", "/other", b"{}")
+    assert ledger.snapshot()["request_count"] == 0
 
 
 def test_timeout_does_not_allow_a_retry_to_overlap_unknown_work(ledger, monkeypatch):

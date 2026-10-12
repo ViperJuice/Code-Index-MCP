@@ -155,6 +155,36 @@ are reachable, after read-only model-catalog and vector-dimension preflight.
 Only this new approved identity may be writable. Preserve any uncertain outcome
 and stop without another dispatch.
 
+## Per-Role Concurrency Amendment - 2026-10-12
+
+The October 4 replacement pilot ran once at `d3f1f0e`. It completed 10/10
+functional goals and failed only semantic search p95: 775.345 ms against the
+unchanged 500 ms limit. Its allowance is consumed. The partial receipt and the
+canonical and archived ledgers stay read-only. Read-only analysis found that
+every slow sample was a query embedding queued behind an in-flight enrichment
+summary in the guard's single global request slot. The candidate correctly
+summarizes each changed chunk, whose ID is a content hash, so it issues more
+summary requests than the accepted PILOT. Production embedding and enrichment
+are separate servers with no shared request slot.
+
+The owner approved one in-flight request per provider role in place of the
+frozen `policies.pilot.requests_concurrency` value of one. This applies to
+admission under any later approval; the hash-bound freeze contract file is
+unchanged. The input budget, deadline, transport block, request envelopes,
+workload, thresholds and every historical ledger and receipt stay unchanged.
+Live verification refuses overlapping requests within one role.
+
+The owner then conditionally approved exactly one more synthetic-local pilot:
+approval ID `v13-prep-178b8328-20261012-synthetic-local`, bound only to
+`.phase-loop/runs/v13-PILOT-allowance-20261012/`. Limits are 100000 input
+units including retries, 900 seconds from first admission, and one in-flight
+request per provider role. Admission requires the committed exact candidate
+to pass the full local, installed, Qdrant, container, browser and rehearsal
+gates and four new complete approvals first. The October 4 ledger is now
+read-only in code alongside the original and September 15 ledgers. There is no
+reset, refund, automatic retry or commercial inference. Signing stays unused
+and deferred until a live receipt is accepted for the same source.
+
 ## Owner-Authorized Manual Review Route - 2026-09-17
 
 The owner's "go with your recomendation. You have my auth" approves the

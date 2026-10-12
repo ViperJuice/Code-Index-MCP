@@ -38,7 +38,13 @@ transport outcome. Its ledger remains blocked and read-only. The owner approved
 one replacement pilot on October 4. It uses only approval
 `v13-prep-178b8328-20261004-synthetic-local` and the canonical
 `.phase-loop/runs/v13-PILOT-allowance-20261004/` ledger: 100000 input units
-including retries, 900 seconds from first admission, concurrency one. The
+including retries, 900 seconds from first admission, concurrency one. That
+pilot failed the semantic search p95 limit and its allowance is consumed. The
+owner later amended concurrency to one in-flight request per provider role and
+conditionally approved one more pilot under
+`v13-prep-178b8328-20261012-synthetic-local` and
+`.phase-loop/runs/v13-PILOT-allowance-20261012/`. It runs only after every gate
+and four new exact-candidate approvals pass. The
 distinct `--renewed-pilot-root` validator requires matching clean source, wheel,
 lock, offline/browser/rehearsal/live proof and the canonical ledger. The legacy
 version-only comparator must still reject these runtime repairs. Signing is

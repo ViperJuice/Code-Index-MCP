@@ -22,11 +22,13 @@ INPUT_LIMIT = 100000
 SECONDS_LIMIT = 900
 APPROVAL = "v13-freeze-178b8328-20260911-synthetic-local"
 SPENT_APPROVAL = "v13-prep-178b8328-20260915-synthetic-local"
-RENEWED_APPROVAL = "v13-prep-178b8328-20261004-synthetic-local"
+REPLACED_APPROVAL = "v13-prep-178b8328-20261004-synthetic-local"
+RENEWED_APPROVAL = "v13-prep-178b8328-20261012-synthetic-local"
 _RUNS_ROOT = Path(__file__).resolve().parents[1] / ".phase-loop" / "runs"
 ORIGINAL_ROOT = _RUNS_ROOT / "v13-PILOT-allowance"
 SPENT_ROOT = _RUNS_ROOT / "v13-PILOT-allowance-20260915"
-RENEWED_ROOT = _RUNS_ROOT / "v13-PILOT-allowance-20261004"
+REPLACED_ROOT = _RUNS_ROOT / "v13-PILOT-allowance-20261004"
+RENEWED_ROOT = _RUNS_ROOT / "v13-PILOT-allowance-20261012"
 ENDPOINTS = {"embedding": "http://ai:8001/v1", "enrichment": "http://ai:8002/v1"}
 ROUTES = {
     ("GET", "/embedding/v1/models"): ("embedding", "/models"),
@@ -45,24 +47,27 @@ class BudgetLedger:
 
     @staticmethod
     def _check_root(root: Path, approval: str, read_only: bool) -> None:
-        if approval not in {APPROVAL, SPENT_APPROVAL, RENEWED_APPROVAL}:
+        spent = ((SPENT_ROOT, SPENT_APPROVAL), (REPLACED_ROOT, REPLACED_APPROVAL))
+        if approval not in {APPROVAL, RENEWED_APPROVAL, *(item for _, item in spent)}:
             raise BudgetDenied("approval_unknown")
         if root.absolute() != root.resolve():
             raise BudgetDenied("allowance_root_invalid")
         if root == ORIGINAL_ROOT and not read_only:
             raise BudgetDenied("ledger_read_only")
-        if root == SPENT_ROOT and not read_only:
-            raise BudgetDenied("ledger_read_only")
-        if root == SPENT_ROOT and approval != SPENT_APPROVAL:
-            raise BudgetDenied("approval_root_mismatch")
+        for spent_root, spent_approval in spent:
+            if root == spent_root and not read_only:
+                raise BudgetDenied("ledger_read_only")
+            if root == spent_root and approval != spent_approval:
+                raise BudgetDenied("approval_root_mismatch")
+            if approval == spent_approval and not read_only:
+                raise BudgetDenied("ledger_read_only")
         if root == RENEWED_ROOT and approval != RENEWED_APPROVAL:
             raise BudgetDenied("approval_root_mismatch")
         if approval == RENEWED_APPROVAL and (
-            root in {ORIGINAL_ROOT, SPENT_ROOT} or (not read_only and root != RENEWED_ROOT)
+            root in {ORIGINAL_ROOT, *(item for item, _ in spent)}
+            or (not read_only and root != RENEWED_ROOT)
         ):
             raise BudgetDenied("approval_root_mismatch")
-        if approval == SPENT_APPROVAL and not read_only:
-            raise BudgetDenied("ledger_read_only")
 
     @staticmethod
     def initialize(root: Path, manifest_sha256: str, *, approval: str = APPROVAL) -> None:
@@ -179,7 +184,10 @@ class BudgetLedger:
             if state["blocked"]:
                 raise BudgetDenied(state["blocked"])
             wall, mono, _ = self._remaining(state)
-            if db.execute("SELECT COUNT(*) FROM requests WHERE outcome='inflight'").fetchone()[0]:
+            # One in-flight request per provider role; the budget and deadline stay global.
+            if db.execute(
+                "SELECT COUNT(*) FROM requests WHERE outcome='inflight' AND role=?", (role,)
+            ).fetchone()[0]:
                 raise BudgetDenied("request_inflight")
             if state["reserved_input_units"] + input_units > INPUT_LIMIT:
                 raise BudgetDenied("token_limit")
@@ -271,7 +279,7 @@ class LocalForwarder:
         queries: tuple[str, ...] = (),
     ) -> None:
         self.ledger = ledger
-        self._forward_lock = threading.Lock()
+        self._forward_locks = {role: threading.Lock() for role in ENDPOINTS}
         self.envelopes = envelopes
         self.queries = queries
         self.endpoints = dict(ENDPOINTS if endpoints is None else endpoints)
@@ -413,9 +421,12 @@ class LocalForwarder:
         return ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 
     def forward_serialized(self, method: str, route: str, body: bytes) -> tuple[int, bytes]:
-        if not self._forward_lock.acquire(timeout=min(90, self.ledger.remaining_seconds())):
+        if (method, route) not in ROUTES:
+            raise BudgetDenied("route_refused")
+        lock = self._forward_locks[ROUTES[method, route][0]]
+        if not lock.acquire(timeout=min(90, self.ledger.remaining_seconds())):
             raise BudgetDenied("queue_timeout")
         try:
             return self.forward(method, route, body)
         finally:
-            self._forward_lock.release()
+            lock.release()

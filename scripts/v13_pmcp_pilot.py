@@ -1901,6 +1901,14 @@ def _verify_live_records(
                     raise PilotRefused("live_request_invalid")
         if any(row["request_class"] not in REQUEST_ENVELOPES for row in snapshot["requests"]):
             raise PilotRefused("live_request_class_invalid")
+        # Concurrency is one in-flight request per provider role.
+        for role in ENDPOINTS:
+            rows = [row for row in snapshot["requests"] if row["role"] == role]
+            if any(
+                later["started_wall"] < earlier["finished_wall"]
+                for earlier, later in zip(rows, rows[1:])
+            ):
+                raise PilotRefused("live_role_concurrency_exceeded")
 
         workload = json.loads(paths["workload"].read_text())
         metadata = json.loads(paths["runtime_metadata"].read_text())

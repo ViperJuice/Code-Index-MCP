@@ -1,7 +1,21 @@
 # V13 Manual Execution
 
-Updated 2026-10-04. Branch: `codex/v13-audit-remediation`.
+Updated 2026-10-12. Branch: `codex/v13-audit-remediation`.
 Worktree: `/mnt/workspace/worktrees/viperjuice/Code-Index-MCP-v13-audit-remediation-closure`.
+
+## October 12 Per-Role Concurrency Checkpoint
+
+Candidate `d3f1f0e` ran the one October 4 replacement pilot. It passed 10/10
+functional goals with no surviving processes, then failed the semantic search
+p95 limit at 775.345 ms against 500 ms. Its allowance is consumed. The partial
+receipt and both copies of its ledger stay read-only; no `live.json` exists.
+The slow samples were query embeddings waiting behind enrichment summaries in
+the guard's single global request slot. The owner amended the guard to admit
+one in-flight request per provider role. Budget, deadline, workload and
+thresholds are unchanged. The owner conditionally approved one more pilot at
+`.phase-loop/runs/v13-PILOT-allowance-20261012/`; it may run only after every
+exact-source gate and four new approvals pass. Signing is unused, and
+Code-Index-MCP#97 remains draft. PREP is not accepted.
 
 ## October 4 Replacement Pilot Checkpoint
 

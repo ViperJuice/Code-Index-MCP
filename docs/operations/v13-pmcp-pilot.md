@@ -73,8 +73,9 @@ Local-only policy must not fall through to commercial providers, BAML defaults o
 unbounded client sampling. Missing explicitly selected resources fail closed.
 
 The pilot's request guard is an operational budgeting tool, not OS-level egress
-confinement. It permits only the frozen local roles, serializes inference and
-reserves conservative serialized input units before forwarding, including retries.
+confinement. It permits only the frozen local roles, admits one in-flight request
+per provider role and reserves conservative serialized input units before
+forwarding, including retries.
 Failed requests consume reservations; redirects and ambient proxies are refused.
 
 The historical PILOT allowance was 100000 input units, 900 seconds from first
@@ -83,9 +84,15 @@ That exhausted ledger is read-only. The September 15 PREP allowance at
 .phase-loop/runs/v13-PILOT-allowance-20260915 admitted one 33-unit request and
 blocked after an unknown transport outcome; it too is read-only. The owner
 approved one separately named replacement on October 4 at
-.phase-loop/runs/v13-PILOT-allowance-20261004 with the same limits. No ledger
-reset, refund, or ordinary-test inference retry is authorized; see
-plans/phase-plan-v13-PREP.md for admission order and bounds.
+.phase-loop/runs/v13-PILOT-allowance-20261004 with the same limits. That run
+completed its functional goals but failed the semantic search p95 limit. Query
+embeddings waited behind enrichment summaries in the single global request slot.
+Its ledger is consumed and read-only. The owner then amended concurrency to one
+in-flight request per provider role and conditionally approved one more pilot
+at .phase-loop/runs/v13-PILOT-allowance-20261012 with otherwise unchanged
+limits. It may run only after the exact candidate passes every gate and four
+new reviews. No ledger reset, refund, or ordinary-test inference retry is
+authorized; see plans/phase-plan-v13-PREP.md for admission order and bounds.
 
 ## Evidence And Repeatable Checks
 

@@ -1073,6 +1073,8 @@ def live_records(tmp_path, manifest, request, monkeypatch):
         "ledger",
         "accounting",
         "inflight",
+        "role_overlap",
+        "cross_role_overlap",
         "envelope",
         "unknown_class",
         "samples_missing",
@@ -1118,9 +1120,14 @@ def test_live_record_reduction_is_consistent_and_read_only(
         ledger_path.write_bytes(b"{}")
     elif damage == "accounting":
         result["budget"]["reserved_input_units"] += 1
-    elif damage in {"inflight", "envelope", "unknown_class"}:
+    elif damage in {"inflight", "role_overlap", "cross_role_overlap", "envelope", "unknown_class"}:
         with sqlite3.connect(ledger_path) as db:
-            if damage == "inflight":
+            if damage in {"role_overlap", "cross_role_overlap"}:
+                # Row 1 is an embedding probe; row 3 is the enrichment summary.
+                row = 1 if damage == "role_overlap" else 3
+                db.execute("UPDATE requests SET finished_wall=1001.0 WHERE rowid=?", (row,))
+                db.execute("UPDATE allowance SET last_wall=1001.0")
+            elif damage == "inflight":
                 db.execute(
                     "UPDATE requests SET outcome='inflight',finished_wall=NULL WHERE rowid=1"
                 )
@@ -1208,7 +1215,7 @@ def test_live_record_reduction_is_consistent_and_read_only(
         result["artifacts"].append(result["artifacts"][0])
     (tmp_path / "live.json").write_text(json.dumps(result))
     before = {path: (tmp_path / path).read_bytes() for path in paths.values()}
-    if damage:
+    if damage and damage != "cross_role_overlap":
         with pytest.raises(PilotRefused):
             verify_saved_receipt(tmp_path, manifest, "live", expected_approval=ledger.approval)
     else:
