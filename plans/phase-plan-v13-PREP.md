@@ -499,8 +499,8 @@ SL-1 — Independent review and evidence reducer
 Scratch read/write: `.phase-loop/runs/v13-PREP-*/**` and newly created
 `.phase-loop/runs/v13-PILOT-PREP-*/**`, `build/**`,
 `index_it_mcp.egg-info/**`, and the sole new canonical
-`.phase-loop/runs/v13-PILOT-allowance-20261004/**`. The September 15 allowance
-root is read-only. Only new PREP-created Qdrant proof outputs under
+`.phase-loop/runs/v13-PILOT-allowance-20261012/**`. The original, September 15
+and October 4 allowance roots are read-only. Only new PREP-created Qdrant proof outputs under
 `.phase-loop/runs/v13-DATA-qdrant-*/pytest.log` and `junit.xml` are readable.
 Read-only original PILOT inputs: the accepted receipt's exact manifest and
 referenced metadata/verification/browser/live records beneath

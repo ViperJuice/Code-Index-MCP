@@ -73,11 +73,12 @@ a repeatable release check: the original 900-second cumulative allowance has
 expired. Runtime or dependency repairs invalidate relevant live proof and need
 a fresh bounded owner decision; no ledger reset or automatic re-admission.
 
-The four exact review seats are Fable `claude-fable-5`, Sol `gpt-5.6-sol`,
-Grok `grok-4.5`, and Gemini `Gemini 3.1 Pro`. Each receives full candidate changes,
-then all peer reports for reconciliation. No unavailable or degraded seat counts
-as approval; configured and reported model identities remain distinguishable.
-Fable uses only first-party subscription TUI/self-PTY execution.
+The owner's September 29 seat replacement sets the four exact review seats:
+`gpt-6-sol` and `gpt-5.6-sol` through Codex subscriptions, `claude-opus-5-5`
+through the tool-enabled Claude TUI adapter, and Gemini `Gemini 3.1 Pro (High)`.
+Grok and Fable are not used. Each receives full candidate changes, then all peer
+reports for reconciliation. No unavailable or degraded seat counts as approval;
+configured and reported model identities remain distinguishable.
 On September 17 the owner authorized the manual pointer-based four-seat route
 for this release, conditional on verified scoped read-only access. Reviewers
 receive short briefs and file pointers, not injected source bundles. This does

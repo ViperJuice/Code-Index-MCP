@@ -111,6 +111,10 @@ class BudgetLedger:
         self.manifest_sha256 = manifest_sha256
         self.clock = clock
         self.read_only = read_only
+        # In-flight requests admitted by this instance. Any other in-flight row is an
+        # unsettled request from an earlier process and blocks every role.
+        self._owned_inflight: set[str] = set()
+        self._owned_lock = threading.Lock()
         with self._transaction():
             pass
 
@@ -185,10 +189,12 @@ class BudgetLedger:
                 raise BudgetDenied(state["blocked"])
             wall, mono, _ = self._remaining(state)
             # One in-flight request per provider role; the budget and deadline stay global.
-            if db.execute(
-                "SELECT COUNT(*) FROM requests WHERE outcome='inflight' AND role=?", (role,)
-            ).fetchone()[0]:
-                raise BudgetDenied("request_inflight")
+            inflight = db.execute("SELECT id, role FROM requests WHERE outcome='inflight'")
+            with self._owned_lock:
+                if any(
+                    row["role"] == role or row["id"] not in self._owned_inflight for row in inflight
+                ):
+                    raise BudgetDenied("request_inflight")
             if state["reserved_input_units"] + input_units > INPUT_LIMIT:
                 raise BudgetDenied("token_limit")
             if request_class is not None:
@@ -219,6 +225,8 @@ class BudgetLedger:
                 "last_wall=?, last_mono=? WHERE id=1",
                 (input_units, wall, mono, wall, mono),
             )
+            with self._owned_lock:
+                self._owned_inflight.add(request_id)
         return request_id
 
     def remaining_seconds(self) -> float:
@@ -239,6 +247,8 @@ class BudgetLedger:
             ).rowcount
             if updated != 1:
                 raise BudgetDenied("settlement_invalid")
+            with self._owned_lock:
+                self._owned_inflight.discard(request_id)
             blocked = "unsettled_transport" if outcome == "transport_unknown" else state["blocked"]
             if wall < state["last_wall"] or mono < state["last_mono"]:
                 blocked = "clock_rollback"

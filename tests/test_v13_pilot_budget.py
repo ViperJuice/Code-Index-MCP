@@ -66,11 +66,13 @@ def test_reservations_are_cumulative_across_failures_and_restart(ledger, clock):
     assert snapshot["requests"][0]["outcome"] == "http_error"
 
 
-def test_unsettled_restart_fails_closed(ledger, clock):
+@pytest.mark.parametrize("role", ["embedding", "enrichment"])
+def test_unsettled_restart_fails_closed(ledger, clock, role):
     ledger.reserve("embedding", 10)
     reopened = BudgetLedger(ledger.root, "a" * 64, clock=lambda: tuple(clock))
+    # An unsettled request from an earlier process blocks every role, not only its own.
     with pytest.raises(BudgetDenied, match="request_inflight"):
-        reopened.reserve("embedding", 10)
+        reopened.reserve(role, 10)
     assert reopened.snapshot()["reserved_input_units"] == 10
 
 
@@ -391,8 +393,9 @@ def test_role_concurrency_keeps_budget_deadline_and_transport_block_global(ledge
         ledger.reserve("enrichment", 11)
     request = ledger.reserve("enrichment", 10)
     ledger.finish(request, "transport_unknown", None)
-    with pytest.raises(BudgetDenied, match="unsettled_transport"):
-        ledger.reserve("enrichment", 1)
+    for role in ("enrichment", "embedding"):
+        with pytest.raises(BudgetDenied, match="unsettled_transport"):
+            ledger.reserve(role, 1)
 
 
 def test_role_concurrency_deadline_is_shared(ledger, clock):

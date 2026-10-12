@@ -114,8 +114,9 @@ Do not tune these limits after measurement.
 
 verify-browser and verify-live consume saved evidence without inference.
 Live verification reopens the archived ledger read-only, reconciles request
-envelopes and accounting, reconstructs raw sample timing/contention, and checks
-workload/model/collection bindings. SQLite mapping count and unique vector point
+envelopes and accounting, refuses overlapping requests within one provider role,
+reconstructs raw sample timing/contention, and checks workload/model/collection
+bindings. SQLite mapping count and unique vector point
 count are separate: multiple mappings may legitimately reference one point.
 
 Source changes invalidate affected candidate evidence. Preserve rejected and
