@@ -12,7 +12,15 @@ index-attestation signing dispatch succeeded and passed the production
 verifier. All four seats reconciled AGREE with no blockers. By owner decision,
 the Gemini seat reconciled on Gemini 3.8 Flash (High) because Gemini 3.1 Pro
 (High) is no longer offered. Code-Index-MCP#97 merged to main as `3453137`
-with the same tree. Publication (SHIP) has not started.
+with the same tree.
+
+v1.4.1 was published once from that commit (Release Automation run
+38337612139): PyPI wheel and sdist, GitHub release, and signed image
+`ghcr.io/consiliency/code-index-mcp@sha256:5e6efbdc…`. Registry-delivered
+acceptance passed on `ai`: delivered `release_smoke.py` (wheel, STDIO, HTTP,
+schema, non-root lifecycle, cosign verification) and PMCP prepare, offline,
+rehearsal and browser modes. No live inference was repeated. Deployment and
+cohort readiness are not claimed.
 
 ## October 12 Per-Role Concurrency Checkpoint
 
@@ -56,7 +64,7 @@ review before admission. PREP is not accepted.
 | DATA | Accepted | `docs/validation/v13/DATA.json`; IF-0-DATA-1 |
 | PILOT | Historical source accepted; repairs require revalidation | `docs/validation/v13/PILOT.json`; original IF-0-PILOT-1 unchanged |
 | PREP | Accepted | Exact `799d9e8`: October 12 live pilot, one signing dispatch and four-seat reconciliation passed; merged as `3453137` |
-| SHIP | Not started | No publication or issue closure claimed |
+| SHIP | Published and accepted | v1.4.1 run 38337612139; delivered acceptance passed; not deployed; no issue closure claimed |
 
 The four-seat reconciled roadmap remains unchanged at SHA-256
 `178b8328d8e7dc76ddc0804d7b72d3ccddb55e23577a3d52cb7cbd70d5fd5308`.
