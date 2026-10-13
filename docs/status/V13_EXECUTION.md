@@ -124,10 +124,10 @@ The DIST plan's unchecked gate/exit checklists are the historical pre-acceptance
 snapshot bound by its receipt. They are not the current closeout status. Preserve
 those hashed plan bytes; `docs/validation/v13/DIST.json` is the acceptance record.
 
-Read `docs/validation/v13/PILOT.json` and
-`.dev-skills/handoffs/codex-execute-phase/latest.md` in this worktree.
-Next phase: PREP, execute the approved diagnostic repair amendment and fresh checks.
-Next command: manual `codex-execute-phase plans/phase-plan-v13-PREP.md`; keep the outer loop disabled.
+PREP is accepted and v1.4.1 is published and delivered-accepted (see
+"October 12 PREP Acceptance"). Do not rerun PREP or the live pilot: their
+allowances are consumed and not repeatable. Remaining SHIP work is controlled
+rollout (deployed and cohort-ready) and issue closure, each by owner decision.
 Do not restart v9 or infer v13 completion from old primary-checkout state.
 
 ## PREP Candidate
