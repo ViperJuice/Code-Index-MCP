@@ -91,7 +91,9 @@ Its ledger is consumed and read-only. The owner then amended concurrency to one
 in-flight request per provider role and conditionally approved one more pilot
 at .phase-loop/runs/v13-PILOT-allowance-20261012 with otherwise unchanged
 limits. It may run only after the exact candidate passes every gate and four
-new reviews. No ledger reset, refund, or ordinary-test inference retry is
+new reviews. Each guard tracks the requests it admitted itself. An in-flight
+ledger row it did not admit is residue from an earlier, crashed process; it
+blocks every role, not just its own, until reviewed. No ledger reset, refund, or ordinary-test inference retry is
 authorized; see plans/phase-plan-v13-PREP.md for admission order and bounds.
 
 ## Evidence And Repeatable Checks
