@@ -76,6 +76,8 @@ a fresh bounded owner decision; no ledger reset or automatic re-admission.
 The owner's September 29 seat replacement sets the four exact review seats:
 `gpt-6-sol` and `gpt-5.6-sol` through Codex subscriptions, `claude-opus-5-5`
 through the tool-enabled Claude TUI adapter, and Gemini `Gemini 3.1 Pro (High)`.
+Gemini 3.1 Pro (High) is no longer offered. On October 12 the owner set
+`Gemini 3.8 Flash (High)` as the Gemini seat for future reviews.
 Grok and Fable are not used. Each receives full candidate changes, then all peer
 reports for reconciliation. No unavailable or degraded seat counts as approval;
 configured and reported model identities remain distinguishable.
