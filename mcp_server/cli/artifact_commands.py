@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from contextlib import closing
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import Any, List, Optional, cast
 from uuid import uuid4
 
 import click
@@ -29,12 +29,7 @@ from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_meta
 from mcp_server.config.settings import get_settings
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexing.change_detector import ChangeDetector, FileChange
-from mcp_server.indexing.incremental_indexer import IncrementalIndexer
-from mcp_server.plugins.language_registry import get_language_by_extension
-from mcp_server.plugins.plugin_factory import PluginFactory
-from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
-from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.subprocess_env import get_full_env
 
 
@@ -375,7 +370,7 @@ def push(
                     raise click.ClickException("Index integrity validation failed")
             click.echo("✅ Validation passed")
 
-        identity = {
+        identity: dict[str, Any] = {
             "repo_id": repo_info.repository_id if repo_info else None,
             "commit": repo_info.last_indexed_commit if repo_info else None,
             "tracked_branch": repo_info.tracked_branch if repo_info else None,

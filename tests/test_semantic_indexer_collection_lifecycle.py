@@ -43,9 +43,7 @@ class FakeQdrantClient:
         size, distance = self.collections[collection_name]
         return SimpleNamespace(
             config=SimpleNamespace(
-                params=SimpleNamespace(
-                    vectors=SimpleNamespace(size=size, distance=distance)
-                )
+                params=SimpleNamespace(vectors=SimpleNamespace(size=size, distance=distance))
             )
         )
 

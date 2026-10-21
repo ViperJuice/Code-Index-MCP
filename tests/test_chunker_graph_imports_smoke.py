@@ -32,9 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 MCP_SERVER_DIR = REPO_ROOT / "mcp_server"
 
 # ``from <module> import <names>`` where module is chunker or a chunker submodule.
-_FROM_RE = re.compile(
-    r"^\s*from\s+(chunker(?:\.[A-Za-z0-9_.]+)?)\s+import\s+(.+?)\s*$"
-)
+_FROM_RE = re.compile(r"^\s*from\s+(chunker(?:\.[A-Za-z0-9_.]+)?)\s+import\s+(.+?)\s*$")
 # ``import <module>`` (optionally ``as alias``) where module is chunker/submodule.
 _IMPORT_RE = re.compile(
     r"^\s*import\s+(chunker(?:\.[A-Za-z0-9_.]+)?)(?:\s+as\s+[A-Za-z0-9_]+)?\s*$"
@@ -59,9 +57,7 @@ def _grep_chunker_import_lines() -> List[str]:
     )
     # grep exit code 1 == "no matches"; that is itself a failure for this repo.
     if result.returncode not in (0, 1):
-        raise RuntimeError(
-            f"grep failed (rc={result.returncode}): {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"grep failed (rc={result.returncode}): {result.stderr.strip()}")
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
@@ -132,9 +128,8 @@ def test_all_chunker_imports_resolve():
         if getattr(module, symbol) is None:
             failures.append(f"{module_name}.{symbol} resolved to None")
 
-    assert not failures, (
-        "chunker import surface degraded (v4 interface move?):\n  "
-        + "\n  ".join(failures)
+    assert not failures, "chunker import surface degraded (v4 interface move?):\n  " + "\n  ".join(
+        failures
     )
 
 
@@ -153,9 +148,7 @@ def like_indexer(tmp_path: Path):
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
 
-    store = SQLiteStore(
-        str(tmp_path / "code_index.db"), path_resolver=PathResolver(repo_path)
-    )
+    store = SQLiteStore(str(tmp_path / "code_index.db"), path_resolver=PathResolver(repo_path))
     repo_id = store.create_repository(str(repo_path), "test-repo")
     ctx = RepoContext(
         repo_id=repo_id,

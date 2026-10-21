@@ -1723,7 +1723,7 @@ async def _serve(registry_path=None) -> None:
     transports = []
     try:
         with serve_scope:
-            transport_options = {}
+            transport_options: dict[str, Any] = {}
             if os.name == "posix":
                 # Cancellable pipes avoid an uninterruptible SDK readline worker
                 # when a client keeps stdin open after sending a termination signal.

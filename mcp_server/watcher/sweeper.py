@@ -249,7 +249,7 @@ class WatcherSweeper:
 
     @staticmethod
     def _hash_stream(open_source) -> str:
-        def normalized_hash(encoding):
+        def normalized_hash(encoding: str) -> str:
             digest = hashlib.sha256()
             with io.TextIOWrapper(open_source(), encoding=encoding, newline=None) as source:
                 for chunk in iter(lambda: source.read(8192), ""):

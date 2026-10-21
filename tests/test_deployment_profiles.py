@@ -30,7 +30,6 @@ from mcp_server.config.settings import (
     resolve_deployment_profile,
 )
 
-
 # ---------------------------------------------------------------------------
 # Per-profile wiring
 # ---------------------------------------------------------------------------
@@ -99,9 +98,7 @@ def test_lexical_only_has_no_learned_model_dependency():
     assert contract.embedding_provider is None
     assert contract.reranker_path is RerankerPath.NONE
     # It is the only profile with no learned-model dependency.
-    learned = {
-        p for p, c in DEPLOYMENT_PROFILES.items() if not c.requires_learned_models
-    }
+    learned = {p for p, c in DEPLOYMENT_PROFILES.items() if not c.requires_learned_models}
     assert learned == {DeploymentProfile.LEXICAL_ONLY}
 
 
@@ -273,9 +270,7 @@ class SpyQdrantClient:
         return _FakeCollections([self._existing_name])
 
     def get_collection(self, name):
-        return _FakeCollectionInfo(
-            _FakeVectors(self._actual_size, self._actual_distance)
-        )
+        return _FakeCollectionInfo(_FakeVectors(self._actual_size, self._actual_distance))
 
     # Mutating operations — must NOT be called on the fail-closed path.
     def create_collection(self, *args, **kwargs):
@@ -297,9 +292,7 @@ def test_fleet_provider_down_degrades_without_collection_mutation():
     """
     # Import the COMMITTED lifecycle function; skip honestly if the qdrant dep is
     # unavailable in this env rather than degrading to a tautology.
-    semantic_indexer = pytest.importorskip(
-        "mcp_server.utils.semantic_indexer"
-    )
+    semantic_indexer = pytest.importorskip("mcp_server.utils.semantic_indexer")
     from mcp_server.utils.semantic_indexer import SemanticIndexer, ensure_qdrant_collection
 
     # 1) Degradation policy: fleet provider is down -> degrade to lexical_only.
@@ -370,8 +363,7 @@ def test_profile_explicitly_set_discriminates_unset_from_lexical_only():
     # var (legacy operator) is NOT the same as an explicitly-chosen lexical_only.
     assert deployment_profile_is_explicitly_set(env={}) is False
     assert (
-        deployment_profile_is_explicitly_set(env={"MCP_DEPLOYMENT_PROFILE": "lexical_only"})
-        is True
+        deployment_profile_is_explicitly_set(env={"MCP_DEPLOYMENT_PROFILE": "lexical_only"}) is True
     )
 
 
@@ -420,10 +412,9 @@ def test_learned_models_allowed_unknown_profile_fails_closed():
     assert learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"}) is False
     # Symmetry: both siblings fail closed on the same unknown explicit profile.
     assert commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"}) is False
-    assert (
-        learned_models_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"})
-        is commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"})
-    )
+    assert learned_models_allowed(
+        env={"MCP_DEPLOYMENT_PROFILE": "nonsense"}
+    ) is commercial_egress_allowed(env={"MCP_DEPLOYMENT_PROFILE": "nonsense"})
 
 
 # ---------------------------------------------------------------------------

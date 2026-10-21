@@ -6,6 +6,7 @@ them, records the code commit, states the holdout was not used for tuning, and
 that SUPPORT_MATRIX keeps semantic/reranked as experimental / opt-in (learned
 reranking not default-enabled).
 """
+
 from __future__ import annotations
 
 import json
@@ -36,18 +37,16 @@ def manifest() -> dict:
 def test_report_exists_and_has_allowed_verdict(report_text: str) -> None:
     m = re.search(r"verdict:\s*(\w+)", report_text)
     assert m, "report must contain a machine-parseable 'verdict: <enum>' line"
-    assert m.group(1) in ALLOWED_VERDICTS, (
-        f"verdict {m.group(1)!r} not in allowed enum {ALLOWED_VERDICTS}"
-    )
+    assert (
+        m.group(1) in ALLOWED_VERDICTS
+    ), f"verdict {m.group(1)!r} not in allowed enum {ALLOWED_VERDICTS}"
 
 
 def test_report_binds_frozen_checksums(report_text: str, manifest: dict) -> None:
     for key in ("dataset_sha256", "corpus_sha256", "thresholds_sha256"):
         recorded = manifest[key]
         assert isinstance(recorded, str) and recorded
-        assert recorded in report_text, (
-            f"report must bind {key} == MANIFEST value {recorded}"
-        )
+        assert recorded in report_text, f"report must bind {key} == MANIFEST value {recorded}"
 
 
 def test_report_records_code_commit(report_text: str) -> None:
@@ -73,12 +72,12 @@ def test_report_documents_collection_resident_provenance_precondition(report_tex
     The report must document that precondition, the manifest schema, and the
     distinct not_run reason codes."""
     low = report_text.lower()
-    assert "collection-resident provenance" in low, (
-        "report must document the collection-resident provenance precondition"
-    )
-    assert "collection-provenance.v1" in report_text, (
-        "report must cite the collection-provenance.v1 manifest schema"
-    )
+    assert (
+        "collection-resident provenance" in low
+    ), "report must document the collection-resident provenance precondition"
+    assert (
+        "collection-provenance.v1" in report_text
+    ), "report must cite the collection-provenance.v1 manifest schema"
     # Every distinct not_run reason code the verifier can emit must be documented,
     # so the report's enforced-bindings text matches exactly what the code checks.
     for code in (
@@ -106,9 +105,9 @@ def test_report_enforced_bindings_match_code(report_text: str) -> None:
     # corpus_sha256 null/absent is honestly classified as unbound, not a mismatch.
     assert "unbound" in low, "report must classify a null corpus_sha256 as unbound"
     # Identity matching is conditional on the run supplying the expectation.
-    assert "only when the run supplies" in low or "only when supplied" in low, (
-        "report must state identity fields are matched only when an expectation is supplied"
-    )
+    assert (
+        "only when the run supplies" in low or "only when supplied" in low
+    ), "report must state identity fields are matched only when an expectation is supplied"
     # The target collection name is always matched (rejects a copied sentinel).
     assert "collection" in low and "matches" in low
 
@@ -117,9 +116,9 @@ def test_report_documents_operator_run_procedure(report_text: str) -> None:
     """The report must land the operator run procedure for a live provider run."""
     low = report_text.lower()
     assert "operator run procedure" in low, "report must include an operator run procedure"
-    assert "expected_point_set_id" in report_text.lower(), (
-        "run procedure must document the EXPECTED_POINT_SET_ID expectation"
-    )
+    assert (
+        "expected_point_set_id" in report_text.lower()
+    ), "run procedure must document the EXPECTED_POINT_SET_ID expectation"
     assert "run_inference_gate.py" in report_text
 
 

@@ -21,13 +21,12 @@ from mcp_server.interfaces.inference_contracts import (
     EmbeddingResponseV1,
     EmbeddingRole,
     ExpectedProfile,
-    ProviderCapability,
     ProvenanceAuthority,
     ProvenanceField,
+    ProviderCapability,
     embed_with_provenance,
     validate_profile,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fakes

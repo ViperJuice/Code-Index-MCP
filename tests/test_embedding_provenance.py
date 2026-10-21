@@ -40,7 +40,6 @@ from mcp_server.interfaces.inference_contracts import (
 )
 from mcp_server.utils.semantic_indexer import SemanticIndexer
 
-
 # ---------------------------------------------------------------------------
 # Response builders (no network, no SDK)
 # ---------------------------------------------------------------------------
@@ -125,9 +124,7 @@ class _RecordingQdrant:
         self.upserts = []
 
     def get_collections(self):
-        return SimpleNamespace(
-            collections=[SimpleNamespace(name=n) for n in self.collections]
-        )
+        return SimpleNamespace(collections=[SimpleNamespace(name=n) for n in self.collections])
 
     def get_collection(self, collection_name):
         size, distance = self.collections[collection_name]
@@ -420,7 +417,9 @@ def test_query_provenance_fails_closed_on_dimension_drift_vs_index(tmp_path):
     # profile: reconstruct an indexer whose profile is 16-d but whose PERSISTED
     # index record still says 8-d -> record-drift branch must fail closed.
     ix16 = _make_indexer(
-        tmp_path, _FakeProvenanceProvider(lambda t, it: _openai_response(t, it, dimension=16)), dim=16
+        tmp_path,
+        _FakeProvenanceProvider(lambda t, it: _openai_response(t, it, dimension=16)),
+        dim=16,
     )
     ix16.metadata_file = ix.metadata_file  # same persisted 8-d record
     query_resp = _openai_response(["q"], "query", dimension=16)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.health.repository_readiness import (
@@ -15,6 +15,9 @@ from mcp_server.health.repository_readiness import (
 from mcp_server.indexing.lock_registry import lock_registry
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.store_registry import StoreRegistry
+
+if TYPE_CHECKING:
+    from mcp_server.storage.git_index_manager import GitAwareIndexManager
 
 logger = logging.getLogger(__name__)
 _MutationResult = TypeVar("_MutationResult")
@@ -59,7 +62,7 @@ class RepoResolver:
     def __init__(self, registry: RepositoryRegistry, store_registry: StoreRegistry):
         self._registry = registry
         self._store_registry = store_registry
-        self._index_manager = None
+        self._index_manager: Optional[GitAwareIndexManager] = None
 
     def classify(self, selector: str | Path) -> RepositoryReadiness:
         """Classify repository readiness for a selector without registering it."""
@@ -115,7 +118,7 @@ class RepoResolver:
                 raise RuntimeError("Staged repository mutation owner is unavailable")
             from mcp_server.storage.git_index_manager import UpdateResult
 
-            outcome = []
+            outcome: list[_MutationResult] = []
 
             def staged_operation(stage):
                 result = operation(stage)

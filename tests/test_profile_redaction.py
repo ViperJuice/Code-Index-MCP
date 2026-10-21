@@ -68,9 +68,7 @@ def test_to_dict_preserves_non_secret_and_reference_fields():
 
 
 def test_registry_export_redacts_secret_values():
-    registry = SemanticProfileRegistry.from_raw(
-        {"oss-high": _payload_with_secret()}, "oss-high"
-    )
+    registry = SemanticProfileRegistry.from_raw({"oss-high": _payload_with_secret()}, "oss-high")
 
     blob = json.dumps(registry.to_dict())
     assert SENTINEL not in blob

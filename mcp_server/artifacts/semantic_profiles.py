@@ -417,6 +417,7 @@ REINDEX_REMEDIATION = (
     "SemanticIndexer.reconcile_existing_collection)."
 )
 
+
 @dataclass
 class ProfileAttestation:
     """Outcome of reconciling a provider response against a semantic profile.
@@ -458,7 +459,9 @@ class ProfileAttestation:
         )
 
 
-def build_expected_profile(profile: Any, *, role: Optional[EmbeddingRole] = None) -> ExpectedProfile:
+def build_expected_profile(
+    profile: Any, *, role: Optional[EmbeddingRole] = None
+) -> ExpectedProfile:
     """Build an :class:`ExpectedProfile` from a semantic profile's assumed values."""
     return ExpectedProfile(
         served_model_id=getattr(profile, "model_name", None),

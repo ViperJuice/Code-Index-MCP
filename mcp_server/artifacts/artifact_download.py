@@ -453,7 +453,7 @@ class IndexArtifactDownloader:
                         expanded.write(chunk)
                 expanded.seek(0)
                 with tarfile.open(fileobj=expanded, mode="r:") as tar:
-                    names = set()
+                    names: set[str] = set()
                     total = 0
                     for member in tar:
                         if time.monotonic() > deadline:

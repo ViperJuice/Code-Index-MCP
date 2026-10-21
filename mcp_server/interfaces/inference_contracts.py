@@ -24,7 +24,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence, runtime_checkable
+from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence, cast, runtime_checkable
 
 CONTRACT_VERSION = "embedding-response.v1"
 
@@ -175,8 +175,10 @@ class EmbeddingResponseV1:
     def provenance_field(self, name: str) -> ProvenanceField:
         """Return the :class:`ProvenanceField` for a named provenance field."""
         if name not in PROVENANCE_FIELDS:
-            raise KeyError(f"{name!r} is not a provenance field; expected one of {PROVENANCE_FIELDS}")
-        return getattr(self, name)
+            raise KeyError(
+                f"{name!r} is not a provenance field; expected one of {PROVENANCE_FIELDS}"
+            )
+        return cast(ProvenanceField, getattr(self, name))
 
     def authority_of(self, name: str) -> ProvenanceAuthority:
         """Return just the authority tag for a named provenance field."""
@@ -228,9 +230,7 @@ class ProviderCapability:
         return {
             "provider": self.provider,
             "supported_roles": sorted(r.value for r in self.supported_roles),
-            "reportable_fields": {
-                name: self.can_report(name) for name in PROVENANCE_FIELDS
-            },
+            "reportable_fields": {name: self.can_report(name) for name in PROVENANCE_FIELDS},
         }
 
 
@@ -368,7 +368,11 @@ def embed_with_provenance(
     declared = dict(declared or {})
     reported = dict(reported or {})
 
-    role = EmbeddingRole(input_type) if input_type in {r.value for r in EmbeddingRole} else EmbeddingRole.DOCUMENT
+    role = (
+        EmbeddingRole(input_type)
+        if input_type in {r.value for r in EmbeddingRole}
+        else EmbeddingRole.DOCUMENT
+    )
 
     started = time.perf_counter()
     vectors = provider.embed(list(texts), input_type)
@@ -395,15 +399,17 @@ def embed_with_provenance(
     model_revision = _provenance(
         capability, "model_revision", reported.get("model_revision"), declared.get("model_revision")
     )
-    dimension = _provenance(
-        capability, "dimension", reported.get("dimension"), declared_dim
-    )
+    dimension = _provenance(capability, "dimension", reported.get("dimension"), declared_dim)
     normalization = _provenance(
         capability, "normalization", reported.get("normalization"), declared.get("normalization")
     )
     # Role is always known locally (derived from input_type). If the server can
     # report it, honor that; otherwise it is a declared value from the caller.
-    if capability is not None and capability.can_report("role") and reported.get("role") is not None:
+    if (
+        capability is not None
+        and capability.can_report("role")
+        and reported.get("role") is not None
+    ):
         role_field = ProvenanceField.reported(EmbeddingRole(reported["role"]).value)
     else:
         role_field = ProvenanceField.declared(role.value)

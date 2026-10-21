@@ -438,7 +438,6 @@ from mcp_server.indexer.reranker import (  # noqa: E402,F401  (re-export for con
     RerankResult,
 )
 
-
 # ========================================
 # Performance Monitoring Interfaces
 # ========================================

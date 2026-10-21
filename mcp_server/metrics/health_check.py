@@ -280,7 +280,7 @@ class ComponentHealthChecker(IHealthCheck):
             return HealthCheckResult(
                 component="disk", status=status, message=message, details=details
             )
-        except Exception as e:
+        except Exception:
             return HealthCheckResult(
                 component="disk",
                 status=HealthStatus.UNHEALTHY,

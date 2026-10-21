@@ -10,6 +10,7 @@ from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver, run_repository_mutation
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.health.repository_readiness import ReadinessClassifier
+from mcp_server.storage.store_registry import StoreRegistry
 
 from .client_types import (
     ClientReindexResult,
@@ -106,7 +107,9 @@ def _generation_unavailable(repo_resolver, ctx) -> IndexUnavailable | None:
     return None
 
 
-def _unavailable_search(options: ClientSearchOptions, unavailable: IndexUnavailable):
+def _unavailable_search(
+    options: ClientSearchOptions, unavailable: IndexUnavailable
+) -> ClientSearchResult:
     return ClientSearchResult(
         query=options.query,
         message=unavailable.message,
@@ -233,7 +236,7 @@ def execute_search_service(
         else None
     )
     if readiness is not None and not readiness.ready:
-        unavailable = _index_unavailable(readiness)
+        unavailable: IndexUnavailable | None = _index_unavailable(readiness)
         return _unavailable_search(options, unavailable)
 
     if ctx is None and repo_resolver is not None:
@@ -351,7 +354,7 @@ class IndexItClient:
         self.registry_path = Path(registry_path).resolve() if registry_path else None
         self._repo_resolver: RepoResolver | None = None
         self._dispatcher: DispatcherProtocol | None = None
-        self._owned_store_registry = None
+        self._owned_store_registry: StoreRegistry | None = None
         self._close_failed = False
 
     def __enter__(self) -> IndexItClient:

@@ -1250,7 +1250,7 @@ def test_legacy_query_entrypoints_recheck_admission(runtime, monkeypatch, surfac
 
 
 @pytest.mark.parametrize(
-    "failure", ["none", "missing_point", "upsert", "unacknowledged", "cleanup"]
+    "failure", ["none", "missing_point", "missing_vector", "upsert", "unacknowledged", "cleanup"]
 )
 @pytest.mark.parametrize("known_paths", [False, True])
 def test_retained_vector_copy_uses_real_generation_clients_without_active_mutation(
@@ -1307,6 +1307,15 @@ def test_retained_vector_copy_uses_real_generation_clients_without_active_mutati
                     original.qdrant.delete(
                         original.collection, models.PointIdsList(points=[256]), wait=True
                     )
+                elif failure == "missing_vector":
+                    retrieve = original.qdrant.retrieve
+
+                    def without_vector(*args, **kwargs):
+                        points = retrieve(*args, **kwargs)
+                        points[0].vector = None
+                        return points
+
+                    monkeypatch.setattr(original.qdrant, "retrieve", without_vector)
                 elif failure == "upsert":
                     monkeypatch.setattr(
                         staged.qdrant, "upsert", MagicMock(side_effect=OSError("write fault"))

@@ -421,9 +421,9 @@ def test_release_tag_is_not_reused_locally():
     released_ancestor = (
         subprocess.run(["git", "merge-base", "--is-ancestor", tag_commit, head]).returncode == 0
     )
-    assert tag_commit == head or released_ancestor, (
-        f"{EXPECTED_TAG} already identifies a different source commit"
-    )
+    assert (
+        tag_commit == head or released_ancestor
+    ), f"{EXPECTED_TAG} already identifies a different source commit"
 
 
 def test_installers_and_download_helper_match_stable_identity_contract():

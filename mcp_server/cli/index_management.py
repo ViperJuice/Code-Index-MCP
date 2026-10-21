@@ -109,7 +109,7 @@ def _get_vector_backend_status() -> Dict[str, Any]:
     return {}
 
 
-def _build_sqlite_baseline() -> Dict[str, int]:
+def _build_sqlite_baseline() -> Dict[str, Any]:
     """Build the local lexical SQLite baseline using dispatcher indexing."""
     original_skip_preindex = os.environ.get("MCP_SKIP_PLUGIN_PREINDEX")
     original_lightweight_docs = os.environ.get("MCP_LIGHTWEIGHT_DOC_INDEX")
@@ -126,7 +126,7 @@ def _build_sqlite_baseline() -> Dict[str, int]:
             memory_aware=False,
             multi_repo_enabled=False,
         )
-        stats = dispatcher.index_directory(Path.cwd(), recursive=True)
+        stats: Dict[str, Any] = dispatcher.index_directory(Path.cwd(), recursive=True)
         stats["lexical_rows"] = store.rebuild_fts_code()
         return stats
     finally:

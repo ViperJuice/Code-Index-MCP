@@ -110,19 +110,40 @@ def test_percentile():
 # Freeze gate (load_frozen_eval)
 # ---------------------------------------------------------------------------
 
-def _write_eval_dir(tmp_path: Path, *, signed=True, break_checksum=None, omit_manifest=False) -> Path:
+
+def _write_eval_dir(
+    tmp_path: Path, *, signed=True, break_checksum=None, omit_manifest=False
+) -> Path:
     """Fabricate a frozen eval dir; optionally break the gate."""
     eval_dir = tmp_path / "retrieval_eval"
     eval_dir.mkdir()
 
     # Real dataset schema: id / relevant_doc_ids / holdout (boolean).
     queries = [
-        {"id": "q1", "query": "find the parser", "category": "exact_identifier",
-         "relevant_doc_ids": ["docA"], "hard_negative_doc_ids": ["docB"], "holdout": False},
-        {"id": "q2", "query": "error on startup", "category": "concept",
-         "relevant_doc_ids": ["docB"], "hard_negative_doc_ids": ["docA"], "holdout": False},
-        {"id": "h1", "query": "held out", "category": "exact_identifier",
-         "relevant_doc_ids": ["docA"], "hard_negative_doc_ids": [], "holdout": True},
+        {
+            "id": "q1",
+            "query": "find the parser",
+            "category": "exact_identifier",
+            "relevant_doc_ids": ["docA"],
+            "hard_negative_doc_ids": ["docB"],
+            "holdout": False,
+        },
+        {
+            "id": "q2",
+            "query": "error on startup",
+            "category": "concept",
+            "relevant_doc_ids": ["docB"],
+            "hard_negative_doc_ids": ["docA"],
+            "holdout": False,
+        },
+        {
+            "id": "h1",
+            "query": "held out",
+            "category": "exact_identifier",
+            "relevant_doc_ids": ["docA"],
+            "hard_negative_doc_ids": [],
+            "holdout": True,
+        },
     ]
     queries_bytes = ("\n".join(json.dumps(q) for q in queries) + "\n").encode()
     (eval_dir / "queries.jsonl").write_bytes(queries_bytes)
@@ -197,6 +218,7 @@ def test_load_frozen_eval_refuses_checksum_mismatch(tmp_path, bad):
 # Holdout safety
 # ---------------------------------------------------------------------------
 
+
 def test_assert_no_holdout():
     assert_no_holdout(["q1", "q2"], ["h1"])  # ok
     with pytest.raises(HoldoutViolationError, match="h1"):
@@ -206,6 +228,7 @@ def test_assert_no_holdout():
 # ---------------------------------------------------------------------------
 # Smoke run over a 2-query fake corpus
 # ---------------------------------------------------------------------------
+
 
 def _fake_arms():
     # lexical arm: ranks docA first for q1, docB first for q2
@@ -227,6 +250,7 @@ def _fake_arms():
     def make(map_):
         def fn(query):
             return map_[query["id"]]
+
         return fn
 
     return {
@@ -351,6 +375,7 @@ def test_fixed_k_vs_per_depth_metrics(tmp_path):
 # Real committed dataset (benchmarks/retrieval_eval) — the frozen contract
 # ---------------------------------------------------------------------------
 
+
 def test_load_frozen_eval_real_dataset():
     """The harness loads and runs against the ACTUAL committed dataset."""
     frozen = load_frozen_eval("benchmarks/retrieval_eval")
@@ -407,6 +432,7 @@ def test_load_frozen_eval_real_dataset():
 # collection's resident provenance verifies against the frozen corpus. These
 # cases pin the not_run reason taxonomy — one distinct reason_code per failure
 # mode — using a fabricated manifest and no live services.
+
 
 def _frozen_for_provenance(tmp_path):
     """A loaded FrozenEval whose corpus commit is ``a*40`` and corpus_sha256 is
@@ -472,9 +498,7 @@ def test_provenance_stale_corpus_mismatch_is_not_run(tmp_path):
 def test_provenance_mixed_run_point_set_mismatch_is_not_run(tmp_path):
     frozen = _frozen_for_provenance(tmp_path)
     manifest = _valid_manifest()  # matches commit + corpus, but wrong point_set
-    result = verify_collection_provenance(
-        manifest, frozen, expected_point_set_id="build-99"
-    )
+    result = verify_collection_provenance(manifest, frozen, expected_point_set_id="build-99")
     assert result.verified is False
     assert result.reason_code == PROVENANCE_MIXED_RUN
 
@@ -484,7 +508,7 @@ def test_provenance_mixed_run_point_set_mismatch_is_not_run(tmp_path):
     [
         lambda m: m.update({"provenance_version": "collection-provenance.v0"}),
         lambda m: m.pop("provenance_version"),
-        lambda m: m.pop("point_set_id"),          # missing required key
+        lambda m: m.pop("point_set_id"),  # missing required key
         lambda m: m.update({"profile_fingerprint": ""}),  # recorded field empty
     ],
 )
@@ -541,9 +565,7 @@ def test_provenance_provider_id_mismatch_is_not_run(tmp_path):
     rejected when the run supplies the expected provider id — Fable's finding."""
     frozen = _frozen_for_provenance(tmp_path)
     manifest = _valid_manifest()  # provider_id == "openai_compatible"
-    result = verify_collection_provenance(
-        manifest, frozen, expected_provider_id="voyage-code-3"
-    )
+    result = verify_collection_provenance(manifest, frozen, expected_provider_id="voyage-code-3")
     assert result.verified is False
     assert result.reason_code == PROVENANCE_PROVIDER_MISMATCH
 

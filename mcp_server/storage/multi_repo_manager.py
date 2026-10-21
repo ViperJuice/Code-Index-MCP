@@ -454,8 +454,7 @@ class MultiRepositoryManager:
 
         # Get repositories to search
         if repository_ids:
-            repos = [self.registry.get(rid) for rid in repository_ids]
-            repos = [r for r in repos if r and r.active]
+            repos = [r for rid in repository_ids if (r := self.registry.get(rid)) and r.active]
         else:
             repos = self.list_repositories(active_only=True)
 
@@ -602,8 +601,7 @@ class MultiRepositoryManager:
 
         # Get repositories to search
         if repository_ids:
-            repos = [self.registry.get(rid) for rid in repository_ids]
-            repos = [r for r in repos if r and r.active]
+            repos = [r for rid in repository_ids if (r := self.registry.get(rid)) and r.active]
         else:
             repos = self.list_repositories(active_only=True)
 
@@ -685,12 +683,13 @@ class MultiRepositoryManager:
             return None
 
         try:
+            search_options: Dict[str, Any] = {"languages": languages} if languages else {}
             bm25_results = store.search_bm25(
                 query,
                 table="fts_code",
                 limit=limit,
                 file_pattern=file_pattern,
-                **({"languages": languages} if languages else {}),
+                **search_options,
             )
 
             # Format results

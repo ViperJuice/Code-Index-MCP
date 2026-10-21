@@ -363,7 +363,7 @@ class MultiRepoArtifactCoordinator:
                     download_workspace.cleanup()
 
                 artifact = result.artifact or {}
-                if not getattr(result, "installed_items", None):
+                if not result.installed_items:
                     raise RuntimeError("Artifact download admitted no new generation")
                 restored_repo = self.multi_repo_manager.registry.get(repo.repository_id)
                 if restored_repo is None or restored_repo.registration_id != repo.registration_id:

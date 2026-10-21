@@ -84,6 +84,7 @@ class HoldoutViolationError(RuntimeError):
 # Checksums
 # ---------------------------------------------------------------------------
 
+
 def sha256_bytes(data: bytes) -> str:
     """Return the hex sha256 of raw bytes."""
     return hashlib.sha256(data).hexdigest()
@@ -97,6 +98,7 @@ def sha256_file(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Frozen eval loading + freeze gate
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FrozenEval:
@@ -176,8 +178,7 @@ def load_frozen_eval(eval_dir: str | Path) -> FrozenEval:
     review = manifest.get("review") or {}
     if review.get("signed") is not True:
         raise FrozenEvalError(
-            "freeze gate: review.signed is not true "
-            f"(got {review.get('signed')!r})"
+            "freeze gate: review.signed is not true " f"(got {review.get('signed')!r})"
         )
 
     # Verify the byte-checksummed files (dataset + thresholds) against disk.
@@ -212,9 +213,7 @@ def load_frozen_eval(eval_dir: str | Path) -> FrozenEval:
     if not manifest_corpus_sha:
         raise FrozenEvalError("freeze gate: MANIFEST missing checksum 'corpus_sha256'")
     if not corpus_recorded_sha:
-        raise FrozenEvalError(
-            "freeze gate: corpus_manifest.json missing 'corpus_sha256'"
-        )
+        raise FrozenEvalError("freeze gate: corpus_manifest.json missing 'corpus_sha256'")
     if manifest_corpus_sha != corpus_recorded_sha:
         raise FrozenEvalError(
             "freeze gate: corpus_sha256 checksum mismatch: "
@@ -224,9 +223,7 @@ def load_frozen_eval(eval_dir: str | Path) -> FrozenEval:
 
     queries = _read_jsonl(eval_dir / QUERIES_FILE)
     thresholds = json.loads((eval_dir / THRESHOLDS_FILE).read_text())
-    holdout_ids = frozenset(
-        manifest.get("holdout_query_ids") or manifest.get("holdout_ids") or []
-    )
+    holdout_ids = frozenset(manifest.get("holdout_query_ids") or manifest.get("holdout_ids") or [])
 
     return FrozenEval(
         eval_dir=eval_dir,
@@ -282,15 +279,15 @@ PROVENANCE_RECORDED_FIELDS: Tuple[str, ...] = (
 
 #: not_run reason codes, one per distinct failure mode. Each maps a live
 #: collection's binding to a truthful, non-overlapping cause.
-PROVENANCE_MISSING = "provenance_missing"      # no binding written into the collection
-PROVENANCE_STALE = "provenance_stale"          # commit or corpus checksum MISMATCH
+PROVENANCE_MISSING = "provenance_missing"  # no binding written into the collection
+PROVENANCE_STALE = "provenance_stale"  # commit or corpus checksum MISMATCH
 PROVENANCE_CORPUS_UNBOUND = "provenance_corpus_unbound"  # corpus_sha256 null/absent
 PROVENANCE_MIXED_RUN = "provenance_mixed_run"  # point_set_id != the run's expectation
-PROVENANCE_TAMPERED = "provenance_tampered"    # schema/version wrong or fields absent
+PROVENANCE_TAMPERED = "provenance_tampered"  # schema/version wrong or fields absent
 #: Identity-expectation mismatches: the binding is internally well-formed and
 #: frozen-corpus-consistent, but a query-side expectation the run supplied does
 #: not match the recorded value. Only fired when an expected value is provided.
-PROVENANCE_PROFILE_MISMATCH = "provenance_profile_mismatch"    # embedding profile fingerprint
+PROVENANCE_PROFILE_MISMATCH = "provenance_profile_mismatch"  # embedding profile fingerprint
 PROVENANCE_PROVIDER_MISMATCH = "provenance_provider_mismatch"  # provider id/revision
 PROVENANCE_COLLECTION_MISMATCH = "provenance_collection_mismatch"  # collection name
 
@@ -506,10 +503,7 @@ def verify_collection_provenance(
             manifest=snapshot,
         )
 
-    if (
-        expected_provider_id is not None
-        and snapshot.get("provider_id") != expected_provider_id
-    ):
+    if expected_provider_id is not None and snapshot.get("provider_id") != expected_provider_id:
         return ProvenanceVerification(
             verified=False,
             reason_code=PROVENANCE_PROVIDER_MISMATCH,
@@ -566,9 +560,10 @@ def verify_collection_provenance(
 # Metrics (pure functions)
 # ---------------------------------------------------------------------------
 
+
 def _gain(rel: float) -> float:
     """Exponential relevance gain ``2**rel - 1`` (binary rel reduces to 1)."""
-    return (2.0 ** float(rel)) - 1.0
+    return float((2.0 ** float(rel)) - 1.0)
 
 
 def dcg_at_k(ranked_ids: Sequence[str], relevance: Mapping[str, float], k: int) -> float:
@@ -624,6 +619,7 @@ def percentile(values: Sequence[float], p: float) -> float:
 # ---------------------------------------------------------------------------
 # Arm output normalization + per-channel diagnostics
 # ---------------------------------------------------------------------------
+
 
 def _normalize_ranking(raw: Any) -> Tuple[List[str], Dict[str, float]]:
     """Normalize an arm's raw output into ``(ranked_ids, scores)``.
@@ -684,6 +680,7 @@ def _per_channel_diagnostics(
 # Holdout safety
 # ---------------------------------------------------------------------------
 
+
 def assert_no_holdout(consumed_query_ids: Iterable[str], holdout_ids: Iterable[str]) -> None:
     """Assert a (tuning) run did not consume any reserved holdout id.
 
@@ -692,14 +689,13 @@ def assert_no_holdout(consumed_query_ids: Iterable[str], holdout_ids: Iterable[s
     consumed = set(consumed_query_ids)
     leaked = sorted(consumed & set(holdout_ids))
     if leaked:
-        raise HoldoutViolationError(
-            f"tuning run touched reserved holdout ids: {leaked}"
-        )
+        raise HoldoutViolationError(f"tuning run touched reserved holdout ids: {leaked}")
 
 
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ArmSpec:
@@ -723,7 +719,9 @@ class RetrievalBenchmarkHarness:
     derived from the ``lexical`` and ``dense`` single-channel arms.
     """
 
-    def __init__(self, frozen: FrozenEval, arms: Mapping[str, ArmSpec], depths: Sequence[int] = DEPTHS):
+    def __init__(
+        self, frozen: FrozenEval, arms: Mapping[str, ArmSpec], depths: Sequence[int] = DEPTHS
+    ):
         self.frozen = frozen
         self.arms = dict(arms)
         self.depths = list(depths)
@@ -741,9 +739,7 @@ class RetrievalBenchmarkHarness:
         if isinstance(rel, Mapping):
             return {k: float(v) for k, v in rel.items()}
         ids = (
-            query.get("relevant_doc_ids")
-            or query.get("relevant_ids")
-            or (list(rel) if rel else [])
+            query.get("relevant_doc_ids") or query.get("relevant_ids") or (list(rel) if rel else [])
         )
         return {doc_id: 1.0 for doc_id in ids}
 
@@ -756,7 +752,9 @@ class RetrievalBenchmarkHarness:
         metrics, latency percentiles, cost/egress, per-channel diagnostics, the
         consumed query-id split, and the bound MANIFEST checksums.
         """
-        queries = [q for q in self.frozen.queries if split is None or self.frozen.query_split(q) == split]
+        queries = [
+            q for q in self.frozen.queries if split is None or self.frozen.query_split(q) == split
+        ]
         consumed_ids = [q["id"] for q in queries]
 
         # Pass 1: run single-channel arms and cache per-query rankings so fused
@@ -803,10 +801,15 @@ class RetrievalBenchmarkHarness:
 
                 # Per-channel diagnostics for fused arms.
                 if arm_name not in CHANNEL_ARMS and any(channel_cache[c] for c in CHANNEL_ARMS):
-                    channels = {c: channel_cache[c].get(qid) for c in CHANNEL_ARMS}
-                    channels = {c: r for c, r in channels.items() if r is not None}
+                    channels = {
+                        c: run
+                        for c in CHANNEL_ARMS
+                        if (run := channel_cache[c].get(qid)) is not None
+                    }
                     if channels:
-                        per_channel.setdefault(arm_name, {})[qid] = _per_channel_diagnostics(ranked_ids, channels)
+                        per_channel.setdefault(arm_name, {})[qid] = _per_channel_diagnostics(
+                            ranked_ids, channels
+                        )
 
                 # Fixed-k metrics named by the frozen thresholds: computed ONCE
                 # per query at their fixed cutoff, independent of candidate depth.
