@@ -150,6 +150,34 @@ a fresh observed run passed every node. No failed attempt is accepted proof.
 
 ## Rollout And Recovery
 
+### Corrective Symbol-Index Upgrades
+
+The decorated Python extraction correction requires a full lexical rebuild for
+each affected repository after installing the corrective package. Restarting or
+running an incremental sync can retain unchanged files with missing definitions.
+Back up the registry, client configuration and index using the existing recovery
+procedure, retain prior generations, and run the installed command in the same
+lexical environment as the downstream child:
+
+```bash
+mcp-index repository sync --repo-id <id> --force-full
+```
+
+Check readiness, source-definition selection and decorated declaration locations
+again after restarting the child. Symbol lookup uses case-sensitive literal
+names; an unqualified name also accepts a final dot-separated member component
+for methods/getters/setters/properties or a final C++ `::` component.
+Source definitions precede documentation examples, and BM25 mentions alone do
+not establish a definition. Ready misses retain the `not_found` response.
+
+Repository regressions and the isolated installed-wheel smoke test establish
+implementation evidence. Subsequent dev0 acceptance must replay the saved
+207-check suite, 38 gateway checks and 1,078-declaration AST inventory against
+the original corpus, followed by a day of normal pilot use before expansion.
+Those live checks are not performed by the implementation tests.
+[Consiliency/pmcp#401](https://github.com/Consiliency/pmcp/issues/401) tracks the
+separate gateway JSON issue; it does not block this source correction.
+
 Even accepted PILOT evidence permits only a controlled rollout decision. It does
 not index the fleet, expand platform/language support, approve learned reranking,
 or establish broad retrieval quality from a two-file synthetic corpus.

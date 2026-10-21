@@ -10,7 +10,7 @@ The Python plugin is a fully implemented specialized language plugin (one of 13 
 
 ### What It Does
 - **Parsing**: Uses Tree-sitter to parse Python files
-- **Indexing**: Extracts top-level functions and classes only
+- **Indexing**: Both `Plugin` and `PythonPluginSemantic` statically extract top-level functions/classes and immediate class methods, including decorated and async declarations. Locations start at the declaration, with existing signature formats preserved.
 - **Symbol Lookup**: Uses Jedi to find symbol definitions
 - **Reference Finding**: Uses Jedi to find all references to symbols
 - **Search**: Fuzzy text search across all Python files
@@ -18,12 +18,12 @@ The Python plugin is a fully implemented specialized language plugin (one of 13 
 
 ### What It Does NOT Do
 - Does NOT use Python's AST module
-- Does NOT index variables or nested definitions
+- Does NOT index variables or arbitrary nested functions/classes beyond immediate class methods
 - Does NOT resolve imports
 - Does NOT extract detailed type information
 - Does NOT support semantic/embedding-based search
 - Does NOT cache parsed results
-- Does NOT handle decorators, metaclasses, or advanced Python features
+- Does NOT execute decorators, resolve decorator-generated symbols, or evaluate metaclasses
 
 ## ESSENTIAL_COMMANDS
 
@@ -240,7 +240,8 @@ class Plugin(PluginBase):
     
     def indexFile(self, path, content):
         # Parses with Tree-sitter
-        # Extracts only function_definition and class_definition nodes
+        # Unwraps decorated definitions at module and immediate class-method scope
+        # Extracts function_definition and class_definition nodes statically
         # Returns simple signatures like "def foo(...):"
     
     def getDefinition(self, symbol):
@@ -258,7 +259,7 @@ class Plugin(PluginBase):
 
 ## Limitations
 
-1. **Limited Symbol Types**: Only indexes functions and classes at the top level
+1. **Limited Symbol Types**: Indexes top-level functions/classes and immediate methods, including decorated declarations; arbitrary nested definitions and runtime-generated symbols remain unsupported
 2. **Simple Signatures**: Extracts basic signatures without parameters
 3. **No Caching**: Re-parses files on every operation
 4. **No Import Analysis**: Cannot resolve imports or dependencies

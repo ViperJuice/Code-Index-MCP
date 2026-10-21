@@ -67,6 +67,36 @@ def _make_dispatcher_with_plugins(plugins: list) -> EnhancedDispatcher:
     return dispatcher
 
 
+@pytest.mark.parametrize("returned_name", [None, "foo", "Owner.foo", "foobar", "FOO"])
+@pytest.mark.parametrize("kind", ["method", "build_method", "lifecycle_method"])
+def test_full_schema_bm25_is_only_a_fallback_hint(tmp_path, returned_name, kind):
+    # Initialize the real schema first: a BM25-only database bypasses the buggy branch.
+    ctx = _make_ctx(str(tmp_path / "full.db"))
+    with sqlite3.connect(ctx.sqlite_store.db_path) as conn:
+        conn.execute(
+            "CREATE VIRTUAL TABLE bm25_content USING fts5(filepath, filename, content, language)"
+        )
+        conn.execute(
+            "INSERT INTO bm25_content VALUES (?, ?, ?, ?)",
+            ("src/main.py", "main.py", "# mentions def foo but has no definition", "python"),
+        )
+    plugin = FakePyPlugin()
+    definition = (
+        {"symbol": returned_name, "kind": kind, "defined_in": "src/real.py", "line": 19}
+        if returned_name
+        else None
+    )
+    plugin.getDefinition = MagicMock(return_value=definition)
+    later = FakePyPlugin()
+    later.getDefinition = MagicMock(return_value=None)
+    dispatcher = _make_dispatcher_with_plugins([plugin, later])
+    result = dispatcher.lookup(ctx, "foo")
+    assert result == (definition if returned_name in {"foo", "Owner.foo"} else None)
+    plugin.getDefinition.assert_called_once_with("foo")
+    if returned_name:
+        later.getDefinition.assert_not_called()
+
+
 class FakePyPlugin(IPlugin):
     """Plugin that claims to handle .py files."""
 

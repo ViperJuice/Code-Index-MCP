@@ -42,6 +42,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
     ) -> None:
         # Initialize enhanced base class
         super().__init__(sqlite_store=sqlite_store, enable_semantic=enable_semantic)
+        self._sqlite_store = sqlite_store
 
         # Initialize Python-specific components
         self._ts = TreeSitterWrapper()
@@ -105,6 +106,11 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
 
         # Extract symbols and documentation
         for child in root.named_children:
+            if child.type == "decorated_definition":
+                definition = child.child_by_field_name("definition")
+                if definition is None:
+                    continue
+                child = definition
             if child.type not in {"function_definition", "class_definition"}:
                 continue
 
@@ -157,6 +163,11 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                 body = child.child_by_field_name("body")
                 if body:
                     for method_node in body.named_children:
+                        if method_node.type == "decorated_definition":
+                            definition = method_node.child_by_field_name("definition")
+                            if definition is None:
+                                continue
+                            method_node = definition
                         if method_node.type != "function_definition":
                             continue
                         method_name_node = method_node.child_by_field_name("name")

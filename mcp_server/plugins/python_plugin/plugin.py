@@ -155,6 +155,11 @@ class Plugin(IPlugin):
 
         symbols: list[dict] = []
         for child in root.named_children:
+            if child.type == "decorated_definition":
+                definition = child.child_by_field_name("definition")
+                if definition is None:
+                    continue
+                child = definition
             if child.type not in {"function_definition", "class_definition"}:
                 continue
 
@@ -201,6 +206,11 @@ class Plugin(IPlugin):
                 body = child.child_by_field_name("body")
                 if body:
                     for method_node in body.named_children:
+                        if method_node.type == "decorated_definition":
+                            definition = method_node.child_by_field_name("definition")
+                            if definition is None:
+                                continue
+                            method_node = definition
                         if method_node.type != "function_definition":
                             continue
                         method_name_node = method_node.child_by_field_name("name")

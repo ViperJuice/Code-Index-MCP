@@ -11,7 +11,7 @@ import re
 import sqlite3
 import threading
 import time
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, closing, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import Enum
@@ -38,7 +38,11 @@ from ..graph import (
 from ..indexing.source_metadata import extract_matching_source_metadata
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.generic_treesitter_plugin import GenericTreeSitterPlugin
-from ..plugins.language_registry import get_all_extensions, get_language_by_extension
+from ..plugins.language_registry import (
+    LANGUAGE_CONFIGS,
+    get_all_extensions,
+    get_language_by_extension,
+)
 from ..plugins.plugin_factory import PluginFactory, PluginUnavailableError
 from ..plugins.plugin_set_registry import PluginSetRegistry
 from ..storage.multi_repo_manager import MultiRepositoryManager
@@ -1057,108 +1061,96 @@ class EnhancedDispatcher:
             return matching_plugins
         return self._plugin_set_registry.plugins_for_file(ctx, path)
 
+    @staticmethod
+    def _matches_symbol_name(name: str, kind: str, symbol: str) -> bool:
+        """Match literal stored names and supported final-component aliases."""
+        if name == symbol:
+            return True
+        if "." in symbol or "::" in symbol:
+            return False
+        return (
+            kind in {"method", "getter", "setter", "property", "build_method", "lifecycle_method"}
+            and "." in name
+            and name.rsplit(".", 1)[1] == symbol
+        ) or ("::" in name and name.rsplit("::", 1)[1] == symbol)
+
+    def _symbol_definition_rank(self, row: sqlite3.Row, symbol: str) -> tuple:
+        """Rank source definitions before documents, then exact names and stable locations."""
+        metadata = json.loads(row["metadata"] or "{}")
+        language = row["language"]
+        document = (
+            language in {"markdown", "plaintext", "rst", "latex"}
+            or row["kind"] in {"document", "heading", "section", "chunk"}
+            or bool(metadata.get("in_code_block"))
+        )
+        if not document and language not in LANGUAGE_CONFIGS:
+            document = self._is_documentation_file(row["path"])
+        return (
+            document,
+            row["name"] != symbol,
+            row["relative_path"],
+            row["line_start"],
+            row["line_end"],
+            row["kind"],
+            row["name"],
+        )
+
     def lookup(self, ctx: RepoContext, symbol: str, limit: int = 20) -> Optional[SymbolDef]:
         """Look up symbol definition within ctx.repo_id."""
         _hp_t0 = time.perf_counter()
         start_time = time.time()
 
         try:
-            # For symbol lookup, prefer BM25 direct lookup to avoid plugin loading delays
-            # Only load plugins if explicitly needed and BM25 fails
+            # Definitions come from parsed symbol records; BM25 only supplies a fallback hint.
             if ctx.sqlite_store:
-                logger.debug("Using BM25 lookup directly for better performance")
                 try:
-                    import sqlite3
-
-                    conn = sqlite3.connect(ctx.sqlite_store.db_path)
-                    cursor = conn.cursor()
-
-                    # First try symbols table for exact matches
-                    cursor.execute(
-                        """
-                        SELECT s.name, s.kind, s.line_start, s.line_end,
-                               s.signature, s.documentation, f.path, f.language
-                        FROM symbols s
-                        JOIN files f ON s.file_id = f.id
-                        WHERE s.name = ? OR s.name LIKE ?
-                        ORDER BY CASE WHEN s.name = ? THEN 0 ELSE 1 END
-                        LIMIT 1
-                    """,
-                        (symbol, f"%{symbol}%", symbol),
+                    with closing(sqlite3.connect(ctx.sqlite_store.db_path)) as conn:
+                        conn.row_factory = sqlite3.Row
+                        rows = conn.execute(
+                            """
+                            SELECT s.name, s.kind, s.line_start, s.line_end,
+                                   s.signature, s.documentation, s.metadata,
+                                   f.path, f.relative_path, f.language
+                            FROM symbols s
+                            JOIN files f ON s.file_id = f.id
+                            WHERE s.name = ? COLLATE BINARY
+                               OR (? AND (
+                                   (s.kind IN ('method', 'getter', 'setter', 'property',
+                                               'build_method', 'lifecycle_method')
+                                    AND substr(s.name, -length(?)) = ? COLLATE BINARY)
+                                   OR substr(s.name, -length(?)) = ? COLLATE BINARY
+                               ))
+                            """,
+                            (
+                                symbol,
+                                "." not in symbol and "::" not in symbol,
+                                "." + symbol,
+                                "." + symbol,
+                                "::" + symbol,
+                                "::" + symbol,
+                            ),
+                        ).fetchall()
+                    row = min(
+                        rows,
+                        key=lambda candidate: self._symbol_definition_rank(candidate, symbol),
+                        default=None,
                     )
-
-                    row = cursor.fetchone()
                     if row:
-                        name, kind, line, end_line, signature, doc, filepath, language = row
-                        conn.close()
-
-                        # Return proper SymbolDef dict
+                        name, kind = row["name"], row["kind"]
+                        line, end_line = row["line_start"], row["line_end"]
                         return {
                             "symbol": name,
                             "kind": kind,
-                            "language": language or "unknown",
-                            "signature": signature or f"{kind} {name}",
-                            "doc": doc,
-                            "defined_in": filepath,
+                            "language": row["language"] or "unknown",
+                            "signature": row["signature"] or f"{kind} {name}",
+                            "doc": row["documentation"],
+                            "defined_in": row["path"],
                             "line": line or 1,
                             "start_line": line or 1,
                             "end_line": end_line or line or 1,
                             "span": (0, len(name)),
                         }
 
-                    # Fallback to BM25 if available
-                    try:
-                        patterns = [
-                            f"class {symbol}",
-                            f"def {symbol}",
-                            f"function {symbol}",
-                            symbol,  # Try exact symbol match as fallback
-                        ]
-
-                        for pattern in patterns:
-                            cursor.execute(
-                                """
-                                SELECT filepath, snippet(bm25_content, -1, '', '', '...', 20), language
-                                FROM bm25_content
-                                WHERE bm25_content MATCH ?
-                                ORDER BY rank
-                                LIMIT 1
-                            """,
-                                (pattern,),
-                            )
-
-                            row = cursor.fetchone()
-                            if row:
-                                filepath, snippet, language = row
-
-                                # Determine kind from pattern
-                                pattern_lower = pattern.lower()
-                                if "class" in pattern_lower:
-                                    kind = "class"
-                                elif "def" in pattern_lower or "function" in pattern_lower:
-                                    kind = "function"
-                                else:
-                                    kind = "symbol"
-
-                                conn.close()
-
-                                return {
-                                    "symbol": symbol,
-                                    "kind": kind,
-                                    "language": language or "unknown",
-                                    "signature": snippet,
-                                    "doc": None,
-                                    "defined_in": filepath,
-                                    "line": 1,
-                                    "start_line": 1,
-                                    "end_line": 1,
-                                    "span": (0, len(symbol)),
-                                }
-                    except sqlite3.OperationalError:
-                        # BM25 table doesn't exist, that's fine
-                        pass
-
-                    conn.close()
                 except Exception as e:
                     logger.error(f"Error in direct symbol lookup: {type(e).__name__}")
 
@@ -1202,6 +1194,8 @@ class EnhancedDispatcher:
 
             self._operation_stats["lookups"] += 1
             self._operation_stats["total_time"] += time.time() - start_time
+            if result and not self._matches_symbol_name(result["symbol"], result["kind"], symbol):
+                return None
             return result
 
         except Exception as e:
