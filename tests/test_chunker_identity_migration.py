@@ -95,9 +95,7 @@ def _insert_summary(store: SQLiteStore, chunk_hash: str, file_id: int) -> None:
 def _clear_marker(store: SQLiteStore) -> None:
     """Simulate a legacy / v3-unmarked index: chunker rows present, no marker."""
     with store._get_connection() as conn:
-        conn.execute(
-            "DELETE FROM index_config WHERE config_key = ?", (CHUNK_SCHEME_MARKER_KEY,)
-        )
+        conn.execute("DELETE FROM index_config WHERE config_key = ?", (CHUNK_SCHEME_MARKER_KEY,))
 
 
 def _force_scheme(monkeypatch, value: str) -> None:
@@ -293,9 +291,7 @@ def test_readiness_reports_scheme_mismatch_not_ready(tmp_path):
             (FOREIGN_SCHEME, CHUNK_SCHEME_MARKER_KEY),
         )
 
-    state = repository_readiness._inspect_index_uncached(
-        __import__("pathlib").Path(store.db_path)
-    )
+    state = repository_readiness._inspect_index_uncached(__import__("pathlib").Path(store.db_path))
     assert state == RepositoryReadinessState.SCHEME_MISMATCH
 
 
@@ -451,8 +447,7 @@ def test_rebuild_invalidates_all_profiles_semantic_mappings(tmp_path):
 
     with store._get_connection() as conn:
         remaining = {
-            (r[0], r[1])
-            for r in conn.execute("SELECT profile_id, chunk_id FROM semantic_points")
+            (r[0], r[1]) for r in conn.execute("SELECT profile_id, chunk_id FROM semantic_points")
         }
     # Both profiles' chunker mappings gone; both profiles' document mapping kept.
     assert ("profile-a", "code-chunk-1") not in remaining

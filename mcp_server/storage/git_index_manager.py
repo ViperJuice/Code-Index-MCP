@@ -456,7 +456,8 @@ class GitAwareIndexManager:
                     "SELECT c.chunk_id, f.relative_path FROM code_chunks c JOIN files f ON f.id=c.file_id"
                 )
             }
-        mapped_chunks, mapped_paths = {}, {}
+        mapped_chunks: Dict[int | str | uuid.UUID, set[str]] = {}
+        mapped_paths: Dict[int | str | uuid.UUID, set[str]] = {}
         for row in mappings:
             chunk_id = row["chunk_id"]
             relative = (
@@ -469,6 +470,8 @@ class GitAwareIndexManager:
             mapped_chunks.setdefault(row["point_id"], set()).add(chunk_id)
             mapped_paths.setdefault(row["point_id"], set()).add(relative)
         seen = set()
+        assert self.dispatcher is not None
+        assert self.dispatcher._semantic_registry is not None
         with self.dispatcher._semantic_registry.lease(ctx.repo_id, ctx=ctx) as indexer:
             profile = indexer.semantic_profile.profile_id
             record = metadata.get("semantic_profiles", {}).get(profile, {})
@@ -478,8 +481,9 @@ class GitAwareIndexManager:
             ):
                 raise ValueError("Artifact vectors lack an attested profile owner")
             indexer._prepare_for_writes()
+            assert indexer._attestation is not None
             indexer._check_indexed_profile(indexer._attestation, record=record)
-            batch = []
+            batch: List[models.PointStruct] = []
 
             def flush():
                 if not batch:
@@ -502,7 +506,10 @@ class GitAwareIndexManager:
                     if (
                         not isinstance(point.vector, list)
                         or len(point.vector) != indexer.embedding_dimension
-                        or not all(math.isfinite(value) for value in point.vector)
+                        or not all(
+                            isinstance(value, (int, float)) and math.isfinite(value)
+                            for value in point.vector
+                        )
                     ):
                         raise ValueError("Artifact vector dimensions do not match provenance")
                     payload = dict(point.payload or {})
@@ -626,7 +633,7 @@ class GitAwareIndexManager:
         indexed_before = repo_info.last_indexed_commit
         full_call_started = False
         full_call_completed = False
-        admitted = False
+        mutation_admitted = False
 
         try:
             self.registry.begin_generation_mutation(
@@ -635,7 +642,7 @@ class GitAwareIndexManager:
                 expected_generation=repo_info.index_generation,
                 **({"require_auto_sync": True} if require_auto_sync else {}),
             )
-            admitted = True
+            mutation_admitted = True
             if force_full:
                 self._write_force_full_exit_trace(
                     repo_info,
@@ -834,7 +841,7 @@ class GitAwareIndexManager:
             )
         except Exception as exc:
             error = f"Staged rebuild failed ({type(exc).__name__})"
-            if admitted:
+            if mutation_admitted:
                 self.registry.fail_generation_mutation(
                     repo_id,
                     error=error,
@@ -919,6 +926,8 @@ class GitAwareIndexManager:
 
         if not ctx.staging:
             raise RuntimeError("Vector publication requires an unpublished generation")
+        assert self.dispatcher is not None
+        assert self.dispatcher._semantic_registry is not None
         with self.dispatcher._semantic_registry.lease(repo_id, ctx=ctx) as staged:
             drained = ctx.sqlite_store.drain_pending_vector_deletions(
                 lambda collection, ids: staged.delete_remote_points(ids, collection=collection),
@@ -992,6 +1001,7 @@ class GitAwareIndexManager:
             ).fetchall()
         if not records:
             return
+        assert self.dispatcher is not None
         registry = self.dispatcher._semantic_registry
         if registry is None:
             raise RuntimeError("Semantic generation owner is unavailable")
@@ -1003,6 +1013,7 @@ class GitAwareIndexManager:
                 if not attested or not attested.get("attested"):
                     raise RuntimeError("Retained vectors lack attested provenance")
                 staged._prepare_for_writes()
+                assert staged._attestation is not None
                 original._check_indexed_profile(staged._attestation)
                 for start in range(0, len(records), 256):
                     batch = records[start : start + 256]
@@ -1015,16 +1026,20 @@ class GitAwareIndexManager:
                     )
                     if {point.id for point in points} != set(ids):
                         raise RuntimeError("Retained vector mappings are incomplete")
-                    acknowledged = staged.qdrant.upsert(
-                        collection_name=staged.collection,
-                        points=[
+                    copied_points = []
+                    for point in points:
+                        if point.vector is None:
+                            raise RuntimeError("Retained vector payload is missing")
+                        copied_points.append(
                             models.PointStruct(
                                 id=point.id,
                                 vector=point.vector,
                                 payload=point.payload,
                             )
-                            for point in points
-                        ],
+                        )
+                    acknowledged = staged.qdrant.upsert(
+                        collection_name=staged.collection,
+                        points=copied_points,
                         wait=True,
                     )
                     if acknowledged.status not in {"completed", models.UpdateStatus.COMPLETED}:
@@ -1977,7 +1992,7 @@ class GitAwareIndexManager:
 
     def sync_all_repositories(self) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates sequentially."""
-        results = {}
+        results: Dict[str, IndexSyncResult] = {}
 
         # Get repositories needing update
         stale_repos = self.registry.get_repositories_needing_update()

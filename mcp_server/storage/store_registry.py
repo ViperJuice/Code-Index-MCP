@@ -92,6 +92,7 @@ class StoreRegistry:
                 retired = self._cache.pop(repo_id, None)
             if retired is not None:
                 binding = retired.registry_binding
+                assert binding is not None
                 replaced = (
                     expected is not None
                     and binding[:-1] == expected[:-1]
@@ -110,6 +111,7 @@ class StoreRegistry:
                     )
             if info is None:
                 raise KeyError(f"repo_id {repo_id!r} is not registered")
+            assert expected is not None
             index_path = str(info.index_path)
             Path(index_path).parent.mkdir(parents=True, exist_ok=True)
             pool = ConnectionPool(
@@ -144,12 +146,10 @@ class StoreRegistry:
         with self._get_build_lock(repo_id):
             with self._lock:
                 cached = self._cache.get(repo_id)
-                if (
-                    expected_owner is not None
-                    and cached is not None
-                    and (cached.registry_binding[:5] != self.binding(expected_owner)[:5])
-                ):
-                    return
+                if expected_owner is not None and cached is not None:
+                    assert cached.registry_binding is not None
+                    if cached.registry_binding[:5] != self.binding(expected_owner)[:5]:
+                        return
                 store = self._cache.pop(repo_id, None)
             if store is not None:
                 store.close()

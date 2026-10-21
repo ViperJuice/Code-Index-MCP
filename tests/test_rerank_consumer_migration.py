@@ -88,9 +88,21 @@ def _dispatcher_with(reranker) -> EnhancedDispatcher:
 
 def _candidates(doc: str = "doc"):
     return [
-        {"file": "a.py", "line": 1, "snippet": "alpha", "score": 0.9, "_rerank_doc": f"alpha {doc}"},
+        {
+            "file": "a.py",
+            "line": 1,
+            "snippet": "alpha",
+            "score": 0.9,
+            "_rerank_doc": f"alpha {doc}",
+        },
         {"file": "b.py", "line": 2, "snippet": "beta", "score": 0.8, "_rerank_doc": f"beta {doc}"},
-        {"file": "c.py", "line": 3, "snippet": "gamma", "score": 0.7, "_rerank_doc": f"gamma {doc}"},
+        {
+            "file": "c.py",
+            "line": 3,
+            "snippet": "gamma",
+            "score": 0.7,
+            "_rerank_doc": f"gamma {doc}",
+        },
     ]
 
 
@@ -137,16 +149,28 @@ def test_dispatcher_build_reranker_endpoint_requires_transport():
 def _hybrid_results(doc: str = "doc"):
     return [
         HybridSearchResult(
-            doc_id="1", filepath="a.py", score=0.9, snippet=f"alpha {doc}",
-            metadata={"line": 1}, source="bm25",
+            doc_id="1",
+            filepath="a.py",
+            score=0.9,
+            snippet=f"alpha {doc}",
+            metadata={"line": 1},
+            source="bm25",
         ),
         HybridSearchResult(
-            doc_id="2", filepath="b.py", score=0.8, snippet=f"beta {doc}",
-            metadata={"line": 2}, source="bm25",
+            doc_id="2",
+            filepath="b.py",
+            score=0.8,
+            snippet=f"beta {doc}",
+            metadata={"line": 2},
+            source="bm25",
         ),
         HybridSearchResult(
-            doc_id="3", filepath="c.py", score=0.7, snippet=f"gamma {doc}",
-            metadata={"line": 3}, source="bm25",
+            doc_id="3",
+            filepath="c.py",
+            score=0.7,
+            snippet=f"gamma {doc}",
+            metadata={"line": 3},
+            source="bm25",
         ),
     ]
 

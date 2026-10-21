@@ -23,7 +23,7 @@ from mcp_server.core.errors import MCPError, record_handled_error
 from mcp_server.dependency_graph.aggregator import DependencyGraphAnalyzer
 from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.indexer.reranker import IReranker as Reranker
-from mcp_server.indexer.reranker import RerankerFactory
+from mcp_server.indexer.reranker import RerankDiagnostics, RerankerFactory
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (
     CrossRepoSearchResult,
@@ -59,7 +59,7 @@ def _redact_secrets(text: Optional[str]) -> Optional[str]:
 def _merge_scope_results(results: List[CrossRepoSearchResult]) -> List[CrossRepoSearchResult]:
     """Union overlapping scopes without hiding a failed repository query."""
     merged = {}
-    seen = defaultdict(set)
+    seen: Dict[str, Set[Tuple[Any, ...]]] = defaultdict(set)
     for result in results:
         repo_id = result.repository_id
         if repo_id not in merged or result.error:
@@ -158,7 +158,7 @@ class CrossRepositoryCoordinator:
         self.enable_reranking = enable_reranking
 
         # Structured outcome of the most recent rerank attempt (RERANKEND).
-        self.last_rerank_diagnostics = None
+        self.last_rerank_diagnostics: Optional[RerankDiagnostics] = None
 
         # Initialize reranker: injected > factory > None
         if reranker is not None:
@@ -282,7 +282,7 @@ class CrossRepositoryCoordinator:
         """Execute search across repositories."""
         results = []
         if context.search_type == "symbol":
-            for language in dict.fromkeys(context.languages or [None]):
+            for language in dict.fromkeys(context.languages or (None,)):
                 results.extend(
                     await self.multi_repo_manager.search_symbol(
                         query=context.query,
@@ -292,7 +292,7 @@ class CrossRepositoryCoordinator:
                     )
                 )
         elif context.search_type == "code":
-            for pattern in dict.fromkeys(context.file_patterns or [None]):
+            for pattern in dict.fromkeys(context.file_patterns or (None,)):
                 results.extend(
                     await self.multi_repo_manager.search_code(
                         query=context.query,
@@ -874,7 +874,7 @@ class CrossRepositorySearchCoordinator:
         self, query: str, repo: Any, scope: SearchScope
     ) -> CrossRepoSearchResult:
         results = []
-        for language in dict.fromkeys(scope.languages or [None]):
+        for language in dict.fromkeys(scope.languages or (None,)):
             result = self.multi_repo_manager._search_repository(
                 repo.repository_id,
                 query,
@@ -910,7 +910,7 @@ class CrossRepositorySearchCoordinator:
                 "native_search",
             )
         results = []
-        for extension in dict.fromkeys(scope.file_types or [None]):
+        for extension in dict.fromkeys(scope.file_types or (None,)):
             result = self.multi_repo_manager._search_code_in_repository(
                 repo.repository_id,
                 query,

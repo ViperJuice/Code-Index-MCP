@@ -138,7 +138,7 @@ class IgnorePatternManager:
         except FileNotFoundError:
             return []
 
-    def _load_patterns(self):
+    def _load_patterns(self) -> None:
         self._gitignore_patterns = self._read_patterns(self.root_path / ".gitignore")
         self._mcp_ignore_patterns = self._load_mcp_ignore_patterns()
         self._patterns = self._gitignore_patterns + self._mcp_ignore_patterns
@@ -147,7 +147,6 @@ class IgnorePatternManager:
 
     def _load_mcp_ignore_patterns(self) -> List[str]:
         """Load patterns from .mcp-index-ignore file."""
-        patterns = []
         ignore_path = self.root_path / ".mcp-index-ignore"
 
         # Default patterns if file doesn't exist

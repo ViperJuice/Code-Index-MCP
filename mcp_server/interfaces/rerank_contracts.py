@@ -104,9 +104,7 @@ class RerankRequest:
         return cls(
             request_id=data["request_id"],
             query=data["query"],
-            candidates=[
-                RerankCandidate.from_dict(c) for c in data.get("candidates", [])
-            ],
+            candidates=[RerankCandidate.from_dict(c) for c in data.get("candidates", [])],
             top_k=data.get("top_k", 10),
             contract_version=data.get("contract_version", RERANK_CONTRACT_VERSION),
         )
@@ -202,9 +200,7 @@ class RerankResponse:
         )
 
 
-def validate_rerank_response(
-    request: RerankRequest, response: RerankResponse
-) -> None:
+def validate_rerank_response(request: RerankRequest, response: RerankResponse) -> None:
     """Validate a ``rerank.v1`` response against its request.
 
     The response must carry exactly one result per requested candidate, keyed by
@@ -237,22 +233,21 @@ def validate_rerank_response(
     # a duplicate of an otherwise-valid requested id is still rejected (set
     # equality alone would miss this).
     if len(result_ids_list) != len(result_ids):
-        seen: set = set()
-        dups = sorted({rid for rid in result_ids_list if rid in seen or seen.add(rid)})
-        raise RerankContractError(
-            f"duplicated candidate_id(s) in response: {dups}"
-        )
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for rid in result_ids_list:
+            if rid in seen:
+                duplicates.add(rid)
+            seen.add(rid)
+        dups = sorted(duplicates)
+        raise RerankContractError(f"duplicated candidate_id(s) in response: {dups}")
 
     # Missing: a requested id has no result.
     missing = request_ids - result_ids
     if missing:
-        raise RerankContractError(
-            f"missing candidate_id(s) in response: {sorted(missing)}"
-        )
+        raise RerankContractError(f"missing candidate_id(s) in response: {sorted(missing)}")
 
     # Unknown: a result id was never requested.
     unknown = result_ids - request_ids
     if unknown:
-        raise RerankContractError(
-            f"unknown candidate_id(s) in response: {sorted(unknown)}"
-        )
+        raise RerankContractError(f"unknown candidate_id(s) in response: {sorted(unknown)}")

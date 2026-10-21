@@ -29,7 +29,6 @@ from mcp_server.utils.embedding_providers import (
     VoyageEmbeddingProvider,
 )
 
-
 # ---------------------------------------------------------------------------
 # Deterministic fakes (no network, no SDK import)
 # ---------------------------------------------------------------------------
@@ -190,7 +189,9 @@ def test_voyage_normalization_unknown_when_unconfigured():
 
 
 def test_openai_emits_valid_response_with_correct_authority():
-    p = _make_openai(model_name="qwen-embed", dimension=4, served_model="srv-qwen-embed", normalization="l2")
+    p = _make_openai(
+        model_name="qwen-embed", dimension=4, served_model="srv-qwen-embed", normalization="l2"
+    )
     resp = p.embed_with_provenance(["a", "b", "c"], input_type="query")
 
     assert isinstance(resp, EmbeddingResponseV1)
@@ -336,6 +337,16 @@ def test_openai_embed_backcompat_raises_on_dimension_mismatch():
     p.vector_dimension = 8  # served vectors are len 4, expectation is 8
     with pytest.raises(RuntimeError, match="dimension mismatch"):
         p.embed(["a"], input_type="document")
+
+
+def test_embed_backcompat_rejects_missing_vector(monkeypatch):
+    provider = _make_openai(dimension=4)
+    response = provider.embed_with_provenance(["a", "b"])
+    response.items[1].vector = None
+    monkeypatch.setattr(provider, "embed_with_provenance", lambda *args: response)
+
+    with pytest.raises(RuntimeError, match="item 1 has no vector"):
+        provider.embed(["a", "b"])
 
 
 # ---------------------------------------------------------------------------

@@ -19,7 +19,7 @@ from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
 from .bm25_indexer import BM25Indexer
 from .query_optimizer import QueryType
-from .reranker import IReranker, RerankerFactory, _redact_error
+from .reranker import IReranker, RerankDiagnostics, RerankerFactory, _redact_error
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class HybridSearch:
         # Initialize reranker if enabled
         self.reranker: Optional[IReranker] = None
         # Structured outcome of the most recent rerank attempt (RERANKEND).
-        self.last_rerank_diagnostics = None
+        self.last_rerank_diagnostics: Optional[RerankDiagnostics] = None
         if reranking_settings and reranking_settings.enabled:
             self._initialize_reranker()
 
@@ -654,9 +654,7 @@ class HybridSearch:
             def _order_key(items):
                 return [(r.filepath, r.metadata.get("line")) for r in items]
 
-            reordered = _order_key(reranked_results) != _order_key(
-                results[: len(reranked_results)]
-            )
+            reordered = _order_key(reranked_results) != _order_key(results[: len(reranked_results)])
             provider = None
             if hasattr(rerank_data, "metadata") and rerank_data.metadata:
                 provider = rerank_data.metadata.get("provider") or rerank_data.metadata.get(

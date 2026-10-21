@@ -8,7 +8,7 @@ import hashlib
 import logging
 import subprocess
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -423,7 +423,7 @@ class MultiRepositoryWatcher:
         self.changed_repos = set()  # Repos with uncommitted changes
         self.git_monitor = GitMonitor(registry, self.on_git_commit, self._reconcile_registry)
         self._watch_lock = threading.RLock()
-        self._pending_syncs = {}
+        self._pending_syncs: Dict[str, list[tuple[Future, threading.Event]]] = {}
 
         self.query_cache = None
         self.path_resolver = None
@@ -476,7 +476,7 @@ class MultiRepositoryWatcher:
             logger.warning("WatcherSweeper default wiring unavailable: no store registry")
             return None
 
-        owners = {}
+        owners: Dict[str, Any] = {}
 
         def _repo_roots() -> Dict[str, Path]:
             owners.clear()

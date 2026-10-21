@@ -24,11 +24,11 @@ from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 try:
-    from qdrant_client.http.exceptions import (
-        ResponseHandlingException as _QdrantResponseHandlingException,
-    )
+    from qdrant_client.http.exceptions import ResponseHandlingException
+
+    _QdrantResponseHandlingException: Optional[type[Exception]] = ResponseHandlingException
 except Exception:  # pragma: no cover - defensive: client layout drift
-    _QdrantResponseHandlingException = None  # type: ignore[assignment]
+    _QdrantResponseHandlingException = None
 
 from ..artifacts.semantic_namespace import SemanticNamespaceResolver
 from ..artifacts.semantic_profiles import (
@@ -1094,6 +1094,7 @@ class SemanticIndexer:
         self._qdrant_available = False
         if not qdrant_path:
             raise ValueError("An explicit Qdrant backend is required")
+        kwargs: Dict[str, Any]
         if qdrant_path == ":memory:":
             mode, kwargs = "memory", {"location": ":memory:"}
         elif qdrant_path.startswith(("http://", "https://")):
@@ -1817,11 +1818,11 @@ class SemanticIndexer:
                     "compatibility_hash"
                 )
                 if other_hash:
-                    return current_hash == other_hash
+                    return bool(current_hash == other_hash)
 
             other_hash = other_metadata.get("compatibility_hash")
 
-            return current_hash == other_hash
+            return bool(current_hash == other_hash)
         except Exception:
             return False  # If we can't read metadata, assume incompatible
 
@@ -2263,6 +2264,7 @@ class SemanticIndexer:
         used_fallback_chunks = False
         if self.staging:
             # SQLite owns the exact chunks summarized for this unpublished generation.
+            assert self.sqlite_store is not None
             file_row = self.sqlite_store.get_file_by_path(path)
             if file_row is None:
                 raise RuntimeError("Staged semantic input has no stored file")

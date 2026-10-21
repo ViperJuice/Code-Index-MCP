@@ -409,14 +409,20 @@ def test_semantic_provider_errors_do_not_leak_payloads(monkeypatch, tmp_path, ca
     failure = Mock(side_effect=RuntimeError(private))
     if boundary == "upsert":
         monkeypatch.setattr(indexer.qdrant, "upsert", failure)
-        operation = lambda: indexer.index_file(source)
+
+        def operation():
+            return indexer.index_file(source)
+
     else:
         monkeypatch.setattr(indexer, "_provider_supports_provenance", lambda: False)
         if boundary == "embedding":
             monkeypatch.setattr(indexer, "_embed_texts", failure)
         else:
             indexer.qdrant.search = failure
-        operation = lambda: list(indexer.query("synthetic query"))
+
+        def operation():
+            return list(indexer.query("synthetic query"))
+
     with pytest.raises(RuntimeError) as error:
         operation()
     assert private not in str(error.value)

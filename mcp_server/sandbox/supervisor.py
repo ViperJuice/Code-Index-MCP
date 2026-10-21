@@ -69,6 +69,7 @@ class SandboxSupervisor:
                 start_new_session=os.name == "posix",
             )
             for stream in (self._proc.stdin, self._proc.stdout):
+                assert stream is not None
                 os.set_blocking(stream.fileno(), False)
             return self._proc
 

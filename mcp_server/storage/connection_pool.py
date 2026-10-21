@@ -29,7 +29,7 @@ class ConnectionPool:
             raise ValueError("ConnectionPool size must be positive")
         self._factory = factory
         self._size = size
-        self._pool = deque()
+        self._pool: deque[sqlite3.Connection] = deque()
         self._condition = threading.Condition()
         self._closed = False
         try:

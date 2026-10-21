@@ -130,7 +130,7 @@ class SecureIndexExporter:
         client = indexer.qdrant if indexer is not None else None
         owns_client = client is None
         try:
-            if owns_client:
+            if client is None:
                 # File owners must be quiescent. A live lock is an error, never removed.
                 backend = str(metadata.get("qdrant_path") or "")
                 if backend.startswith(("http://", "https://")):

@@ -6,7 +6,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import anyio
 import mcp.types as types
@@ -53,15 +53,21 @@ def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path
     relative = active_store.path_resolver.normalize_path(target_path)
     with active_store._get_connection() as connection:
         if relative == ".":
-            return connection.execute(
-                "SELECT COUNT(*) FROM files WHERE COALESCE(is_deleted, 0) = 0"
-            ).fetchone()[0]
+            return cast(
+                int,
+                connection.execute(
+                    "SELECT COUNT(*) FROM files WHERE COALESCE(is_deleted, 0) = 0"
+                ).fetchone()[0],
+            )
         prefix = relative.rstrip("/") + "/"
-        return connection.execute(
-            "SELECT COUNT(*) FROM files WHERE COALESCE(is_deleted, 0) = 0 "
-            "AND (relative_path = ? OR substr(relative_path, 1, ?) = ?)",
-            (relative, len(prefix), prefix),
-        ).fetchone()[0]
+        return cast(
+            int,
+            connection.execute(
+                "SELECT COUNT(*) FROM files WHERE COALESCE(is_deleted, 0) = 0 "
+                "AND (relative_path = ? OR substr(relative_path, 1, ?) = ?)",
+                (relative, len(prefix), prefix),
+            ).fetchone()[0],
+        )
 
 
 def _candidate_checkpoint_paths(target_path: Path, workspace_root: Path) -> list[str]:

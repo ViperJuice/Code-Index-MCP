@@ -280,7 +280,8 @@ def _scheme_read_config_value(conn: sqlite3.Connection, key: str) -> Optional[st
         raise
     if row is None:
         return None
-    return row[0]
+    value: Optional[str] = row[0]
+    return value
 
 
 def _has_chunker_rows(conn: sqlite3.Connection) -> bool:
@@ -370,7 +371,7 @@ class SQLiteStore:
         self.path_resolver = path_resolver or PathResolver()
         self._pool = pool
         self._connection_state = threading.local()
-        self.registry_binding = None
+        self.registry_binding: Optional[tuple] = None
         self._memory_uri = None
         self._memory_anchor = None
         if db_path == ":memory:" and pool is None:
@@ -842,7 +843,7 @@ class SQLiteStore:
 
     def drain_pending_vector_deletions(
         self,
-        delete_remote: Callable[[Optional[str], List[Any]], None],
+        delete_remote: Callable[[Optional[str], List[Any]], object],
         *,
         only_collection: Optional[str] = None,
     ) -> Dict[str, int]:

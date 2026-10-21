@@ -15,8 +15,7 @@ of truth. New code should import :class:`IReranker` / :class:`IRerankerFactory`
 
 Return contract
 ~~~~~~~~~~~~~~~
-Although the ABC signature is annotated ``-> RerankResult`` for brevity, the
-**de-facto** canonical return convention — established by every concrete
+The canonical return convention — established by every concrete
 implementation (Cohere/CrossEncoder/TFIDF/Hybrid) and by the live consumer
 ``hybrid_search.py`` which reads ``rerank_result.data`` — is
 ``Result[RerankResult]``: success carries the :class:`RerankResult` container in
@@ -44,6 +43,7 @@ import hashlib
 import json
 import logging
 import os
+import re as _re
 import threading
 import uuid
 
@@ -52,7 +52,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict
 from dataclasses import dataclass as dc
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar, cast
 
 
 # Define SearchResult inline
@@ -100,8 +100,8 @@ class RerankResult:
 class IReranker(ABC):
     @abstractmethod
     async def rerank(
-        self, query: str, results: List[SearchResult], top_k: int = 10
-    ) -> RerankResult:
+        self, query: str, results: List[SearchResult], top_k: Optional[int] = 10
+    ) -> "Result":
         pass
 
 
@@ -124,11 +124,11 @@ class Result:
         self.error = error
 
     @classmethod
-    def ok(cls, data=None):
+    def ok(cls, data=None) -> "Result":
         return cls(True, data)
 
     @classmethod
-    def error(cls, error):
+    def error(cls, error) -> "Result":
         return cls(False, None, error)
 
 
@@ -765,8 +765,6 @@ class HybridReranker(BaseReranker):
         return capabilities
 
 
-import re as _re
-
 # Substrings that look like secrets (bearer tokens / api keys) are scrubbed from
 # any error string exposed via ``last_error`` so the dispatcher lane never sees a
 # credential. Candidate/query text is NEVER put in ``last_error``.
@@ -1030,7 +1028,7 @@ def run_coroutine_sync(coro: Awaitable[_T], *, timeout: Optional[float] = None) 
         raise TimeoutError(f"run_coroutine_sync timed out after {timeout}s")
     if "error" in box:
         raise box["error"]
-    return box["value"]
+    return cast(_T, box["value"])
 
 
 class SyncRerankerAdapter:
@@ -1187,7 +1185,7 @@ class EndpointReranker(IReranker):
             else:
                 failed_ids.append(r.candidate_id)
 
-        scored.sort(key=lambda r: r.score, reverse=True)
+        scored.sort(key=lambda r: cast(float, r.score), reverse=True)
         failed_ids.sort(key=lambda cid: original_rank[cid])
 
         ordered: List[tuple] = [(r.candidate_id, r.score) for r in scored]

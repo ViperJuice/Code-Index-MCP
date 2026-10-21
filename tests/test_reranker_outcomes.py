@@ -121,9 +121,7 @@ def test_fallback_applied_names_providers():
 
 def test_skipped_policy_on_semantic_skip_path():
     # A text reranker on the pure-vector semantic path is skipped by policy.
-    d = _make_dispatcher(
-        _ReorderReranker(), reranker_type="flashrank", skips_semantic=True
-    )
+    d = _make_dispatcher(_ReorderReranker(), reranker_type="flashrank", skips_semantic=True)
     out = d._apply_reranker(None, "q", _candidates(), limit=10, semantic_source=True)
     # Ordering untouched; reranker never ran.
     assert [c["file"] for c in out] == ["a.py", "b.py", "c.py"]

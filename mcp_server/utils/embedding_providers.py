@@ -12,15 +12,15 @@ from __future__ import annotations
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, cast
 
 from mcp_server.interfaces.inference_contracts import (
     EmbeddingItem,
     EmbeddingItemStatus,
     EmbeddingResponseV1,
     EmbeddingRole,
-    ProviderCapability,
     ProvenanceField,
+    ProviderCapability,
 )
 
 
@@ -67,7 +67,12 @@ class EmbeddingProvider(ABC):
         so callers not yet migrated keep working unchanged.
         """
         response = self.embed_with_provenance(texts, input_type)
-        return [item.vector for item in response.items]
+        vectors = []
+        for item in response.items:
+            if item.vector is None:
+                raise RuntimeError(f"Embedding response item {item.index} has no vector")
+            vectors.append(item.vector)
+        return vectors
 
 
 class VoyageEmbeddingProvider(EmbeddingProvider):
@@ -150,7 +155,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
         # against a short/over-long batch is a length check: a mismatch means we
         # cannot know which input each vector answers. Refuse rather than
         # positionally misattach vectors to the wrong texts.
-        vectors = response.embeddings
+        vectors = cast(List[List[float]], response.embeddings)
         if len(vectors) != request_size:
             raise RuntimeError(
                 "Voyage embedding arity mismatch for model "

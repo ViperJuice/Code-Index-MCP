@@ -108,7 +108,7 @@ class RepositoryRegistry:
         """Read one complete on-disk revision; malformed state is not an empty registry."""
         try:
             with self.registry_path.open() as source:
-                data = json.load(source)
+                data: Dict[str, Dict[str, Any]] = json.load(source)
         except FileNotFoundError:
             return {}
         for repo_data in data.values():
@@ -310,7 +310,7 @@ class RepositoryRegistry:
 
             logger.info(f"Registered repository: {repo_info.name} ({repo_info.repository_id})")
 
-    def unregister(self, repository_id: str, *, expected_owner=None):
+    def unregister(self, repository_id: str, *, expected_owner=None) -> bool:
         """
         Unregister a repository.
 

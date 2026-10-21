@@ -19,7 +19,6 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..config.settings import reload_settings
 from ..core.errors import IndexingError, TransientArtifactError, record_handled_error
 from ..core.ignore_patterns import EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS
@@ -530,7 +529,7 @@ class EnhancedDispatcher:
         lazy_load: bool = True,
         semantic_search_enabled: bool = True,
         memory_aware: bool = True,
-        multi_repo_enabled: bool = None,
+        multi_repo_enabled: Optional[bool] = None,
         reranker_type: str = "none",
         plugin_set_registry: Optional[PluginSetRegistry] = None,
         semantic_indexer_registry: Optional[SemanticIndexerRegistry] = None,
@@ -1863,6 +1862,7 @@ class EnhancedDispatcher:
                     if semantic:
                         # Restrict Qdrant before top-k, retaining every derived subchunk
                         # through its source identity instead of one mapped point ID.
+                        assert _semantic_indexer is not None
                         chunks = {item["chunk_id"]: item for item in filtered_results}
                         ranked = _semantic_indexer.search(
                             query=query, limit=limit, source_chunk_ids=list(chunks)
@@ -2986,7 +2986,7 @@ class EnhancedDispatcher:
         cancel_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Run the summary-first strict semantic pipeline for selected files."""
-        stats = {
+        stats: Dict[str, Any] = {
             "summaries_written": 0,
             "summary_chunks_attempted": 0,
             "summary_missing_chunks": 0,
@@ -3231,7 +3231,7 @@ class EnhancedDispatcher:
 
         if ctx.staging:
             _sem._prepare_for_writes()
-            semantic_preflight = {
+            semantic_preflight: Dict[str, Any] = {
                 "can_write_semantic_vectors": True,
                 "blocker": None,
                 "effective_config": {
@@ -3251,11 +3251,10 @@ class EnhancedDispatcher:
         if not semantic_preflight.get("can_write_semantic_vectors", True):
             blocker = semantic_preflight.get("blocker") or {}
             if blocker.get("code") == "collection_missing":
-                collection_bootstrap = bootstrap_active_profile_collection(
+                stats["semantic_collection_bootstrap"] = bootstrap_active_profile_collection(
                     settings=settings,
                     profile=profile_id,
                 ).to_dict()
-                stats["semantic_collection_bootstrap"] = collection_bootstrap
                 semantic_preflight = run_semantic_preflight(
                     settings=settings,
                     strict=False,
@@ -4031,7 +4030,8 @@ class EnhancedDispatcher:
         if sqlite_store is None or not hasattr(sqlite_store, "health_check"):
             return None
         try:
-            return sqlite_store.health_check()
+            diagnostics: Dict[str, Any] = sqlite_store.health_check()
+            return diagnostics
         except Exception as exc:
             return {
                 "status": "unhealthy",
@@ -4043,7 +4043,7 @@ class EnhancedDispatcher:
     ) -> Optional[Dict[str, Any]]:
         sqlite_store = getattr(ctx, "sqlite_store", None)
         if sqlite_store is not None and hasattr(sqlite_store, "get_readonly_diagnostics"):
-            diagnostics = sqlite_store.get_readonly_diagnostics()
+            diagnostics: Optional[Dict[str, Any]] = sqlite_store.get_readonly_diagnostics()
             if diagnostics is not None:
                 return diagnostics
         if isinstance(error, TransientArtifactError):
@@ -4692,7 +4692,7 @@ class EnhancedDispatcher:
         max_context_nodes: int = 50,
         semantic: bool = False,
         limit: int = 20,
-    ) -> Iterable[SearchResult]:
+    ) -> Iterable[Dict[str, Any]]:
         """Search with graph-based context expansion within ctx.repo_id."""
         # First, perform regular search
         search_results = list(self.search(ctx, query, semantic=semantic, limit=limit))
